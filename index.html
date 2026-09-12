@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B0908">
+<meta name="description" content="AgriTracer · Don Ricardo — Tiempos de ciclo y reubicación de personal.">
+<title>AgriTracer · Don Ricardo</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="img/icono.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+
+<div id="splash">
+  <div id="splashFondo"></div>
+  <div id="splashVelo"></div>
+
+  <svg id="marcaAgua" viewBox="0 0 626 300" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M150,0 A150,150 0 0 0 150,300 Z" fill="#579BCB"/>
+    <circle cx="272" cy="192" r="98" fill="#E37E3B"/>
+    <path d="M360,300 A132,132 0 0 1 624,300 Z" fill="#8FBD38"/>
+  </svg>
+
+  <div id="splashCentro">
+    <div class="logo" id="logoDR">
+      <svg class="marca" id="marcaDR" width="280" viewBox="0 0 626 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Don Ricardo">
+        <path class="lg-forma lg-azul"    d="M150,0 A150,150 0 0 0 150,300 Z" fill="#579BCB"/>
+        <circle class="lg-forma lg-naranja" cx="272" cy="192" r="98" fill="#E37E3B"/>
+        <path class="lg-forma lg-verde"   d="M360,300 A132,132 0 0 1 624,300 Z" fill="#8FBD38"/>
+      </svg>
+      <div class="texto" id="textoDR">DON RICARDO</div>
+      <div class="bajada" id="bajadaDR">– A <b>FRUTURA</b> COMPANY –</div>
+    </div>
+
+    <div id="etiquetaApp">Ingeniería de Procesos</div>
+    <div id="tituloApp">AgriTracer</div>
+    <div id="sedeApp">Tiempos de ciclo · Reubicación de personal</div>
+
+    <div id="loginPanel" class="login-panel">
+      <div class="campo"><label>Usuario</label><input id="loginUsuario" autocomplete="username"></div>
+      <div class="campo"><label>Contraseña</label><input id="loginPassword" type="password" autocomplete="current-password"></div>
+      <div id="loginError" class="aviso alerta oculto"></div>
+      <button id="btnIngresar" class="btn">Ingresar</button>
+      <div class="aviso" style="margin-top:12px">¿Solo vienes a escanear un fotocheck? <a href="reubicacion/">Entra sin iniciar sesión</a>.</div>
+    </div>
+
+    <div id="cambiarPanel" class="login-panel oculto">
+      <div class="aviso">Por seguridad, define una nueva contraseña antes de continuar.</div>
+      <div class="campo" style="margin-top:12px"><label>Nueva contraseña</label><input id="nuevaPassword" type="password"></div>
+      <div class="campo"><label>Repite la contraseña</label><input id="nuevaPassword2" type="password"></div>
+      <div id="cambiarError" class="aviso alerta oculto"></div>
+      <button id="btnGuardarPassword" class="btn verde">Guardar y continuar</button>
+    </div>
+  </div>
+
+  <div id="barraCarga"></div>
+</div>
+
+<div id="landing" class="oculto">
+  <header id="barraSup">
+    <div id="slotLogo"></div>
+    <button id="chipDatos" class="chip" type="button"><i></i><span id="landingUsuario">—</span></button>
+  </header>
+  <main id="contenido">
+    <div class="vista angosta entra">
+      <div class="encabezado">
+        <div class="ruta">Ingeniería de Procesos</div>
+        <h1>¿A dónde vamos?</h1>
+        <p>Elige un módulo. Puedes volver aquí cuando quieras desde el logo.</p>
+      </div>
+      <div class="modulos" id="modulos"></div>
+      <div class="acciones" style="margin-top:20px">
+        <button class="btn sec" id="btnCerrarSesion">Cerrar sesión</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<script src="vendor/anime.min.js"></script>
+<script src="vendor/supabase.min.js"></script>
+<script src="js/nucleo.js"></script>
+<script src="js/supabase-cliente.js"></script>
+<script>
+var MODULOS = [
+  { href: 'ciclos/', color: '#579BCB', bg: 'linear-gradient(150deg,#17293A,#0F1B26)', nombre: 'Tiempos de Ciclo',
+    sub: 'Resumen semanal, captura en campo y configuración',
+    icono: '<svg viewBox="0 0 24 24" fill="none" stroke="#9CC8E8" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>',
+    roles: ['admin', 'captura', 'visor'] },
+  { href: 'reubicacion/', color: '#E37E3B', bg: 'linear-gradient(150deg,#35210F,#21150B)', nombre: 'Reubicación de Personal',
+    sub: 'Escanear fotocheck, buscar personal y actualizar la lista',
+    icono: '<svg viewBox="0 0 24 24" fill="none" stroke="#F0A96F" stroke-width="1.8"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.8-3.2 3-5 5.5-5s4.7 1.8 5.5 5"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.2c2.3.1 4 1.6 4.8 4.3"/></svg>',
+    roles: ['admin', 'captura', 'visor'] }
+];
+
+function mostrarErrorLogin(msg) { var el = DR.$('#loginError'); el.textContent = msg; el.classList.remove('oculto'); }
+
+function animarInicio() {
+  if (!DR.anima) {
+    ['#splashFondo', '#etiquetaApp', '#tituloApp', '#sedeApp', '#loginPanel'].forEach(function (s) { DR.$(s).style.opacity = 1; });
+    DR.$('#marcaAgua').style.opacity = .05;
+    return;
+  }
+  var texto = DR.$('#textoDR');
+  texto.innerHTML = texto.textContent.split('').map(function (ch) { return "<span class='ltr'>" + (ch === ' ' ? '&nbsp;' : ch) + '</span>'; }).join('');
+  anime.set(['.lg-azul', '.lg-naranja', '.lg-verde', '.ltr', '#bajadaDR', '#loginPanel'], { opacity: 0 });
+  anime.timeline({ easing: 'easeOutExpo' })
+    .add({ targets: '#splashFondo', opacity: [0, .6], scale: [1.1, 1], duration: 1600 })
+    .add({ targets: '#marcaAgua', opacity: [0, .05], scale: [.85, 1], duration: 1400 }, 100)
+    .add({ targets: '.lg-azul', opacity: [0, 1], translateX: [-90, 0], duration: 800 }, 200)
+    .add({ targets: '.lg-naranja', opacity: [0, 1], scale: [0, 1], duration: 1000, easing: 'easeOutElastic(1, .7)' }, 380)
+    .add({ targets: '.lg-verde', opacity: [0, 1], translateX: [90, 0], duration: 800 }, 560)
+    .add({ targets: '.ltr', opacity: [0, 1], translateY: [16, 0], duration: 600, delay: anime.stagger(34) }, 780)
+    .add({ targets: '#bajadaDR', opacity: [0, 1], letterSpacing: ['0.6em', '0.30em'], duration: 800 }, 1300)
+    .add({ targets: '#etiquetaApp', opacity: [0, 1], translateY: [10, 0], duration: 600 }, 1480)
+    .add({ targets: '#tituloApp', opacity: [0, 1], translateY: [10, 0], duration: 600 }, 1580)
+    .add({ targets: '#sedeApp', opacity: [0, 1], duration: 600 }, 1680)
+    .add({ targets: '#loginPanel', opacity: [0, 1], translateY: [12, 0], duration: 600 }, 1780);
+  anime({ targets: '#barraCarga', width: ['0%', '92%'], duration: 2000, easing: 'easeInOutQuad' });
+}
+
+function pintarLanding() {
+  var slot = DR.$('#slotLogo');
+  slot.innerHTML = '<div class="logo"><svg class="marca" width="118" viewBox="0 0 626 300"><path d="M150,0 A150,150 0 0 0 150,300 Z" fill="#579BCB"/><circle cx="272" cy="192" r="98" fill="#E37E3B"/><path d="M360,300 A132,132 0 0 1 624,300 Z" fill="#8FBD38"/></svg><div class="texto">DON RICARDO</div></div>';
+  DR.$('#landingUsuario').textContent = (AT.perfil && AT.perfil.nombre) || '—';
+
+  var rol = AT.perfil ? AT.perfil.rol : 'visor';
+  var disponibles = MODULOS.filter(function (m) { return m.roles.indexOf(rol) > -1; });
+  DR.$('#modulos').innerHTML = disponibles.map(function (m) {
+    return '<a class="modulo-card" href="' + m.href + '"><div class="ico" style="background:' + m.bg + '">' + m.icono + '</div>' +
+      '<div><b>' + DR.esc(m.nombre) + '</b><span>' + DR.esc(m.sub) + '</span></div></a>';
+  }).join('');
+
+  DR.$('#splash').style.display = 'none';
+  DR.$('#landing').classList.remove('oculto');
+  DR.entrarPaneles('#landing');
+}
+
+function intentarLogin() {
+  var usuario = DR.$('#loginUsuario').value.trim();
+  var password = DR.$('#loginPassword').value;
+  if (!usuario || !password) { mostrarErrorLogin('Ingresa usuario y contraseña.'); return; }
+  var btn = DR.$('#btnIngresar');
+  btn.disabled = true;
+  DR.$('#loginError').classList.add('oculto');
+  AT.login(usuario, password).then(function (perfil) {
+    btn.disabled = false;
+    if (perfil.debe_cambiar_password) {
+      DR.$('#loginPanel').classList.add('oculto');
+      DR.$('#cambiarPanel').classList.remove('oculto');
+      return;
+    }
+    pintarLanding();
+  }).catch(function (e) { btn.disabled = false; mostrarErrorLogin(e.message); });
+}
+
+function intentarCambiarPassword() {
+  var n1 = DR.$('#nuevaPassword').value, n2 = DR.$('#nuevaPassword2').value;
+  var el = DR.$('#cambiarError');
+  el.classList.add('oculto');
+  if (n1.length < 6) { el.textContent = 'Debe tener al menos 6 caracteres.'; el.classList.remove('oculto'); return; }
+  if (n1 !== n2) { el.textContent = 'Las contraseñas no coinciden.'; el.classList.remove('oculto'); return; }
+  var btn = DR.$('#btnGuardarPassword');
+  btn.disabled = true;
+  sb.auth.updateUser({ password: n1 }).then(function (r) {
+    if (r.error) throw new Error(r.error.message);
+    return AT.rpc('rpc_marcar_password_cambiada');
+  }).then(function () {
+    AT.perfil.debe_cambiar_password = false;
+    pintarLanding();
+  }).catch(function (e) { btn.disabled = false; el.textContent = e.message; el.classList.remove('oculto'); });
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  animarInicio();
+  DR.$('#btnIngresar').addEventListener('click', intentarLogin);
+  DR.$('#loginPassword').addEventListener('keydown', function (e) { if (e.key === 'Enter') intentarLogin(); });
+  DR.$('#btnGuardarPassword').addEventListener('click', intentarCambiarPassword);
+  DR.$('#btnCerrarSesion').addEventListener('click', function () { AT.logout().then(function () { location.reload(); }); });
+
+  AT.sesionInicial().then(function (perfil) {
+    if (perfil) pintarLanding();
+  });
+});
+</script>
+</body>
+</html>

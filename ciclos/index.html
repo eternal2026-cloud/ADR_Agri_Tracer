@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B0908">
+<meta name="description" content="Resumen semanal, captura en campo y configuración de tiempos de ciclo.">
+<title>Tiempos de Ciclo · Don Ricardo</title>
+<link rel="icon" href="../img/icono.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/estilos.css">
+</head>
+<body>
+
+<div id="app">
+  <header id="barraSup">
+    <div id="slotLogo"></div>
+    <button id="chipDatos" class="chip" type="button" title="Cerrar sesión"><i></i><span id="chipTexto">Cargando…</span></button>
+  </header>
+
+  <main id="contenido"><div class="vacio">Cargando…</div></main>
+
+  <nav id="navInf">
+    <span id="navIndicador"></span>
+    <button class="nav-btn" data-vista="resumen" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg><span>Resumen</span>
+    </button>
+    <button class="nav-btn" data-vista="captura" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span>Captura</span>
+    </button>
+    <button class="nav-btn" data-vista="config" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 6h10M4 12h16M4 18h7"/><circle cx="18" cy="6" r="2"/><circle cx="15" cy="18" r="2"/></svg><span>Config</span>
+    </button>
+  </nav>
+</div>
+
+<div id="toast"></div>
+
+<script src="../vendor/anime.min.js"></script>
+<script src="../vendor/supabase.min.js"></script>
+<script src="../js/nucleo.js"></script>
+<script src="../js/supabase-cliente.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/grafico.js"></script>
+<script src="js/resumen.js"></script>
+<script src="js/captura.js"></script>
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

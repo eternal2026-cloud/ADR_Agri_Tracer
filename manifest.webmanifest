@@ -1,0 +1,14 @@
+{
+  "name": "AgriTracer · Don Ricardo",
+  "short_name": "AgriTracer",
+  "description": "Tiempos de ciclo y reubicación de personal — Ingeniería de Procesos, Don Ricardo.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0B0908",
+  "theme_color": "#0B0908",
+  "lang": "es",
+  "icons": [
+    { "src": "img/icono.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

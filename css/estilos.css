@@ -465,6 +465,15 @@ tr.fila-cerca td{background:#23170E}
 ::-webkit-scrollbar-thumb{background:#43382F;border-radius:6px}
 ::-webkit-scrollbar-track{background:transparent}
 
+/* ============================ ELIMINAR / PAPELERA ======================== */
+.zona-peligro{display:flex;justify-content:center;margin:18px 0 4px}
+.btn-peligro{background:none;border:0;color:#FF9A9A;font:500 14.5px var(--fuente);padding:10px 14px;border-radius:10px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.btn-peligro:active{background:rgba(229,72,77,.14)}
+.btn.btn-rojo{background:linear-gradient(135deg,#F06A6E,#C8373C);color:#fff;box-shadow:0 8px 20px -10px rgba(229,72,77,.7)}
+.papelera-item{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #2E251E}
+.papelera-item:last-child{border-bottom:0}
+.papelera-item .u-cuerpo{flex:1}
+
 @media (prefers-reduced-motion: reduce){
   #splashFondo::before,.cc-pasos i.actual{animation:none}
 }

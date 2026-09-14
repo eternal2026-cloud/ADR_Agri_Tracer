@@ -304,7 +304,8 @@ CAPTURA.pintarCiclo = function (direccion) {
     '<section class="etapa" id="etapaCard" style="--c:' + e.color + '">' +
       '<div class="etapa-cab"><span class="etapa-num">Etapa ' + (CAPTURA.etapaIdx + 1) + ' de ' + ETAPAS.length + '</span>' +
       '<h2>' + e.titulo + '</h2>' + (completada ? '<span class="pill verde">Completada · puedes corregirla</span>' : '') + '</div>' +
-      cuerpo + '<div class="avisos oculto" id="avisosEtapa"></div></section>';
+      cuerpo + '<div class="avisos oculto" id="avisosEtapa"></div></section>' +
+    (fila && AT.esAdmin() ? '<div class="zona-peligro"><button type="button" class="btn-peligro" onclick="CAPTURA.confirmarEliminar()">Eliminar este ciclo</button></div>' : '');
 
   CAPTURA.ponerBarra();
   CAPTURA.enlazarCiclo(cont);
@@ -596,7 +597,8 @@ CAPTURA.mostrarFin = function (fila) {
     '<div class="acciones-fin">' +
       '<button type="button" class="btn verde grande" id="btnOtroCiclo">' + DR.ICONOS.mas + '<span>Iniciar otro ciclo</span></button>' +
       '<button type="button" class="btn sec" id="btnFinLista">Ver ciclos en curso</button>' +
-      '<button type="button" class="btn sec" id="btnFinCorregir">Corregir una etapa</button></div>';
+      '<button type="button" class="btn sec" id="btnFinCorregir">Corregir una etapa</button></div>' +
+    (AT.esAdmin() && fila.origen !== 'excel' ? '<div class="zona-peligro"><button type="button" class="btn-peligro" onclick="CAPTURA.confirmarEliminar()">Eliminar este ciclo</button></div>' : '');
 
   DR.$('#btnOtroCiclo').onclick = CAPTURA.nuevoCiclo;
   DR.$('#btnFinLista').onclick = CAPTURA.pintarLista;
@@ -616,4 +618,29 @@ CAPTURA.mostrarFin = function (fila) {
     anime({ targets: b, width: [0, b.getAttribute('data-ancho') + '%'], duration: 800, delay: 600 + i * 45, easing: 'easeOutCubic' });
   });
   if (DR.$('#finTotal')) DR.contar(DR.$('#finTotal'), Math.round(total));
+};
+
+/* ============================================================ ELIMINAR CICLO (solo admin → papelera) */
+CAPTURA.confirmarEliminar = function () {
+  var fila = CAPTURA.fila;
+  if (!fila || !AT.esAdmin()) return;
+  var sub = [fila.fundo, fila.lote ? 'Lote ' + fila.lote : '', fila.fecha].filter(Boolean).map(DR.esc).join(' · ');
+  UI.abrirHoja('<div class="asa"></div>' +
+    '<div class="res-estado" style="color:#FFA3A3">' + DR.ICONOS.alerta + '<span>Eliminar ciclo</span></div>' +
+    '<div class="res-nombre">' + DR.esc(fila.codigo) + '</div><div class="res-dni">' + sub + '</div>' +
+    '<div class="aviso" style="margin-top:14px">Se mueve a la <b>papelera</b> (Config → Ajustes): deja de contar en el resumen y en Google Sheets, y puedes restaurarlo cuando quieras.</div>' +
+    '<div class="campo" style="margin-top:14px"><label for="inpMotivo">Motivo</label><input id="inpMotivo" value="Dato de prueba" autocomplete="off"></div>' +
+    '<div class="acciones"><button type="button" class="btn sec" id="btnCancelarEliminar" style="flex:1">Cancelar</button>' +
+    '<button type="button" class="btn btn-rojo" id="btnSiEliminar" style="flex:1">Mover a la papelera</button></div>');
+  DR.$('#btnCancelarEliminar').onclick = UI.cerrarHoja;
+  DR.$('#btnSiEliminar').onclick = function () {
+    var btn = this;
+    btn.disabled = true;
+    AT.rpc('rpc_eliminar_ciclo', { p_codigo: fila.codigo, p_motivo: DR.$('#inpMotivo').value }).then(function () {
+      UI.cerrarHoja();
+      CAPTURA.sucio = false;
+      DR.toast('Ciclo ' + fila.codigo + ' movido a la papelera.');
+      CAPTURA.pintarLista();
+    }).catch(function (e) { btn.disabled = false; DR.toast(e.message, 'error'); });
+  };
 };

@@ -463,6 +463,34 @@ CONFIG.importarExcel = function () {
   });
 };
 
+/* ============================================================ PAPELERA DE CICLOS */
+CONFIG.cargarPapelera = function () {
+  var cont = DR.$('#papeleraLista');
+  if (!cont) return;
+  sb.from('ciclos_papelera').select('id,codigo,ciclo,motivo,eliminado_en').order('eliminado_en', { ascending: false }).limit(50).then(function (r) {
+    if (r.error) throw new Error(r.error.message);
+    var filas = r.data || [];
+    if (!filas.length) { cont.innerHTML = '<div class="vacio">La papelera está vacía.</div>'; return; }
+    cont.innerHTML = filas.map(function (p) {
+      var c = p.ciclo || {};
+      var sub = [c.fundo, c.lote ? 'Lote ' + c.lote : '', c.fecha].filter(Boolean).map(DR.esc).join(' · ');
+      return '<div class="papelera-item"><div class="u-cuerpo"><div class="u-nombre">' + DR.esc(p.codigo) + '</div>' +
+        '<div class="u-det">' + sub + '</div><div class="u-det">' + DR.esc(p.motivo || '') + ' · ' + DR.hace(p.eliminado_en) + '</div></div>' +
+        '<button type="button" class="btn sec chico" data-restaurar="' + p.id + '">Restaurar</button></div>';
+    }).join('');
+    DR.$$('[data-restaurar]', cont).forEach(function (b) {
+      b.onclick = function () {
+        var btn = this;
+        btn.disabled = true;
+        AT.rpc('rpc_restaurar_ciclo', { p_id: Number(btn.getAttribute('data-restaurar')) }).then(function (res) {
+          DR.toast('Ciclo ' + res.codigo + ' restaurado.');
+          CONFIG.cargarPapelera();
+        }).catch(function (e) { btn.disabled = false; DR.toast(e.message, 'error'); });
+      };
+    });
+  }).catch(function (e) { cont.innerHTML = '<div class="aviso alerta">' + DR.esc(e.message) + '</div>'; });
+};
+
 /* ============================================================ AJUSTES */
 CONFIG.tabAjustes = function (c) {
   c.innerHTML = UI.panel('Umbral de calidad de datos', 'Los ciclos que superen estos minutos se excluyen de los promedios (se asume un error de digitación). Se siguen mostrando tachados en el detalle.',
@@ -470,8 +498,11 @@ CONFIG.tabAjustes = function (c) {
     '<div class="acciones"><button type="button" class="btn" id="btnGuardarUmbral">Guardar</button></div>') +
     UI.panel('Importar histórico desde Excel', 'Carga o actualiza los ciclos del archivo «5.1. TIEMPO DE CICLO ACTUALIZADO.xlsx» (hoja BD). Puedes repetirlo cada vez que el Excel tenga filas nuevas: no duplica y nunca modifica ciclos capturados en la app.',
       '<label class="zona-carga" id="zonaExcel"><input type="file" accept=".xlsx,.xls" id="inpExcel">' + DR.ICONOS.subir +
-      '<b>Elegir archivo Excel</b><span>Se revisa en este dispositivo y te muestra un resumen antes de importar.</span></label><div id="excelVista"></div>');
+      '<b>Elegir archivo Excel</b><span>Se revisa en este dispositivo y te muestra un resumen antes de importar.</span></label><div id="excelVista"></div>') +
+    UI.panel('Papelera de ciclos', 'Los ciclos eliminados quedan aquí y se pueden restaurar. Si alguien borra ciclos directamente en Supabase, también llegan aquí.',
+      '<div id="papeleraLista"><div class="vacio">Cargando…</div></div>');
   DR.$('#inpExcel').onchange = CONFIG.leerExcel;
+  CONFIG.cargarPapelera();
   DR.$('#btnGuardarUmbral').onclick = function () {
     var v = Number(DR.$('#inpUmbral').value);
     if (!v || v < 1) { DR.toast('Escribe un número de minutos válido.', 'error'); return; }

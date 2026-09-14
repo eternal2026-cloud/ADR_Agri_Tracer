@@ -55,6 +55,24 @@ tiempos coinciden con los del Excel) y recién entonces importa.
   listas de captura. Las tareadoras llegan **inactivas** (el Excel trae variantes
   del mismo nombre): actívalas en `Config → Listas`.
 
+## Borrar datos de prueba sin riesgo
+
+**Nunca borres filas desde el panel de Supabase.** Usa la app:
+
+1. Entra como **admin** → **Captura** → toca el ciclo de prueba (o ábrelo desde
+   "Cerrados recientemente").
+2. Al final de la pantalla: **Eliminar este ciclo** → escribe el motivo → **Mover a
+   la papelera**.
+3. Si te equivocas: **Config → Ajustes → Papelera de ciclos → Restaurar**.
+
+Protecciones en la base de datos (migración 0011):
+- Cualquier ciclo borrado, incluso desde Supabase, se copia a la papelera.
+- Vaciar tablas (TRUNCATE) está bloqueado en ciclos, parámetros, listas, bitácora,
+  perfiles y personal.
+- `parametros` (configuración) y `bitacora` (auditoría) no permiten borrar filas.
+- Los ciclos importados del Excel no se eliminan desde la app: se corrigen en el
+  Excel y se vuelve a importar.
+
 ## Captura de tiempos
 
 - **Ciclos en curso** aparecen al abrir Captura, con barra de progreso de 7 etapas.

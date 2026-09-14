@@ -76,7 +76,8 @@ DR.toast = function (msg, tipo) {
 /** Entrada animada de los bloques marcados con .entra dentro de una vista. */
 DR.entrarPaneles = function (raiz) {
   var nodos = DR.$$('.entra', DR.$(raiz)).filter(function (n) { return !n.classList.contains('oculto'); });
-  if (!DR.anima) { nodos.forEach(function (n) { n.style.opacity = 1; }); return; }
+  // Pestaña en segundo plano: el navegador pausa requestAnimationFrame y los paneles quedarían en opacidad 0.
+  if (!DR.anima || document.hidden) { nodos.forEach(function (n) { n.style.opacity = 1; n.style.transform = 'none'; }); return; }
   anime.remove(nodos);
   anime({ targets: nodos, opacity: [0, 1], translateY: [16, 0], duration: 520, delay: anime.stagger(55), easing: 'easeOutQuad' });
 };

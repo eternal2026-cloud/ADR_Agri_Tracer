@@ -323,6 +323,16 @@ CONFIG.tabSheets = function (c) {
   DR.$('#inpCredencial').onchange = CONFIG.subirCredencial;
 };
 
+/** Upsert: si la fila del parámetro no existe la crea (un UPDATE sobre una fila inexistente "funciona" sin guardar nada). */
+CONFIG.guardarParametro = function (clave, valor) {
+  return sb.from('parametros').upsert({ clave: clave, valor: String(valor), actualizado_en: new Date().toISOString() }, { onConflict: 'clave' })
+    .select('clave,valor').then(function (r) {
+      if (r.error) throw new Error(r.error.message);
+      if (!r.data || !r.data.length || r.data[0].valor !== String(valor)) throw new Error('No se pudo guardar «' + clave + '». Verifica que tu usuario sea administrador.');
+      return r.data[0];
+    });
+};
+
 CONFIG.guardarHoja = function () {
   var enlace = DR.$('#inpHoja').value.trim(), minutos = DR.$('#selMinutos').value;
   if (enlace && !/docs\.google\.com\/spreadsheets\/d\/[\w-]+/.test(enlace) && !/^[\w-]{25,}$/.test(enlace)) {
@@ -330,12 +340,10 @@ CONFIG.guardarHoja = function () {
     return;
   }
   var btn = this; btn.disabled = true;
-  var ahora = new Date().toISOString();
   Promise.all([
-    sb.from('parametros').update({ valor: enlace, actualizado_en: ahora }).eq('clave', 'SHEETS_ID'),
-    sb.from('parametros').update({ valor: minutos, actualizado_en: ahora }).eq('clave', 'SHEETS_SYNC_MINUTOS')
-  ]).then(function (r) {
-    r.forEach(function (x) { if (x.error) throw new Error(x.error.message); });
+    CONFIG.guardarParametro('SHEETS_ID', enlace),
+    CONFIG.guardarParametro('SHEETS_SYNC_MINUTOS', minutos)
+  ]).then(function () {
     DR.toast('Configuración guardada.');
     return CONFIG.refrescar();
   }).then(function () {
@@ -468,8 +476,7 @@ CONFIG.tabAjustes = function (c) {
     var v = Number(DR.$('#inpUmbral').value);
     if (!v || v < 1) { DR.toast('Escribe un número de minutos válido.', 'error'); return; }
     var btn = this; btn.disabled = true;
-    sb.from('parametros').update({ valor: String(Math.round(v)), actualizado_en: new Date().toISOString() }).eq('clave', 'UMBRAL_TIEMPO_CICLO_MIN').then(function (r) {
-      if (r.error) throw new Error(r.error.message);
+    CONFIG.guardarParametro('UMBRAL_TIEMPO_CICLO_MIN', Math.round(v)).then(function () {
       DR.toast('Umbral actualizado.');
       return CONFIG.refrescar();
     }).catch(function (e) { DR.toast(e.message, 'error'); btn.disabled = false; });

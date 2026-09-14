@@ -297,7 +297,7 @@ ESCANER.pararAnimaciones = function () {
 var RESULTADO = { abierta: false, origen: null };
 
 RESULTADO.FORMAS = {
-  linea: '<svg class="res-forma" viewBox="0 0 150 300" aria-hidden="true"><path d="M150,0 A150,150 0 0 0 150,300 Z"/></svg>',
+  linea: '<svg class="res-forma" viewBox="0 0 150 300" aria-hidden="true"><path d="M0,0 A150,150 0 0 1 0,300 Z"/></svg>',
   lado: '<svg class="res-forma" viewBox="0 0 200 200" aria-hidden="true"><circle cx="100" cy="100" r="98"/></svg>',
   labor: '<svg class="res-forma" viewBox="0 0 264 132" aria-hidden="true"><path d="M0,132 A132,132 0 0 1 264,132 Z"/></svg>'
 };

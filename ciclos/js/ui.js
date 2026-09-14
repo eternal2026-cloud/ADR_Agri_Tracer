@@ -21,11 +21,50 @@ var CAMPOS_RESUMEN = [
 ];
 
 UI.kpi = function (etq, val, nota, color) {
-  return '<div class="kpi" style="--acento:' + (color || '#579BCB') + '"><div class="etq">' + DR.esc(etq) + '</div>' +
+  return '<div class="kpi" style="--acento:' + (color || '#0097CE') + '"><div class="etq">' + DR.esc(etq) + '</div>' +
     '<div class="val">' + val + '</div>' + (nota ? '<div class="nota">' + nota + '</div>' : '') + '</div>';
 };
 UI.panel = function (titulo, sub, cuerpo) {
-  return '<section class="panel"><h2>' + DR.esc(titulo) + '</h2>' + (sub ? '<div class="sub">' + DR.esc(sub) + '</div>' : '') + cuerpo + '</section>';
+  return '<section class="panel entra"><h2>' + DR.esc(titulo) + '</h2>' + (sub ? '<div class="sub">' + DR.esc(sub) + '</div>' : '') + cuerpo + '</section>';
+};
+
+/** Hoja inferior (bottom sheet). opc.fija: no se cierra al tocar el velo (p. ej. credenciales). */
+UI.abrirHoja = function (html, opc) {
+  var hoja = DR.$('#hoja');
+  if (!hoja) {
+    hoja = document.createElement('div');
+    hoja.id = 'hoja';
+    hoja.innerHTML = '<div id="hojaVelo"></div><div id="hojaTarjeta" role="dialog" aria-modal="true"></div>';
+    document.body.appendChild(hoja);
+  }
+  DR.$('#hojaVelo').onclick = (opc && opc.fija) ? null : UI.cerrarHoja;
+  DR.$('#hojaTarjeta').innerHTML = html;
+  hoja.classList.remove('oculto');
+  if (DR.anima) {
+    anime.remove(['#hojaVelo', '#hojaTarjeta']);
+    anime({ targets: '#hojaVelo', opacity: [0, 1], duration: 260, easing: 'linear' });
+    anime({ targets: '#hojaTarjeta', translateY: ['100%', '0%'], duration: 480, easing: 'easeOutCubic' });
+  }
+};
+UI.cerrarHoja = function () {
+  var hoja = DR.$('#hoja');
+  if (!hoja) return;
+  if (!DR.anima) { hoja.classList.add('oculto'); return; }
+  anime({ targets: '#hojaVelo', opacity: 0, duration: 220, easing: 'linear' });
+  anime({ targets: '#hojaTarjeta', translateY: '100%', duration: 300, easing: 'easeInCubic', complete: function () { hoja.classList.add('oculto'); } });
+};
+
+/** Copia texto al portapapeles (con alternativa para navegadores sin Clipboard API). */
+UI.copiar = function (texto) {
+  if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(texto);
+  return new Promise(function (resolve, reject) {
+    var t = document.createElement('textarea');
+    t.value = texto; t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0';
+    document.body.appendChild(t);
+    t.select();
+    try { if (document.execCommand('copy')) resolve(); else reject(new Error('No se pudo copiar.')); } catch (e) { reject(e); }
+    document.body.removeChild(t);
+  });
 };
 UI.tabla = function (columnas, filas, claseFilaFn) {
   if (!filas.length) return '<div class="vacio">No hay registros para este filtro.</div>';

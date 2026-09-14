@@ -13,15 +13,17 @@ var sb = supabase.createClient(SB_URL, SB_KEY, {
 
 var AT = { perfil: null };
 
+/** Misma normalización que la Edge Function admin-usuarios (sin tildes, espacios → punto). */
 AT.usuarioAEmail = function (usuario) {
-  return String(usuario || '').trim().toLowerCase().replace(/\s+/g, '.') + SB_DOMINIO_INTERNO;
+  return String(usuario || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .trim().toLowerCase().replace(/\s+/g, '.') + SB_DOMINIO_INTERNO;
 };
 
 /** Login: mismo mensaje genérico exista o no el usuario (Supabase ya lo garantiza). */
 AT.login = function (usuario, password) {
   return sb.auth.signInWithPassword({ email: AT.usuarioAEmail(usuario), password: password })
     .then(function (r) {
-      if (r.error) throw new Error('Usuario o contraseña incorrectos.');
+      if (r.error) throw new Error(/banned/i.test(r.error.message) ? 'Este usuario está desactivado. Contacta al administrador.' : 'Usuario o contraseña incorrectos.');
       return AT.cargarPerfil();
     });
 };
@@ -71,23 +73,23 @@ AT.rpc = function (nombre, args) {
 
 AT.tabla = function (nombre) { return sb.from(nombre); };
 
-/** Token JWT de la sesión actual, para llamar a las funciones serverless de /api. */
+/** Token JWT de la sesión actual, para llamar a las Edge Functions. */
 AT.tokenAcceso = function () {
   return sb.auth.getSession().then(function (r) { return r.data.session ? r.data.session.access_token : null; });
 };
 
-/** Llama a una función serverless propia (api/admin-*.js) con el token del usuario. */
-AT.llamarApi = function (ruta, body) {
+/** Llama a una Edge Function de Supabase (admin-usuarios, sync-sheets) con la sesión del usuario. */
+AT.llamarFuncion = function (nombre, body) {
   return AT.tokenAcceso().then(function (token) {
-    if (!token) throw new Error('Sesión no válida.');
-    return fetch(ruta, {
+    if (!token) throw new Error('Sesión no válida. Vuelve a iniciar sesión.');
+    return fetch(SB_URL + '/functions/v1/' + nombre, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token, 'apikey': SB_KEY },
       body: JSON.stringify(body || {})
     });
   }).then(function (r) {
     return r.json().catch(function () { return {}; }).then(function (j) {
-      if (!r.ok) throw new Error(j.error || 'Error de servidor (' + r.status + ').');
+      if (!r.ok || j.ok === false) throw new Error(j.error || 'Error de servidor (' + r.status + ').');
       return j;
     });
   });

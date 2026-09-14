@@ -2,3 +2,9 @@ node_modules/
 .vercel/
 .env
 .env.local
+
+# Credenciales de Google (clave privada) — NUNCA subir al repo
+JSON/
+*.iam.gserviceaccount.json
+don-ricardo-*.json
+supabase/.temp/

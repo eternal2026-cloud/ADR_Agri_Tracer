@@ -41,10 +41,10 @@ RES.renderGeneral = function (cont) {
       UI.encabezado('Tiempos de ciclo', 'Promedio general', 'Todas las semanas registradas, agrupado por fundo. Toca un fundo para ver sus muestras individuales.', sel);
 
     h += '<div class="kpis">' +
-      UI.kpi('Tiempo de ciclo promedio', DR.num(total.t_ciclo_total, 1) + ' min', DR.num(total.tiempo_horas, 2) + ' h en promedio', '#579BCB') +
-      UI.kpi('Muestras válidas', DR.num(total.n_muestras), 'Umbral actual: ' + DR.num(RES.umbral) + ' min', '#8FBD38') +
+      UI.kpi('Tiempo de ciclo promedio', DR.num(total.t_ciclo_total, 1) + ' min', DR.num(total.tiempo_horas, 2) + ' h en promedio', '#0097CE') +
+      UI.kpi('Muestras válidas', DR.num(total.n_muestras), 'Umbral actual: ' + DR.num(RES.umbral) + ' min', '#76B729') +
       UI.kpi('Fundos', DR.num(fundos.length), 'Con datos registrados', '#B7A99C') +
-      UI.kpi('Semanas', DR.num(semanas.length), semanas.length ? ('De la ' + semanas[0] + ' a la ' + semanas[semanas.length - 1]) : '', '#E37E3B') +
+      UI.kpi('Semanas', DR.num(semanas.length), semanas.length ? ('De la ' + semanas[0] + ' a la ' + semanas[semanas.length - 1]) : '', '#EF7C3B') +
       '</div>';
 
     fundos.forEach(function (f, i) { f._idx = i; f._clic = true; });
@@ -82,8 +82,8 @@ RES.renderSemana = function (cont) {
         UI.encabezado('Tiempos de ciclo', 'Semana ' + semana, 'Promedio de cada tramo agrupado por fundo. Los registros que superan el umbral se excluyen del cálculo.', sel);
 
       h += '<div class="kpis">' +
-        UI.kpi('Tiempo de ciclo promedio', DR.num(total.t_ciclo_total, 1) + ' min', DR.num(total.tiempo_horas, 2) + ' h', '#579BCB') +
-        UI.kpi('Muestras válidas', DR.num(total.n_muestras), 'Umbral: ' + DR.num(RES.umbral) + ' min', '#8FBD38') +
+        UI.kpi('Tiempo de ciclo promedio', DR.num(total.t_ciclo_total, 1) + ' min', DR.num(total.tiempo_horas, 2) + ' h', '#0097CE') +
+        UI.kpi('Muestras válidas', DR.num(total.n_muestras), 'Umbral: ' + DR.num(RES.umbral) + ' min', '#76B729') +
         UI.kpi('Fundos con datos', DR.num(fundos.length), 'En esta semana', '#B7A99C') +
         '</div>';
 
@@ -125,8 +125,8 @@ RES.renderMuestras = function (cont) {
     var h = UI.migas(migas) + UI.encabezado('Tiempos de ciclo', RES.fundo, (RES.semana ? 'Semana ' + RES.semana + ' · ' : 'Todas las semanas · ') + filas.length + ' registro(s)');
 
     h += '<div class="kpis">' +
-      UI.kpi('Promedio válido', DR.num(promedio, 1) + ' min', validas.length + ' muestra(s)', '#579BCB') +
-      UI.kpi('Excluidas por umbral', DR.num(excluidas.length), 'Umbral: ' + DR.num(RES.umbral) + ' min', excluidas.length ? '#B94A02' : '#8FBD38') +
+      UI.kpi('Promedio válido', DR.num(promedio, 1) + ' min', validas.length + ' muestra(s)', '#0097CE') +
+      UI.kpi('Excluidas por umbral', DR.num(excluidas.length), 'Umbral: ' + DR.num(RES.umbral) + ' min', excluidas.length ? '#B94A02' : '#76B729') +
       '</div>';
 
     var cols = [

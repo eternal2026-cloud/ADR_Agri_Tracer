@@ -20,7 +20,7 @@ GRAFICO.barrasFundo = function (items, umbral) {
   items.forEach(function (it, i) {
     var w = 34, x = pad + i * (ancho - pad) / items.length;
     var h = escala(it.valor), y2 = alto - base - h;
-    svg += '<rect class="gf-barra" data-y="' + y2 + '" data-h="' + h + '" x="' + x + '" y="' + (alto - base) + '" width="' + w + '" height="0" rx="4" fill="' + (umbral && it.valor > umbral ? '#B94A02' : '#579BCB') + '"></rect>';
+    svg += '<rect class="gf-barra" data-y="' + y2 + '" data-h="' + h + '" x="' + x + '" y="' + (alto - base) + '" width="' + w + '" height="0" rx="4" fill="' + (umbral && it.valor > umbral ? '#B94A02' : '#0097CE') + '"></rect>';
     svg += '<text x="' + (x + w / 2) + '" y="' + (alto - base + 16) + '" text-anchor="middle" font-size="9" fill="#B7A99C">' + DR.esc(String(it.etq).substring(0, 9)) + '</text>';
     svg += '<text x="' + (x + w / 2) + '" y="' + (y2 - 6) + '" text-anchor="middle" font-size="9.5" fill="#F1EBE4">' + DR.num(it.valor, 0) + '</text>';
   });

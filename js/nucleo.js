@@ -61,7 +61,7 @@ DR.toast = function (msg, tipo) {
   var t = DR.$('#toast');
   if (!t) return;
   t.textContent = msg;
-  t.style.borderLeftColor = tipo === 'error' ? '#E37E3B' : (tipo === 'info' ? '#579BCB' : '#8FBD38');
+  t.style.borderLeftColor = tipo === 'error' ? '#EF7C3B' : (tipo === 'info' ? '#0097CE' : '#76B729');
   clearTimeout(DR._toastT);
   if (DR.anima) {
     anime.remove(t);
@@ -130,5 +130,27 @@ DR.ICONOS = {
   checkChico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>',
   alertaChico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 6v8"/><circle cx="12" cy="18.5" r=".6" fill="currentColor"/></svg>',
   chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>',
-  reloj: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>'
+  reloj: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>',
+  mas: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  lupa: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
+  atras: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>',
+  subir: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5"/><path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>'
+};
+
+/** Isotipo oficial Don Ricardo: D azul (lado recto a la izquierda) · círculo naranja · medio sol verde. */
+DR.marcaSvg = function (ancho) {
+  return '<svg class="marca" width="' + ancho + '" viewBox="0 0 650 300" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
+    '<path d="M0,0 A150,150 0 0 1 0,300 Z" fill="#0097CE"/><circle cx="262" cy="188" r="112" fill="#EF7C3B"/>' +
+    '<path d="M350,300 A150,150 0 0 1 650,300 Z" fill="#76B729"/></svg>';
+};
+
+/** "hace 5 min", "hace 2 h 10 min", "hace 3 d". */
+DR.hace = function (iso) {
+  var min = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (isNaN(min)) return '';
+  if (min < 1) return 'recién';
+  if (min < 60) return 'hace ' + min + ' min';
+  var h = Math.floor(min / 60);
+  if (h < 24) return 'hace ' + h + ' h' + (min % 60 ? ' ' + (min % 60) + ' min' : '');
+  return 'hace ' + Math.floor(h / 24) + ' d';
 };

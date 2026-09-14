@@ -75,7 +75,7 @@ VISTAS.personal = function () {
   var labores = DATOS.agrupar('labor');
   if (VISTAS.filtro.linea && !lineas.some(function (l) { return l.etq === VISTAS.filtro.linea; })) VISTAS.filtro.linea = '';
 
-  kpis.innerHTML = UI.kpi('kpiPersonas', 'Personas', '#579BCB') + UI.kpi('kpiLineas', 'Líneas', '#E37E3B') + UI.kpi('kpiLabores', 'Labores', '#8FBD38');
+  kpis.innerHTML = UI.kpi('kpiPersonas', 'Personas', '#0097CE') + UI.kpi('kpiLineas', 'Líneas', '#EF7C3B') + UI.kpi('kpiLabores', 'Labores', '#76B729');
   DR.contar(DR.$('#kpiPersonas'), DATOS.lista.filas.length);
   DR.contar(DR.$('#kpiLineas'), lineas.length);
   DR.contar(DR.$('#kpiLabores'), labores.length);
@@ -84,7 +84,7 @@ VISTAS.personal = function () {
     lineas.map(function (l) { return '<button class="filtro' + (VISTAS.filtro.linea === l.etq ? ' activo' : '') + '" data-linea="' + DR.esc(l.etq) + '" type="button">' + DR.esc(l.etq) + '<small>' + l.valor + '</small></button>'; }).join('');
 
   distrib.classList.remove('oculto');
-  DR.$('#perBarras').innerHTML = UI.barras(lineas, '#579BCB');
+  DR.$('#perBarras').innerHTML = UI.barras(lineas, '#0097CE');
   UI.animarBarras(distrib);
 
   DR.$('#inpBuscar').value = VISTAS.filtro.q;

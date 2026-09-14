@@ -6,12 +6,12 @@
  * ==========================================================================*/
 
 DR.ORDEN = ['escaner', 'personal', 'datos'];
-DR.COLOR = { escaner: '#E37E3B', personal: '#579BCB', datos: '#8FBD38' };
+DR.COLOR = { escaner: '#EF7C3B', personal: '#0097CE', datos: '#76B729' };
 
 function animarInicio() {
   if (!DR.anima) {
     ['#splashFondo', '#etiquetaApp', '#tituloApp', '#sedeApp', '#btnIngresar'].forEach(function (s) { DR.$(s).style.opacity = 1; });
-    DR.$('#splashFondo').style.opacity = .5;
+    DR.$('#splashFondo').style.opacity = 1;
     DR.$('#marcaAgua').style.opacity = .05;
     return;
   }
@@ -19,7 +19,7 @@ function animarInicio() {
   texto.innerHTML = texto.textContent.split('').map(function (ch) { return "<span class='ltr'>" + (ch === ' ' ? '&nbsp;' : ch) + '</span>'; }).join('');
   anime.set(['.lg-azul', '.lg-naranja', '.lg-verde', '.ltr', '#bajadaDR'], { opacity: 0 });
   anime.timeline({ easing: 'easeOutExpo' })
-    .add({ targets: '#splashFondo', opacity: [0, .5], scale: [1.12, 1], duration: 2200 })
+    .add({ targets: '#splashFondo', opacity: [0, 1], scale: [1.12, 1], duration: 2200 })
     .add({ targets: '#marcaAgua', opacity: [0, .045], scale: [.85, 1], duration: 1800 }, 100)
     .add({ targets: '.lg-azul', opacity: [0, 1], translateX: [-90, 0], duration: 900 }, 250)
     .add({ targets: '.lg-naranja', opacity: [0, 1], scale: [0, 1], duration: 1100, easing: 'easeOutElastic(1, .7)' }, 450)
@@ -33,7 +33,7 @@ function animarInicio() {
   anime({ targets: '#barraCarga', width: ['0%', '85%'], duration: 2600, easing: 'easeInOutQuad' });
   setTimeout(function () {
     DR.$$('#splashFondo, .lg-forma, .ltr, #bajadaDR, #etiquetaApp, #tituloApp, #sedeApp, #btnIngresar').forEach(function (el) {
-      if (Number(getComputedStyle(el).opacity) < 0.05) { el.style.opacity = el.id === 'splashFondo' ? .5 : 1; el.style.transform = 'none'; }
+      if (Number(getComputedStyle(el).opacity) < 0.05) { el.style.opacity = 1; el.style.transform = 'none'; }
     });
   }, 3500);
 }
@@ -106,7 +106,7 @@ DR.ir = function (vista) {
 DR.moverIndicador = function (vista) {
   var ind = DR.$('#navIndicador');
   var x = DR.ORDEN.indexOf(vista) * 100;
-  ind.style.setProperty('--acento-nav', DR.COLOR[vista]);
+  DR.$('#navInf').style.setProperty('--acento-nav', DR.COLOR[vista]);
   if (DR.anima) anime({ targets: ind, translateX: x + '%', duration: 520, easing: 'easeOutElastic(1, .85)' });
   else ind.style.transform = 'translateX(' + x + '%)';
 };

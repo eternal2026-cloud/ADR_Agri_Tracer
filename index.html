@@ -8,9 +8,10 @@
 <title>AgriTracer · Don Ricardo</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="img/icono.svg" type="image/svg+xml">
+<link rel="preload" href="img/fondo.jpg" as="image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/estilos.css">
 </head>
 <body>
@@ -19,18 +20,12 @@
   <div id="splashFondo"></div>
   <div id="splashVelo"></div>
 
-  <svg id="marcaAgua" viewBox="0 0 626 300" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <path d="M150,0 A150,150 0 0 0 150,300 Z" fill="#579BCB"/>
-    <circle cx="272" cy="192" r="98" fill="#E37E3B"/>
-    <path d="M360,300 A132,132 0 0 1 624,300 Z" fill="#8FBD38"/>
-  </svg>
-
   <div id="splashCentro">
     <div class="logo" id="logoDR">
-      <svg class="marca" id="marcaDR" width="280" viewBox="0 0 626 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Don Ricardo">
-        <path class="lg-forma lg-azul"    d="M150,0 A150,150 0 0 0 150,300 Z" fill="#579BCB"/>
-        <circle class="lg-forma lg-naranja" cx="272" cy="192" r="98" fill="#E37E3B"/>
-        <path class="lg-forma lg-verde"   d="M360,300 A132,132 0 0 1 624,300 Z" fill="#8FBD38"/>
+      <svg class="marca" id="marcaDR" width="260" viewBox="0 0 650 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Don Ricardo">
+        <path class="lg-forma lg-azul" d="M0,0 A150,150 0 0 1 0,300 Z" fill="#0097CE"/>
+        <circle class="lg-forma lg-naranja" cx="262" cy="188" r="112" fill="#EF7C3B"/>
+        <path class="lg-forma lg-verde" d="M350,300 A150,150 0 0 1 650,300 Z" fill="#76B729"/>
       </svg>
       <div class="texto" id="textoDR">DON RICARDO</div>
       <div class="bajada" id="bajadaDR">– A <b>FRUTURA</b> COMPANY –</div>
@@ -41,19 +36,19 @@
     <div id="sedeApp">Tiempos de ciclo · Reubicación de personal</div>
 
     <div id="loginPanel" class="login-panel">
-      <div class="campo"><label>Usuario</label><input id="loginUsuario" autocomplete="username"></div>
-      <div class="campo"><label>Contraseña</label><input id="loginPassword" type="password" autocomplete="current-password"></div>
+      <div class="campo"><label for="loginUsuario">Usuario</label><input id="loginUsuario" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="ej. juan.perez"></div>
+      <div class="campo"><label for="loginPassword">Contraseña</label><input id="loginPassword" type="password" autocomplete="current-password"></div>
       <div id="loginError" class="aviso alerta oculto"></div>
-      <button id="btnIngresar" class="btn">Ingresar</button>
+      <button id="btnIngresar" class="btn" type="button">Ingresar</button>
       <div class="aviso" style="margin-top:12px">¿Solo vienes a escanear un fotocheck? <a href="reubicacion/">Entra sin iniciar sesión</a>.</div>
     </div>
 
     <div id="cambiarPanel" class="login-panel oculto">
-      <div class="aviso">Por seguridad, define una nueva contraseña antes de continuar.</div>
-      <div class="campo" style="margin-top:12px"><label>Nueva contraseña</label><input id="nuevaPassword" type="password"></div>
-      <div class="campo"><label>Repite la contraseña</label><input id="nuevaPassword2" type="password"></div>
+      <div class="aviso ok">¡Bienvenido! Por seguridad, crea tu propia contraseña antes de continuar.</div>
+      <div class="campo" style="margin-top:12px"><label for="nuevaPassword">Nueva contraseña</label><input id="nuevaPassword" type="password" autocomplete="new-password" placeholder="Mínimo 6 caracteres"></div>
+      <div class="campo"><label for="nuevaPassword2">Repite la contraseña</label><input id="nuevaPassword2" type="password" autocomplete="new-password"></div>
       <div id="cambiarError" class="aviso alerta oculto"></div>
-      <button id="btnGuardarPassword" class="btn verde">Guardar y continuar</button>
+      <button id="btnGuardarPassword" class="btn verde" type="button">Guardar y continuar</button>
     </div>
   </div>
 
@@ -63,55 +58,62 @@
 <div id="landing" class="oculto">
   <header id="barraSup">
     <div id="slotLogo"></div>
-    <button id="chipDatos" class="chip" type="button"><i></i><span id="landingUsuario">—</span></button>
+    <button id="chipDatos" class="chip ok" type="button" title="Cerrar sesión"><i></i><span id="landingUsuario">—</span></button>
   </header>
   <main id="contenido">
-    <div class="vista angosta entra">
-      <div class="encabezado">
-        <div class="ruta">Ingeniería de Procesos</div>
-        <h1>¿A dónde vamos?</h1>
-        <p>Elige un módulo. Puedes volver aquí cuando quieras desde el logo.</p>
+    <div class="vista angosta">
+      <div class="hero entra">
+        <div class="hero-foto"></div>
+        <div class="hero-txt">
+          <div class="ruta">Ingeniería de Procesos · Don Ricardo</div>
+          <h1 id="saludo">Hola</h1>
+          <p id="saludoSub">¿A dónde vamos hoy?</p>
+        </div>
       </div>
       <div class="modulos" id="modulos"></div>
-      <div class="acciones" style="margin-top:20px">
-        <button class="btn sec" id="btnCerrarSesion">Cerrar sesión</button>
+      <div class="acciones" style="margin-top:22px;justify-content:center">
+        <button class="btn sec" id="btnCerrarSesion" type="button">Cerrar sesión</button>
       </div>
+      <div class="pie-version">AgriTracer · Ingeniería de Procesos · Don Ricardo</div>
     </div>
   </main>
 </div>
 
-<div id="toast"></div>
+<div id="toast" role="status"></div>
 
 <script src="vendor/anime.min.js"></script>
 <script src="vendor/supabase.min.js"></script>
 <script src="js/nucleo.js"></script>
 <script src="js/supabase-cliente.js"></script>
 <script>
+var ICO = {
+  cronometro: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.5 1.5M9.5 3h5M12 3v3"/></svg>',
+  grafico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 20h16"/><rect x="5.5" y="11" width="3" height="6" rx="1"/><rect x="10.5" y="6" width="3" height="11" rx="1"/><rect x="15.5" y="9" width="3" height="8" rx="1"/></svg>',
+  personas: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.8-3.2 3-5 5.5-5s4.7 1.8 5.5 5"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.2c2.3.1 4 1.6 4.8 4.3"/></svg>',
+  usuarios: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.8-3.2 3-5 5.5-5s4.7 1.8 5.5 5"/><path d="M17 8v6M14 11h6"/></svg>'
+};
+
 var MODULOS = [
-  { href: 'ciclos/', color: '#579BCB', bg: 'linear-gradient(150deg,#17293A,#0F1B26)', nombre: 'Tiempos de Ciclo',
-    sub: 'Resumen semanal, captura en campo y configuración',
-    icono: '<svg viewBox="0 0 24 24" fill="none" stroke="#9CC8E8" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>',
-    roles: ['admin', 'captura', 'visor'] },
-  { href: 'reubicacion/', color: '#E37E3B', bg: 'linear-gradient(150deg,#35210F,#21150B)', nombre: 'Reubicación de Personal',
-    sub: 'Escanear fotocheck, buscar personal y actualizar la lista',
-    icono: '<svg viewBox="0 0 24 24" fill="none" stroke="#F0A96F" stroke-width="1.8"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.8-3.2 3-5 5.5-5s4.7 1.8 5.5 5"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.2c2.3.1 4 1.6 4.8 4.3"/></svg>',
-    roles: ['admin', 'captura', 'visor'] }
+  { href: 'ciclos/#captura', color: '#76B729', nombre: 'Captura de tiempos', icono: ICO.cronometro,
+    sub: 'Registra un ciclo etapa por etapa desde el celular', roles: ['admin', 'captura'] },
+  { href: 'ciclos/#resumen', color: '#0097CE', nombre: 'Resumen de tiempos de ciclo', icono: ICO.grafico,
+    sub: 'Promedios por semana y fundo, muestras y gráficos', roles: ['admin', 'captura', 'visor'] },
+  { href: 'reubicacion/', color: '#EF7C3B', nombre: 'Reubicación de personal', icono: ICO.personas,
+    sub: 'Escanear fotocheck, buscar personal y actualizar la lista', roles: ['admin', 'captura', 'visor'] },
+  { href: 'ciclos/#usuarios', color: '#E8B04A', nombre: 'Usuarios y configuración', icono: ICO.usuarios,
+    sub: 'Dar acceso a tu equipo, listas de captura y Google Sheets', roles: ['admin'] }
 ];
 
 function mostrarErrorLogin(msg) { var el = DR.$('#loginError'); el.textContent = msg; el.classList.remove('oculto'); }
 
 function animarInicio() {
-  if (!DR.anima) {
-    ['#splashFondo', '#etiquetaApp', '#tituloApp', '#sedeApp', '#loginPanel'].forEach(function (s) { DR.$(s).style.opacity = 1; });
-    DR.$('#marcaAgua').style.opacity = .05;
-    return;
-  }
+  var visibles = ['#splashFondo', '#etiquetaApp', '#tituloApp', '#sedeApp', '#loginPanel'];
+  if (!DR.anima) { visibles.forEach(function (s) { DR.$(s).style.opacity = 1; }); return; }
   var texto = DR.$('#textoDR');
   texto.innerHTML = texto.textContent.split('').map(function (ch) { return "<span class='ltr'>" + (ch === ' ' ? '&nbsp;' : ch) + '</span>'; }).join('');
   anime.set(['.lg-azul', '.lg-naranja', '.lg-verde', '.ltr', '#bajadaDR', '#loginPanel'], { opacity: 0 });
   anime.timeline({ easing: 'easeOutExpo' })
-    .add({ targets: '#splashFondo', opacity: [0, .6], scale: [1.1, 1], duration: 1600 })
-    .add({ targets: '#marcaAgua', opacity: [0, .05], scale: [.85, 1], duration: 1400 }, 100)
+    .add({ targets: '#splashFondo', opacity: [0, 1], scale: [1.12, 1], duration: 1800 })
     .add({ targets: '.lg-azul', opacity: [0, 1], translateX: [-90, 0], duration: 800 }, 200)
     .add({ targets: '.lg-naranja', opacity: [0, 1], scale: [0, 1], duration: 1000, easing: 'easeOutElastic(1, .7)' }, 380)
     .add({ targets: '.lg-verde', opacity: [0, 1], translateX: [90, 0], duration: 800 }, 560)
@@ -122,18 +124,33 @@ function animarInicio() {
     .add({ targets: '#sedeApp', opacity: [0, 1], duration: 600 }, 1680)
     .add({ targets: '#loginPanel', opacity: [0, 1], translateY: [12, 0], duration: 600 }, 1780);
   anime({ targets: '#barraCarga', width: ['0%', '92%'], duration: 2000, easing: 'easeInOutQuad' });
+  // Red de seguridad: si una pestaña en segundo plano congeló la animación, todo queda visible.
+  setTimeout(function () {
+    DR.$$('#splashFondo, .lg-forma, .ltr, #bajadaDR, #etiquetaApp, #tituloApp, #sedeApp, #loginPanel').forEach(function (el) {
+      if (Number(getComputedStyle(el).opacity) < 0.05) { el.style.opacity = 1; el.style.transform = 'none'; }
+    });
+  }, 3500);
+}
+
+function mostrarPanel(sel) {
+  DR.$$('.login-panel').forEach(function (p) { p.classList.add('oculto'); });
+  var panel = DR.$(sel);
+  panel.classList.remove('oculto');
+  if (DR.anima) anime({ targets: panel, opacity: [0, 1], translateY: [14, 0], duration: 500, easing: 'easeOutCubic' });
+  else panel.style.opacity = 1;
 }
 
 function pintarLanding() {
-  var slot = DR.$('#slotLogo');
-  slot.innerHTML = '<div class="logo"><svg class="marca" width="118" viewBox="0 0 626 300"><path d="M150,0 A150,150 0 0 0 150,300 Z" fill="#579BCB"/><circle cx="272" cy="192" r="98" fill="#E37E3B"/><path d="M360,300 A132,132 0 0 1 624,300 Z" fill="#8FBD38"/></svg><div class="texto">DON RICARDO</div></div>';
-  DR.$('#landingUsuario').textContent = (AT.perfil && AT.perfil.nombre) || '—';
+  DR.$('#slotLogo').innerHTML = '<div class="logo">' + DR.marcaSvg(46) + '<div class="texto">DON RICARDO</div></div>';
+  var nombre = (AT.perfil && AT.perfil.nombre) || '';
+  DR.$('#landingUsuario').textContent = nombre || '—';
+  var h = new Date().getHours();
+  DR.$('#saludo').textContent = (h < 12 ? 'Buenos días' : (h < 19 ? 'Buenas tardes' : 'Buenas noches')) + (nombre ? ', ' + nombre.split(' ')[0] : '');
 
   var rol = AT.perfil ? AT.perfil.rol : 'visor';
-  var disponibles = MODULOS.filter(function (m) { return m.roles.indexOf(rol) > -1; });
-  DR.$('#modulos').innerHTML = disponibles.map(function (m) {
-    return '<a class="modulo-card" href="' + m.href + '"><div class="ico" style="background:' + m.bg + '">' + m.icono + '</div>' +
-      '<div><b>' + DR.esc(m.nombre) + '</b><span>' + DR.esc(m.sub) + '</span></div></a>';
+  DR.$('#modulos').innerHTML = MODULOS.filter(function (m) { return m.roles.indexOf(rol) > -1; }).map(function (m) {
+    return '<a class="modulo-card entra" href="' + m.href + '" style="--c:' + m.color + '"><div class="ico">' + m.icono + '</div>' +
+      '<div class="mc-txt"><b>' + DR.esc(m.nombre) + '</b><span>' + DR.esc(m.sub) + '</span></div>' + DR.ICONOS.chevron + '</a>';
   }).join('');
 
   DR.$('#splash').style.display = 'none';
@@ -147,16 +164,14 @@ function intentarLogin() {
   if (!usuario || !password) { mostrarErrorLogin('Ingresa usuario y contraseña.'); return; }
   var btn = DR.$('#btnIngresar');
   btn.disabled = true;
+  btn.textContent = 'Ingresando…';
   DR.$('#loginError').classList.add('oculto');
   AT.login(usuario, password).then(function (perfil) {
     btn.disabled = false;
-    if (perfil.debe_cambiar_password) {
-      DR.$('#loginPanel').classList.add('oculto');
-      DR.$('#cambiarPanel').classList.remove('oculto');
-      return;
-    }
+    btn.textContent = 'Ingresar';
+    if (perfil.debe_cambiar_password) { mostrarPanel('#cambiarPanel'); DR.$('#nuevaPassword').focus(); return; }
     pintarLanding();
-  }).catch(function (e) { btn.disabled = false; mostrarErrorLogin(e.message); });
+  }).catch(function (e) { btn.disabled = false; btn.textContent = 'Ingresar'; mostrarErrorLogin(e.message); });
 }
 
 function intentarCambiarPassword() {
@@ -172,19 +187,29 @@ function intentarCambiarPassword() {
     return AT.rpc('rpc_marcar_password_cambiada');
   }).then(function () {
     AT.perfil.debe_cambiar_password = false;
+    DR.toast('Contraseña creada. ¡Listo!');
     pintarLanding();
   }).catch(function (e) { btn.disabled = false; el.textContent = e.message; el.classList.remove('oculto'); });
+}
+
+function cerrarSesion() {
+  if (!window.confirm('¿Cerrar la sesión en este dispositivo?')) return;
+  AT.logout().then(function () { location.reload(); });
 }
 
 document.addEventListener('DOMContentLoaded', function () {
   animarInicio();
   DR.$('#btnIngresar').addEventListener('click', intentarLogin);
   DR.$('#loginPassword').addEventListener('keydown', function (e) { if (e.key === 'Enter') intentarLogin(); });
+  DR.$('#nuevaPassword2').addEventListener('keydown', function (e) { if (e.key === 'Enter') intentarCambiarPassword(); });
   DR.$('#btnGuardarPassword').addEventListener('click', intentarCambiarPassword);
-  DR.$('#btnCerrarSesion').addEventListener('click', function () { AT.logout().then(function () { location.reload(); }); });
+  DR.$('#btnCerrarSesion').addEventListener('click', cerrarSesion);
+  DR.$('#chipDatos').addEventListener('click', cerrarSesion);
 
   AT.sesionInicial().then(function (perfil) {
-    if (perfil) pintarLanding();
+    if (!perfil) return;
+    if (perfil.debe_cambiar_password) mostrarPanel('#cambiarPanel');
+    else pintarLanding();
   });
 });
 </script>

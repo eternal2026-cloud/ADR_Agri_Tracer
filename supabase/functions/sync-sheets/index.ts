@@ -3,7 +3,8 @@
  * La invoca pg_cron (header x-sync-token, ver migración 0007) o un admin desde
  * Configuración → Google Sheets (JWT de su sesión). Sobrescribe solo sus
  * pestañas: Ciclos_BD, Resumen_Semanal, Personal_Reubicacion,
- * Auditoria_Escaneos y Sync_Info; cualquier otra pestaña de la hoja se respeta.
+ * Auditoria_Escaneos, 5S_BD, 5S_Observaciones, 5S_Resumen y Sync_Info;
+ * cualquier otra pestaña de la hoja se respeta.
  * La clave de la cuenta de servicio vive en Vault, nunca en el código.
  * ==========================================================================*/
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
@@ -111,7 +112,8 @@ async function gapi(token: string, saEmail: string, metodo: string, ruta: string
   return j;
 }
 
-type Pestana = { titulo: string; valores: unknown[][] };
+/** formulas: la pestaña se escribe con USER_ENTERED (miniaturas =IMAGE); altoFila y anchos en píxeles. */
+type Pestana = { titulo: string; valores: unknown[][]; formulas?: boolean; altoFila?: number; anchos?: [number, number][] };
 
 async function escribirHoja(token: string, saEmail: string, id: string, pestanas: Pestana[]): Promise<string> {
   const meta = await gapi(token, saEmail, 'GET', `${id}?fields=properties.title,sheets.properties(sheetId,title,gridProperties(rowCount,columnCount))`);
@@ -144,13 +146,34 @@ async function escribirHoja(token: string, saEmail: string, id: string, pestanas
         fields: 'userEnteredFormat(textFormat,backgroundColor)',
       },
     });
+    if (p.altoFila && p.valores.length > 1) {
+      requests.push({
+        updateDimensionProperties: {
+          range: { sheetId: pr.sheetId, dimension: 'ROWS', startIndex: 1, endIndex: p.valores.length },
+          properties: { pixelSize: p.altoFila }, fields: 'pixelSize',
+        },
+      });
+    }
+    for (const [col, px] of p.anchos || []) {
+      requests.push({
+        updateDimensionProperties: {
+          range: { sheetId: pr.sheetId, dimension: 'COLUMNS', startIndex: col, endIndex: col + 1 },
+          properties: { pixelSize: px }, fields: 'pixelSize',
+        },
+      });
+    }
   }
   await gapi(token, saEmail, 'POST', `${id}:batchUpdate`, { requests });
   await gapi(token, saEmail, 'POST', `${id}/values:batchClear`, { ranges: pestanas.map((p) => `'${p.titulo}'`) });
-  await gapi(token, saEmail, 'POST', `${id}/values:batchUpdate`, {
-    valueInputOption: 'RAW',
-    data: pestanas.map((p) => ({ range: `'${p.titulo}'!A1`, values: p.valores })),
-  });
+  // Solo las pestañas con fórmulas usan USER_ENTERED (sus textos llegan escapados); el resto sigue en RAW.
+  const grupos: [string, Pestana[]][] = [['RAW', pestanas.filter((p) => !p.formulas)], ['USER_ENTERED', pestanas.filter((p) => p.formulas)]];
+  for (const [modo, grupo] of grupos) {
+    if (!grupo.length) continue;
+    await gapi(token, saEmail, 'POST', `${id}/values:batchUpdate`, {
+      valueInputOption: modo,
+      data: grupo.map((p) => ({ range: `'${p.titulo}'!A1`, values: p.valores })),
+    });
+  }
   return (meta.properties && meta.properties.title) || id;
 }
 
@@ -175,8 +198,109 @@ async function rpc(sb: SupabaseClient, nombre: string, args?: Record<string, unk
   return data;
 }
 
+/** RPC que devuelve filas, paginada (PostgREST corta en 1000). */
+async function leerRpc(sb: SupabaseClient, nombre: string, maximo = 50000): Promise<Fila[]> {
+  const filas: Fila[] = [];
+  for (let desde = 0; desde < maximo; desde += 1000) {
+    const { data, error } = await sb.rpc(nombre, {}).range(desde, desde + 999);
+    if (error) throw new Error(nombre + ': ' + error.message);
+    const lote = (data || []) as Fila[];
+    filas.push(...lote);
+    if (lote.length < 1000) break;
+  }
+  return filas;
+}
+
 const fijarParametro = (sb: SupabaseClient, clave: string, valor: string) =>
   sb.from('parametros').update({ valor, actualizado_en: new Date().toISOString() }).eq('clave', clave);
+
+/* ------------------------------------------------------------ Auditoría 5S */
+type S5Datos = {
+  bd: Fila[]; resumen: Fila[]; obs: Fila[]; auds: Map<string, Fila>; zonas: Map<number, Fila>; areas: Map<number, Fila>;
+  segs: Map<string, Fila[]>; fotos: Map<string, string>; fotosError: string;
+};
+
+/** URLs firmadas por 7 días del bucket privado; se renuevan en cada sincronización. */
+async function firmarFotos(sb: SupabaseClient, rutas: string[]): Promise<Map<string, string>> {
+  const mapa = new Map<string, string>();
+  const unicas = [...new Set(rutas.filter(Boolean))];
+  for (let i = 0; i < unicas.length; i += 100) {
+    const { data, error } = await sb.storage.from('auditoria-5s').createSignedUrls(unicas.slice(i, i + 100), 7 * 24 * 3600);
+    if (error) throw new Error(error.message);
+    (data || []).forEach((d: Fila) => { if (d.signedUrl && d.path) mapa.set(d.path, d.signedUrl); });
+  }
+  return mapa;
+}
+
+async function leerS5(sb: SupabaseClient): Promise<S5Datos> {
+  const [bd, resumen, obs, auds, zonas, areas, segs] = await Promise.all([
+    leerRpc(sb, 'fn_s5_bd'),
+    leerRpc(sb, 'fn_s5_resumen'),
+    leerTodo(sb, 's5_observaciones', [['fecha_registro', true], ['zona_id', true], ['numero', true]]),
+    leerTodo(sb, 's5_auditorias', [['fecha', true]]),
+    leerTodo(sb, 's5_zonas', [['id', true]]),
+    leerTodo(sb, 's5_areas', [['id', true]]),
+    leerTodo(sb, 's5_seguimientos', [['fecha', true]]),
+  ]);
+  const mapaAuds = new Map<string, Fila>(auds.map((a) => [a.id, a]));
+  const validas = obs.filter((o) => { const a = mapaAuds.get(o.auditoria_id); return a && a.estado !== 'anulada'; });
+  const porObs = new Map<string, Fila[]>();
+  segs.forEach((s) => { const l = porObs.get(s.observacion_id) || []; l.push(s); porObs.set(s.observacion_id, l); });
+  let fotos = new Map<string, string>();
+  let fotosError = '';
+  try { fotos = await firmarFotos(sb, validas.flatMap((o) => [o.foto_antes, o.foto_despues])); } catch (e) { fotosError = (e as Error).message || String(e); }
+  return {
+    bd, resumen, obs: validas, auds: mapaAuds, segs: porObs, fotos, fotosError,
+    zonas: new Map<number, Fila>(zonas.map((z) => [z.id, z])), areas: new Map<number, Fila>(areas.map((a) => [a.id, a])),
+  };
+}
+
+/** Texto seguro para USER_ENTERED: lo que empieza con = + - @ no se interpreta como fórmula. */
+const seguro = (v: unknown) => { const t = txt(v); return /^[=+\-@]/.test(t) ? "'" + t : t; };
+const imagen = (url?: string) => (url ? `=IMAGE("${url.replace(/"/g, '%22')}")` : '');
+
+function pestanasS5(d: S5Datos | null): Pestana[] {
+  if (!d) return [];
+  const aud = (f: Fila): Fila => d.auds.get(f.auditoria_id) || {};
+  const segsDe = (f: Fila): Fila[] => d.segs.get(f.id) || [];
+
+  // Mismos 19 encabezados que la hoja BD del Excel; las columnas extra van al final.
+  const colsBd: Col[] = [
+    TX('fecha', 'FECHA'), TX('campana', 'CAMPAÑA'), TX('planta', 'PLANTA'), NU('semana', 'SEMANA', 0), NU('numero_auditoria', 'N° AUDITORIA', 0),
+    TX('tipo_auditoria', 'TIPO AUDITORIA'), TX('area', 'ÁREA'), NU('numero_zona', 'N° ZONA', 0), TX('sub_area', 'SUB ÁREA'), TX('zona', 'ZONA'), TX('s', 'S'),
+    NU('i1', '1', 1), NU('i2', '2', 1), NU('i3', '3', 1), NU('i4', '4', 1), NU('i5', '5', 1), NU('i6', '6', 1),
+    NU('suma', 'SUMA', 1), NU('puntaje', 'PUNTAJE %', 4),
+    TX('codigo', 'CÓDIGO'), ['ESTADO AUDITORÍA', (f) => f.estado_auditoria === 'cerrada' ? 'Cerrada' : 'En curso'],
+    ['ESTADO ZONA', (f) => f.estado_zona === 'completa' ? 'Completa' : 'En curso'],
+  ];
+
+  // Formato de la hoja Observaciones; los seguimientos se concatenan con « // » como en el Excel.
+  const colsObs: Col[] = [
+    ['N°', (f) => f.numero], ['Semana', (f) => f.semana ?? ''], ['Fecha de Registro', (f) => txt(f.fecha_registro)],
+    ['Área', (f) => seguro((d.areas.get(aud(f).area_id) || {}).nombre)], ['Zona', (f) => seguro((d.zonas.get(f.zona_id) || {}).nombre)],
+    ['Observaciones', (f) => seguro(f.descripcion)],
+    ['Acción correctiva', (f) => seguro([f.accion_correctiva, ...segsDe(f).map((s) => s.nota).filter((n) => n && n !== 'Registro inicial')].filter(Boolean).join(' // '))],
+    ['Estado', (f) => txt(f.estado)], ['Fecha de cierre', (f) => txt(f.fecha_cierre)],
+    ['Antes', (f) => imagen(d.fotos.get(f.foto_antes))], ['Después', (f) => imagen(d.fotos.get(f.foto_despues))],
+    ['Código auditoría', (f) => txt(aud(f).codigo)], ['N° auditoría', (f) => aud(f).numero_auditoria ?? ''],
+    ['S relacionada', (f) => f.s_referencia ? f.s_referencia + 'S' : ''], ['Auditor', (f) => seguro(f.auditor)],
+    ['Correcciones de puntaje', (f) => segsDe(f).flatMap((s) => (s.cambios_puntaje || []).map((c: Fila) => `${c.s}S-${c.numero}: ${num(c.antes, 1)}→${num(c.despues, 1)}`)).join(' · ')],
+    TS('actualizado_en', 'Actualizado'),
+  ];
+
+  const colsRes: Col[] = [
+    TX('codigo', 'Código'), TX('fecha', 'Fecha'), NU('semana', 'Semana', 0), TX('area', 'Área'), NU('numero_auditoria', 'N° auditoría', 0), TX('tipo', 'Tipo'),
+    ['Estado auditoría', (f) => f.estado_auditoria === 'cerrada' ? 'Cerrada' : 'En curso'], NU('numero_zona', 'N° zona', 0), TX('zona', 'Zona'),
+    ['Estado zona', (f) => f.estado_zona === 'completa' ? 'Completa' : 'En curso'],
+    NU('p1', '1S %', 4), NU('p2', '2S %', 4), NU('p3', '3S %', 4), NU('p4', '4S %', 4), NU('p5', '5S %', 4), NU('total', 'Total %', 4), TX('madurez', 'Madurez'),
+  ];
+
+  return [
+    { titulo: '5S_BD', valores: tabla(colsBd, d.bd) },
+    { titulo: '5S_Observaciones', valores: tabla(colsObs, d.obs), formulas: true, altoFila: 110, anchos: [[5, 320], [6, 320], [9, 150], [10, 150]] },
+    { titulo: '5S_Resumen', valores: tabla(colsRes, d.resumen) },
+  ];
+}
 
 /* ------------------------------------------------------------ handler */
 Deno.serve(async (req) => {
@@ -242,6 +366,11 @@ Deno.serve(async (req) => {
     }
     ((general || []) as Fila[]).forEach((f) => resumen.push({ ...f, _semana: 'General' }));
 
+    // Auditoría 5S: si falla, las demás pestañas se escriben igual y el motivo queda en Sync_Info.
+    let s5: S5Datos | null = null;
+    let s5Error = '';
+    try { s5 = await leerS5(sb); } catch (e) { s5Error = (e as Error).message || String(e); }
+
     const colsCiclos: Col[] = [
       TX('fecha', 'Fecha'), NU('semana', 'Semana', 0), TX('codigo', 'Código'), TX('fundo', 'Fundo'), TX('lote', 'Lote'),
       TX('lider', 'Líder de grupo'), TX('presentacion', 'Presentación'), TX('variedad', 'Variedad'), TX('calibre', 'Calibre'),
@@ -276,11 +405,13 @@ Deno.serve(async (req) => {
     ];
 
     const ahora = new Date().toISOString();
+    const estadoS5 = s5 ? (s5.fotosError ? 'OK · fotos sin miniatura: ' + s5.fotosError : 'OK') : 'No sincronizada: ' + s5Error;
     const pestanas: Pestana[] = [
       { titulo: 'Ciclos_BD', valores: tabla(colsCiclos, ciclos) },
       { titulo: 'Resumen_Semanal', valores: tabla(colsResumen, resumen) },
       { titulo: 'Personal_Reubicacion', valores: tabla(colsPersonal, personal) },
       { titulo: 'Auditoria_Escaneos', valores: tabla(colsEscaneos, escaneos) },
+      ...pestanasS5(s5),
       { titulo: 'Sync_Info', valores: [
         ['Dato', 'Valor'],
         ['Última sincronización (hora Lima)', fechaHora(ahora)],
@@ -288,18 +419,24 @@ Deno.serve(async (req) => {
         ['Ciclos', ciclos.length], ['Filas de resumen', resumen.length],
         ['Personal', personal.length], ['Escaneos', escaneos.length],
         ['Umbral de tiempo de ciclo (min)', txt(parametros.UMBRAL_TIEMPO_CICLO_MIN)],
-        ['Nota', 'Estas pestañas se sobrescriben en cada sincronización. Crea tus gráficos o tablas dinámicas en otras pestañas.'],
+        ['Auditoría 5S · filas BD', s5 ? s5.bd.length : ''],
+        ['Auditoría 5S · observaciones', s5 ? s5.obs.length : ''],
+        ['Auditoría 5S · estado', estadoS5],
+        ['Nota', 'Estas pestañas se sobrescriben en cada sincronización. Crea tus gráficos o tablas dinámicas en otras pestañas. Las miniaturas de 5S_Observaciones se renuevan en cada sincronización.'],
       ] },
     ];
 
     paso = 'escritura';
     const tituloHoja = await escribirHoja(token, saEmail, hojaId, pestanas);
 
-    const filas = { ciclos: ciclos.length, resumen: resumen.length, personal: personal.length, escaneos: escaneos.length };
+    const filas = {
+      ciclos: ciclos.length, resumen: resumen.length, personal: personal.length, escaneos: escaneos.length,
+      s5_bd: s5 ? s5.bd.length : 0, s5_observaciones: s5 ? s5.obs.length : 0,
+    };
     await fijarParametro(sb, 'ULTIMA_SYNC_SHEETS', ahora);
-    await fijarParametro(sb, 'ULTIMO_ERROR_SYNC_SHEETS', '');
+    await fijarParametro(sb, 'ULTIMO_ERROR_SYNC_SHEETS', s5 ? '' : `${fechaHora(ahora)} · Auditoría 5S: ${s5Error}`);
     await sb.from('bitacora').insert({ usuario_id: usuarioId, modulo: 'SHEETS', accion: 'Sincronización OK', detalle: `${origen} · ${JSON.stringify(filas)}` });
-    return responder({ ok: true, hoja: tituloHoja, filas, origen, duracion_ms: Date.now() - inicio });
+    return responder({ ok: true, hoja: tituloHoja, filas, origen, s5: estadoS5, duracion_ms: Date.now() - inicio });
   } catch (e) {
     const msg = (e && (e as Error).message) || String(e);
     await fijarParametro(sb, 'ULTIMO_ERROR_SYNC_SHEETS', `${fechaHora(new Date().toISOString())} · ${msg}`);

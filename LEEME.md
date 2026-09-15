@@ -6,7 +6,7 @@ respaldado por **Supabase** (Postgres + Auth + Edge Functions + Vault + pg_cron)
 ## Estado actual
 
 - **Proyecto Supabase** `agritracer-don-ricardo` (ref `ptsvriudoilsyofgccsb`) con
-  migraciones `supabase/migrations/0001..0009` aplicadas.
+  migraciones `supabase/migrations/0001..0012` aplicadas (0012: Auditoría 5S).
 - **Edge Functions desplegadas** (código en `supabase/functions/`):
   - `admin-usuarios` — crear usuarios, restablecer contraseñas, cambiar rol, desactivar.
   - `sync-sheets` — espejo de auditoría hacia Google Sheets.
@@ -83,10 +83,40 @@ Protecciones en la base de datos (migración 0011):
 - Cada marca con **Ahora** se guarda de inmediato.
 - Avisa horas en el futuro o fuera de orden antes de avanzar.
 
+## Auditoría 5S (módulo `auditoria5s/`, migración 0012)
+
+Réplica del proceso de los Excel «TERCERA AUDITORIA 5S - <ÁREA>» (hojas CHECK LIST,
+BD, Observaciones y Resultados), con el mismo estilo secuencial de Captura.
+
+- **Auditar** (admin y captura): Nueva auditoría (área, Opinada/Inopinada, N°,
+  fecha, campaña, planta) → N° de zona → 1S → 2S → 3S → 4S → 5S → resumen de la
+  zona → siguiente zona → cerrar auditoría. Los pasos se tocan para regresar.
+- Checklist de 26 ítems (5-5-6-5-5), puntaje 0 · 1 · 1.5 · 2 por ítem.
+  `% de la S = SUMA / (n° de ítems × 2)`; zona = promedio de las 5 S; madurez
+  ≥ 90 % EXCELENTE · ≥ 75 % BIEN · ≥ 65 % REGULAR · resto CRÍTICO
+  (validado contra la auditoría 3 de Producción: 0.80 · 0.80 · 0.75 · 0.80 · 0.70 → 0.77 BIEN).
+- Cada S se guarda al continuar; cada toque queda además en el celular y se
+  recupera si se va la señal o se cierra la app.
+- **Observaciones**: libres por zona, foto «Antes» obligatoria (se comprime en el
+  celular), N° correlativo por zona que continúa entre auditorías. Al entrar a una
+  zona se avisan las observaciones abiertas de auditorías anteriores.
+- **Seguimiento**: nuevo estado (Pendiente, En ejecución, Cerrado, Cancelado,
+  Stand By, Recomendación), nota, foto «Después» y **corrección del puntaje en
+  formato checklist**. Se conserva el puntaje original, quién, cuándo y la nota.
+- **Plazo**: `S5_DIAS_CORRECCION` (3) días desde la fecha de la auditoría para el
+  rol captura; después solo admin. Una zona completa solo se reescribe directo el
+  mismo día de la auditoría; luego, únicamente por seguimiento.
+- **Catálogo** (admin): parámetros, áreas, zonas numeradas, textos del checklist y
+  reabrir/anular auditorías. Nada se borra: se desactiva o se anula.
+- Fotos en Storage privado `auditoria-5s` (la app usa URLs firmadas temporales).
+
 ## Conectar Google Sheets (referencia)
 
 Pestañas que la app sobrescribe: `Ciclos_BD`, `Resumen_Semanal`,
-`Personal_Reubicacion`, `Auditoria_Escaneos`, `Sync_Info` (horas de Lima).
+`Personal_Reubicacion`, `Auditoria_Escaneos`, `5S_BD` (mismas 19 columnas de la
+hoja BD), `5S_Observaciones` (formato de la hoja Observaciones, con miniaturas
+Antes/Después que se renuevan en cada sincronización), `5S_Resumen` y
+`Sync_Info` (horas de Lima).
 Tus otras pestañas no se tocan. Estado, frecuencia y "Sincronizar ahora" en
 `Config → Sheets`.
 
@@ -111,6 +141,12 @@ ciclos/                  Tiempos de Ciclo (Resumen · Captura · Config)
   js/importar-excel.js   Lector del Excel histórico (hoja BD)
 
 reubicacion/             Reubicación de Personal (Escanear · Personal · Datos)
+
+auditoria5s/             Auditoría 5S (Resultados · Auditar · Observaciones · Catálogo)
+  js/catalogo.js         Catálogo, parámetros y fórmulas del CHECK LIST
+  js/auditar.js          Asistente secuencial: área → zona → 1S…5S
+  js/observaciones.js    Observaciones, seguimiento y corrección de puntajes
+  js/fotos.js            Cámara, compresión y Storage privado
 
 supabase/migrations/     Esquema SQL completo (ya aplicado)
 supabase/functions/      Edge Functions admin-usuarios y sync-sheets (ya desplegadas)

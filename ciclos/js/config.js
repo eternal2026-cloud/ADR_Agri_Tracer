@@ -312,7 +312,7 @@ CONFIG.tabSheets = function (c) {
     : zona('Subir clave JSON', 'Google Cloud → Cuentas de servicio → Claves → archivo .json') +
       '<div class="ayuda" style="text-align:left">Se guarda cifrada en Supabase Vault: nunca queda en el código, en GitHub ni en este celular.</div>';
 
-  c.innerHTML = UI.panel('Estado del espejo', 'La app escribe las pestañas Ciclos_BD, Resumen_Semanal, Personal_Reubicacion, Auditoria_Escaneos y Sync_Info. Tus otras pestañas no se tocan.', estado) +
+  c.innerHTML = UI.panel('Estado del espejo', 'La app escribe las pestañas Ciclos_BD, Resumen_Semanal, Personal_Reubicacion, Auditoria_Escaneos, 5S_BD, 5S_Observaciones, 5S_Resumen y Sync_Info. Tus otras pestañas no se tocan.', estado) +
     (s.tiene_credencial && tieneHoja && s.ultima_sync ? '' : UI.panel('Cómo conectarla (una sola vez)', '', pasos)) +
     UI.panel('Hoja destino y frecuencia', '', form) +
     UI.panel('Credencial de Google', '', cred);
@@ -363,7 +363,9 @@ CONFIG.sincronizar = function () {
     return CONFIG.refrescar().then(function () {
       var f = r.filas || {};
       mostrar('<div class="aviso ok" style="margin-top:12px"><b>Listo: «' + DR.esc(r.hoja) + '» actualizada.</b><br>' +
-        DR.num(f.ciclos) + ' ciclos · ' + DR.num(f.resumen) + ' filas de resumen · ' + DR.num(f.personal) + ' personas · ' + DR.num(f.escaneos) + ' escaneos.</div>');
+        DR.num(f.ciclos) + ' ciclos · ' + DR.num(f.resumen) + ' filas de resumen · ' + DR.num(f.personal) + ' personas · ' + DR.num(f.escaneos) + ' escaneos' +
+        (f.s5_bd !== undefined ? ' · ' + DR.num(f.s5_bd) + ' filas 5S · ' + DR.num(f.s5_observaciones) + ' observaciones 5S' : '') + '.' +
+        (r.s5 && r.s5 !== 'OK' ? '<br>Auditoría 5S: ' + DR.esc(r.s5) : '') + '</div>');
       DR.toast('Google Sheet sincronizada.');
     });
   }).catch(function (e) {

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0B0908">
-<meta name="description" content="AgriTracer · Don Ricardo — Tiempos de ciclo y reubicación de personal.">
+<meta name="description" content="AgriTracer · Don Ricardo — Tiempos de ciclo, reubicación de personal y auditoría 5S.">
 <title>AgriTracer · Don Ricardo</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="img/icono.svg" type="image/svg+xml">
@@ -33,7 +33,7 @@
 
     <div id="etiquetaApp">Ingeniería de Procesos</div>
     <div id="tituloApp">AgriTracer</div>
-    <div id="sedeApp">Tiempos de ciclo · Reubicación de personal</div>
+    <div id="sedeApp">Tiempos de ciclo · Reubicación de personal · Auditoría 5S</div>
 
     <div id="loginPanel" class="login-panel">
       <div class="campo"><label for="loginUsuario">Usuario</label><input id="loginUsuario" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="ej. juan.perez"></div>
@@ -90,7 +90,8 @@ var ICO = {
   cronometro: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.5 1.5M9.5 3h5M12 3v3"/></svg>',
   grafico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 20h16"/><rect x="5.5" y="11" width="3" height="6" rx="1"/><rect x="10.5" y="6" width="3" height="11" rx="1"/><rect x="15.5" y="9" width="3" height="8" rx="1"/></svg>',
   personas: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.8-3.2 3-5 5.5-5s4.7 1.8 5.5 5"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.2c2.3.1 4 1.6 4.8 4.3"/></svg>',
-  usuarios: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.8-3.2 3-5 5.5-5s4.7 1.8 5.5 5"/><path d="M17 8v6M14 11h6"/></svg>'
+  usuarios: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.8-3.2 3-5 5.5-5s4.7 1.8 5.5 5"/><path d="M17 8v6M14 11h6"/></svg>',
+  auditoria: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M8.5 11l2 2 4-4M8.5 17h7"/></svg>'
 };
 
 var MODULOS = [
@@ -100,6 +101,8 @@ var MODULOS = [
     sub: 'Promedios por semana y fundo, muestras y gráficos', roles: ['admin', 'captura', 'visor'] },
   { href: 'reubicacion/', color: '#EF7C3B', nombre: 'Reubicación de personal', icono: ICO.personas,
     sub: 'Escanear fotocheck, buscar personal y actualizar la lista', roles: ['admin', 'captura', 'visor'] },
+  { href: 'auditoria5s/', color: '#D9622B', nombre: 'Auditoría 5S', icono: ICO.auditoria,
+    sub: 'Checklist por zona, observaciones con foto y seguimiento', roles: ['admin', 'captura', 'visor'] },
   { href: 'ciclos/#usuarios', color: '#E8B04A', nombre: 'Usuarios y configuración', icono: ICO.usuarios,
     sub: 'Dar acceso a tu equipo, listas de captura y Google Sheets', roles: ['admin'] }
 ];

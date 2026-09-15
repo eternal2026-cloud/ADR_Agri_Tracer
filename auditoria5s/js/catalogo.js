@@ -1,13 +1,16 @@
 /* ============================================================================
- * catalogo.js — NÚCLEO DE AUDITORÍA 5S: catálogo, parámetros y fórmulas
- * Mismas fórmulas del CHECK LIST del Excel:
+ * catalogo.js — NÚCLEO DE AUDITORÍA 5S: cultivos, catálogo, parámetros y fórmulas
+ * Cada cultivo (Arándano, Uva, Cítrico…) tiene su campaña, su planta y sus zonas
+ * por área; los puntajes nunca se mezclan entre cultivos.
+ * Fórmulas del CHECK LIST del Excel:
  *   % de una S = SUMA / (n° de ítems × 2) · total de la zona = promedio de las 5 S
  *   madurez: ≥ 90 % EXCELENTE · ≥ 75 % BIEN · ≥ 65 % REGULAR · resto CRÍTICO
  * ==========================================================================*/
 var VISTAS = {};
 
 var S5 = {
-  areas: [], zonas: [], items: [], parametros: {}, _carga: null,
+  cultivos: [], areas: [], zonas: [], items: [], parametros: {}, _carga: null, _cultivo: null,
+  CLAVE_CULTIVO: 'agritracer.5s.cultivo',
   NOMBRES: { 1: 'Seleccionar', 2: 'Ordenar', 3: 'Limpieza', 4: 'Estandarización', 5: 'Disciplina' },
   COLORES: { 1: '#76B729', 2: '#0097CE', 3: '#EF7C3B', 4: '#E8B04A', 5: '#D9622B' },
   ESTADOS: ['Pendiente', 'En ejecución', 'Cerrado', 'Cancelado', 'Stand By', 'Recomendación'],
@@ -15,34 +18,50 @@ var S5 = {
   PILL_ESTADO: { 'Pendiente': 'rojo', 'En ejecución': 'naranja', 'Cerrado': 'verde', 'Cancelado': 'gris', 'Stand By': 'azul', 'Recomendación': 'azul' },
   COLOR_ESTADO: { 'Pendiente': '#F06A6E', 'En ejecución': '#EF7C3B', 'Cerrado': '#76B729', 'Cancelado': '#A89A8C', 'Stand By': '#0097CE', 'Recomendación': '#4FC3F0' },
   PILL_MADUREZ: { 'EXCELENTE': 'verde', 'BIEN': 'azul', 'REGULAR': 'naranja', 'CRÍTICO': 'rojo' },
-  PUNTOS: [{ v: 0, t: 'No cumple' }, { v: 1, t: 'Parcial' }, { v: 1.5, t: '' }, { v: 2, t: 'Cumple' }]
+  PUNTOS: [{ v: 0, t: 'No cumple' }, { v: 1, t: 'Parcial' }, { v: 1.5, t: '' }, { v: 2, t: 'Cumple' }],
+  ICONOS_CULTIVO: [{ id: 'arandano', t: 'Arándano' }, { id: 'uva', t: 'Uva' }, { id: 'citrico', t: 'Cítrico' }, { id: 'hoja', t: 'Otro cultivo' }]
 };
 
 /* ------------------------------------------------ catálogo */
 S5.cargar = function (forzar) {
   if (S5._carga && !forzar) return S5._carga;
   S5._carga = Promise.all([
+    sb.from('s5_cultivos').select('*').order('orden').order('nombre'),
     sb.from('s5_areas').select('*').order('orden').order('nombre'),
-    sb.from('s5_zonas').select('*').order('area_id').order('numero'),
+    sb.from('s5_zonas').select('*').order('cultivo_id').order('area_id').order('numero'),
     sb.from('s5_items').select('*').order('s').order('numero'),
-    sb.from('parametros').select('clave,valor').in('clave', ['S5_DIAS_CORRECCION', 'S5_CAMPANA', 'S5_PLANTA'])
+    sb.from('parametros').select('clave,valor').in('clave', ['S5_DIAS_CORRECCION'])
   ]).then(function (r) {
     r.forEach(function (x) { if (x.error) throw new Error(x.error.message); });
-    S5.areas = r[0].data || [];
-    S5.zonas = r[1].data || [];
-    S5.items = r[2].data || [];
+    S5.cultivos = r[0].data || [];
+    S5.areas = r[1].data || [];
+    S5.zonas = r[2].data || [];
+    S5.items = r[3].data || [];
     S5.parametros = {};
-    (r[3].data || []).forEach(function (p) { S5.parametros[p.clave] = p.valor; });
-    if (!S5.items.length) throw new Error('El checklist 5S está vacío. Falta aplicar la migración 0012 en Supabase.');
+    (r[4].data || []).forEach(function (p) { S5.parametros[p.clave] = p.valor; });
+    if (!S5.items.length) throw new Error('El checklist 5S está vacío. Falta aplicar las migraciones 0012 y 0013 en Supabase.');
+    if (!S5.cultivos.length) throw new Error('No hay cultivos registrados. Falta aplicar la migración 0013 en Supabase.');
   }).catch(function (e) { S5._carga = null; throw e; });
   return S5._carga;
 };
 
+S5.cultivo = function (id) { return S5.cultivos.filter(function (c) { return c.id === Number(id); })[0] || null; };
 S5.area = function (id) { return S5.areas.filter(function (a) { return a.id === Number(id); })[0] || null; };
 S5.zona = function (id) { return S5.zonas.filter(function (z) { return z.id === Number(id); })[0] || null; };
 S5.item = function (id) { return S5.items.filter(function (i) { return i.id === Number(id); })[0] || null; };
-S5.zonasDe = function (areaId, todas) {
-  return S5.zonas.filter(function (z) { return z.area_id === Number(areaId) && (todas || z.activo); });
+S5.cultivosActivos = function () { return S5.cultivos.filter(function (c) { return c.activo; }); };
+
+/** Zonas de un área; si se indica cultivo, solo las de ese cultivo. */
+S5.zonasDe = function (areaId, todas, cultivoId) {
+  return S5.zonas.filter(function (z) {
+    return z.area_id === Number(areaId) && (cultivoId === undefined || cultivoId === null || z.cultivo_id === Number(cultivoId)) && (todas || z.activo);
+  });
+};
+/** Áreas que tienen zonas para un cultivo. */
+S5.areasDe = function (cultivoId, todas) {
+  return S5.areas.filter(function (a) {
+    return (todas || a.activo) && S5.zonas.some(function (z) { return z.area_id === a.id && z.cultivo_id === Number(cultivoId) && (todas || z.activo); });
+  });
 };
 S5.itemsDe = function (s, todos) {
   return S5.items.filter(function (i) { return i.s === Number(s) && (todos || i.activo); });
@@ -51,6 +70,69 @@ S5.nombreZona = function (z) { return z ? z.numero + '. ' + z.nombre : '—'; };
 S5.diasCorreccion = function () {
   var n = parseInt(S5.parametros.S5_DIAS_CORRECCION, 10);
   return isNaN(n) ? 3 : Math.max(n, 0);
+};
+
+/* ------------------------------------------------ cultivo en uso (se recuerda en el celular) */
+S5.cultivoActual = function () {
+  var c = S5.cultivo(S5._cultivo || S5.leerLocal(S5.CLAVE_CULTIVO));
+  if (!c || !c.activo) c = S5.cultivosActivos()[0] || S5.cultivos[0] || null;
+  S5._cultivo = c ? c.id : null;
+  return c;
+};
+S5.cultivoId = function () { var c = S5.cultivoActual(); return c ? c.id : null; };
+S5.fijarCultivo = function (id) {
+  S5._cultivo = Number(id);
+  S5.escribirLocal(S5.CLAVE_CULTIVO, Number(id));
+};
+
+/** Íconos SVG de cultivo (autónomos: sirven en pantalla y para el PDF). */
+S5.iconoSvg = function (icono, color, tam) {
+  var c = color || '#76B729', t = tam || 28, hoja = '#76B729', cuerpo;
+  if (icono === 'arandano') {
+    cuerpo = '<path d="M36 13c5-7 14-8 19-4-5 5-12 7-19 4z" fill="' + hoja + '"/>' +
+      '<circle cx="42" cy="41" r="14" fill="' + c + '" opacity=".8"/>' +
+      '<circle cx="24" cy="37" r="16" fill="' + c + '"/>' +
+      '<circle cx="18" cy="31" r="4.5" fill="#fff" opacity=".28"/>' +
+      '<path d="M18.5 25l3 1.6 2.5-3.6 2.5 3.6 3-1.6-1 4.2h-9z" fill="#1B2347" opacity=".78"/>' +
+      '<path d="M41 31.6l2.4 1.3 2-2.9 2 2.9 2.4-1.3-.8 3.3h-7.2z" fill="#1B2347" opacity=".62"/>';
+  } else if (icono === 'uva') {
+    cuerpo = '<path d="M33 4v10" stroke="#5D4835" stroke-width="3" stroke-linecap="round"/>' +
+      '<path d="M34 10c5-6 14-7 19-3-5 5-13 7-19 3z" fill="' + hoja + '"/>' +
+      [[19, 22], [33, 22], [47, 22], [26, 34], [40, 34], [33, 46], [19, 34], [47, 34], [26, 46], [40, 46], [33, 57]]
+        .filter(function (p, i) { return i < 6 || i === 10; })
+        .map(function (p) {
+          return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="7" fill="' + c + '"/><circle cx="' + (p[0] - 2.4) + '" cy="' + (p[1] - 2.4) + '" r="1.8" fill="#fff" opacity=".35"/>';
+        }).join('');
+  } else if (icono === 'citrico') {
+    cuerpo = '<path d="M34 13c3-7 11-9 16-7-2 6-9 9-16 7z" fill="' + hoja + '"/>' +
+      '<circle cx="32" cy="36" r="23" fill="' + c + '"/>' +
+      '<circle cx="32" cy="36" r="18" fill="#FFE2BF"/>' +
+      '<path d="M32 18v36M14 36h36M19.3 23.3l25.4 25.4M44.7 23.3L19.3 48.7" stroke="' + c + '" stroke-width="2.6" opacity=".85"/>' +
+      '<circle cx="32" cy="36" r="3.5" fill="#FFF4E6"/>';
+  } else {
+    cuerpo = '<path d="M11 53C11 28 27 12 53 11c0 26-15 42-42 42z" fill="' + c + '"/>' +
+      '<path d="M13 51L43 21" stroke="#fff" stroke-opacity=".55" stroke-width="2.6" stroke-linecap="round"/>';
+  }
+  return '<svg class="cultivo-ico" width="' + t + '" height="' + t + '" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' + cuerpo + '</svg>';
+};
+S5.iconoCultivo = function (c, tam) { return c ? S5.iconoSvg(c.icono, c.color, tam) : ''; };
+
+S5.selectorCultivoHtml = function () {
+  var actual = S5.cultivoActual();
+  return '<div class="cultivos-bar entra" role="tablist" aria-label="Cultivo">' + S5.cultivosActivos().map(function (c) {
+    return '<button type="button" role="tab" class="cultivo-chip' + (actual && c.id === actual.id ? ' activo' : '') + '" data-cultivo-sel="' + c.id + '" style="--c:' + c.color + '">' +
+      S5.iconoCultivo(c, 26) + '<span>' + DR.esc(c.nombre) + '</span></button>';
+  }).join('') + '</div>';
+};
+S5.enlazarSelectorCultivo = function (raiz, alCambiar) {
+  DR.$$('[data-cultivo-sel]', raiz).forEach(function (b) {
+    b.onclick = function () {
+      var id = Number(this.getAttribute('data-cultivo-sel'));
+      if (id === S5.cultivoId()) return;
+      S5.fijarCultivo(id);
+      alCambiar(S5.cultivo(id));
+    };
+  });
 };
 
 /* ------------------------------------------------ fórmulas del CHECK LIST */

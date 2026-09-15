@@ -6,7 +6,8 @@ respaldado por **Supabase** (Postgres + Auth + Edge Functions + Vault + pg_cron)
 ## Estado actual
 
 - **Proyecto Supabase** `agritracer-don-ricardo` (ref `ptsvriudoilsyofgccsb`) con
-  migraciones `supabase/migrations/0001..0012` aplicadas (0012: Auditoría 5S).
+  migraciones `supabase/migrations/0001..0013` aplicadas (0012: Auditoría 5S,
+  0013: Auditoría 5S por cultivo).
 - **Edge Functions desplegadas** (código en `supabase/functions/`):
   - `admin-usuarios` — crear usuarios, restablecer contraseñas, cambiar rol, desactivar.
   - `sync-sheets` — espejo de auditoría hacia Google Sheets.
@@ -83,14 +84,29 @@ Protecciones en la base de datos (migración 0011):
 - Cada marca con **Ahora** se guarda de inmediato.
 - Avisa horas en el futuro o fuera de orden antes de avanzar.
 
-## Auditoría 5S (módulo `auditoria5s/`, migración 0012)
+## Auditoría 5S (módulo `auditoria5s/`, migraciones 0012 y 0013)
 
 Réplica del proceso de los Excel «TERCERA AUDITORIA 5S - <ÁREA>» (hojas CHECK LIST,
 BD, Observaciones y Resultados), con el mismo estilo secuencial de Captura.
 
-- **Auditar** (admin y captura): Nueva auditoría (área, Opinada/Inopinada, N°,
-  fecha, campaña, planta) → N° de zona → 1S → 2S → 3S → 4S → 5S → resumen de la
-  zona → siguiente zona → cerrar auditoría. Los pasos se tocan para regresar.
+- **Por cultivo** (0013): Arándano, Uva y Cítrico tienen cada uno su campaña, su
+  planta y sus propias zonas por área (verificado contra los 21 Excel de
+  `Ejemplo/<CULTIVO>`). Resultados, observaciones, informes y Sheets **nunca
+  mezclan cultivos**. Nuevos cultivos, con ícono y color, en Catálogo.
+- **Auditar** (admin y captura): Nueva auditoría (cultivo → área → zonas, con
+  «+ Agregar área» y «+ Agregar zonas» antes de iniciar; Opinada/Inopinada, N°,
+  fecha, campaña y planta del cultivo) → N° de zona → 1S → 2S → 3S → 4S → 5S →
+  resumen de la zona → siguiente zona → cerrar auditoría. Los pasos se tocan para
+  regresar. Los auditores pueden **agregar** áreas y zonas; renombrar, renumerar o
+  desactivar es solo de administradores.
+- **Observaciones en tabla** con las columnas de la hoja Observaciones y botón
+  **Descargar Excel** con el formato manual: «Evidencia Fotográfica», colores y
+  anchos originales, color por estado, filtros, fotos Antes/Después incrustadas,
+  una hoja por área y hoja BD.
+- **Informe PDF** (Resultados): elige área y una o más fechas → resultado por S,
+  gráfico radar, detalle por área o zona y observaciones, con logo y paleta Don
+  Ricardo · Ingeniería de Procesos. Librerías locales: `vendor/jspdf.umd.min.js`
+  y `vendor/exceljs.min.js` (se cargan solo al generar).
 - Checklist de 26 ítems (5-5-6-5-5), puntaje 0 · 1 · 1.5 · 2 por ítem.
   `% de la S = SUMA / (n° de ítems × 2)`; zona = promedio de las 5 S; madurez
   ≥ 90 % EXCELENTE · ≥ 75 % BIEN · ≥ 65 % REGULAR · resto CRÍTICO
@@ -133,7 +149,7 @@ css/estilos.css          Sistema visual único (colores oficiales Don Ricardo)
 img/fondo.jpg, icono.svg Foto del fundo e isotipo
 js/nucleo.js             Utilidades DR.* (animaciones, toasts, isotipo, íconos)
 js/supabase-cliente.js   Cliente Supabase + sesión + RPC + Edge Functions (AT.*)
-vendor/                  anime.js, supabase-js, html5-qrcode, jsQR (UMD)
+vendor/                  anime.js, supabase-js, html5-qrcode, jsQR, jsPDF 2.5.2, ExcelJS 4.4.0 (UMD)
 
 ciclos/                  Tiempos de Ciclo (Resumen · Captura · Config)
   js/captura.js          Asistente secuencial por etapas
@@ -147,6 +163,9 @@ auditoria5s/             Auditoría 5S (Resultados · Auditar · Observaciones �
   js/auditar.js          Asistente secuencial: área → zona → 1S…5S
   js/observaciones.js    Observaciones, seguimiento y corrección de puntajes
   js/fotos.js            Cámara, compresión y Storage privado
+  js/informes.js         Excel de observaciones (formato manual) e informe PDF con radar
+  js/resultados.js       Resultados por cultivo, radar e informe PDF por fechas
+  js/config.js           Catálogo: cultivos, áreas, zonas por cultivo, checklist, auditorías
 
 supabase/migrations/     Esquema SQL completo (ya aplicado)
 supabase/functions/      Edge Functions admin-usuarios y sync-sheets (ya desplegadas)

@@ -1,11 +1,18 @@
 /* ============================================================================
  * observaciones.js — HOJA «OBSERVACIONES» DEL EXCEL, CON SEGUIMIENTO
- * Registro libre por zona (foto «Antes» obligatoria), lista con filtros,
- * detalle con línea de tiempo y seguimiento: nuevo estado, nota, foto
- * «Después» y sobrescritura del puntaje en formato checklist, dentro del plazo
- * (S5_DIAS_CORRECCION) o por un administrador. Todo queda en s5_seguimientos.
+ * Siempre de UN cultivo. Registro libre por zona (foto «Antes» obligatoria),
+ * vista en tarjetas o en tabla con el formato del Excel manual, descarga del
+ * Excel con ese formato, detalle con línea de tiempo y seguimiento: nuevo
+ * estado, nota, foto «Después» y sobrescritura del puntaje en formato
+ * checklist dentro del plazo (S5_DIAS_CORRECCION) o por un administrador.
  * ==========================================================================*/
-var OBS = { filtros: { estado: 'abiertas', area: '', zona: '', auditoria: '' }, lista: [], auds: {}, form: null, seg: null, LIMITE: 150 };
+var OBS = {
+  filtros: { estado: 'abiertas', area: '', zona: '', auditoria: '', vista: S5.leerLocal('agritracer.5s.vistaObs') || 'tarjetas' },
+  lista: [], auds: {}, notas: {}, notasPedidas: {}, form: null, seg: null, LIMITE: 150,
+  // Colores de estado del formato condicional del Excel manual.
+  COLOR_XL: { 'Pendiente': ['#9DC3E6', '#14100C'], 'En ejecución': ['#ED7D31', '#FFFFFF'], 'Cancelado': ['#FF0000', '#FFFFFF'],
+    'Cerrado': ['#92D050', '#FFFFFF'], 'Recomendación': ['#FFC000', '#FFFFFF'], 'Stand By': ['#BDD7EE', '#14100C'] }
+};
 
 VISTAS.observaciones = function (cont) {
   S5.cargar().then(OBS.cargar).then(function () { OBS.pintar(true); }).catch(function (e) { UI.error(cont, e); });
@@ -13,8 +20,8 @@ VISTAS.observaciones = function (cont) {
 
 OBS.cargar = function () {
   return Promise.all([
-    sb.from('s5_auditorias').select('id,codigo,area_id,numero_auditoria,tipo,fecha,estado,campana').order('fecha', { ascending: false }).limit(1000),
-    sb.from('s5_observaciones').select('*').order('fecha_registro', { ascending: false }).order('numero', { ascending: false }).limit(2000)
+    sb.from('s5_auditorias').select('id,codigo,cultivo_id,area_id,numero_auditoria,tipo,fecha,estado,campana').order('fecha', { ascending: false }).limit(2000),
+    sb.from('s5_observaciones').select('*').order('fecha_registro', { ascending: false }).order('numero', { ascending: false }).limit(3000)
   ]).then(function (r) {
     if (r[0].error) throw new Error(r[0].error.message);
     if (r[1].error) throw new Error(r[1].error.message);
@@ -30,11 +37,13 @@ OBS.audDe = function (o) { return o.s5_auditorias || OBS.auds[o.auditoria_id] ||
 OBS.reemplazar = function (o) {
   var i = OBS.lista.map(function (x) { return x.id; }).indexOf(o.id);
   if (i > -1) OBS.lista[i] = o; else OBS.lista.unshift(o);
+  delete OBS.notasPedidas[o.id];
   if (DR.vista === 'observaciones') OBS.pintar(false);
 };
 
 OBS.coincide = function (o, sinEstado) {
   var f = OBS.filtros, a = OBS.audDe(o);
+  if (a.cultivo_id !== S5.cultivoId()) return false;
   if (f.area && String(a.area_id) !== String(f.area)) return false;
   if (f.zona && String(o.zona_id) !== String(f.zona)) return false;
   if (f.auditoria && o.auditoria_id !== f.auditoria) return false;
@@ -43,13 +52,13 @@ OBS.coincide = function (o, sinEstado) {
   return o.estado === f.estado;
 };
 
-/** Selección única en un grupo de .opcion; alElegir(valor). */
+/** Selección única en un grupo de .opcion (los botones .agregar no son opciones); alElegir(valor). */
 OBS.chips = function (sel, alElegir) {
   var grupo = DR.$(sel);
   if (!grupo) return;
   grupo.onclick = function (ev) {
     var b = ev.target.closest('.opcion');
-    if (!b) return;
+    if (!b || b.classList.contains('agregar')) return;
     DR.$$('.opcion', grupo).forEach(function (x) { x.classList.toggle('activa', x === b); });
     if (DR.anima) anime({ targets: b, scale: [0.9, 1], duration: 300, easing: 'easeOutBack' });
     alElegir(b.getAttribute('data-valor'));
@@ -76,7 +85,7 @@ OBS.porS = function (puntajes) {
 
 /* ============================================================ LISTA */
 OBS.pintar = function (animar) {
-  var cont = DR.$('#contenido'), f = OBS.filtros;
+  var cont = DR.$('#contenido'), f = OBS.filtros, cul = S5.cultivoActual();
   if (DR.vista !== 'observaciones' || !cont) return;
   var base = OBS.lista.filter(function (o) { return OBS.coincide(o, true); });
   var visibles = base.filter(function (o) { return OBS.coincide(o); });
@@ -84,37 +93,51 @@ OBS.pintar = function (animar) {
   var chips = [{ id: 'abiertas', t: 'Abiertas', n: cuenta(function (o) { return S5.ABIERTOS.indexOf(o.estado) > -1; }) }]
     .concat(S5.ESTADOS.map(function (e) { return { id: e, t: e, n: cuenta(function (o) { return o.estado === e; }) }; }))
     .concat([{ id: 'todas', t: 'Todas', n: base.length }]);
-  var auds = Object.keys(OBS.auds).map(function (k) { return OBS.auds[k]; })
-    .filter(function (a) { return a.estado !== 'anulada' && (!f.area || String(a.area_id) === String(f.area)); });
+  var auds = Object.keys(OBS.auds).map(function (k) { return OBS.auds[k]; }).filter(function (a) {
+    return a.estado !== 'anulada' && a.cultivo_id === S5.cultivoId() && (!f.area || String(a.area_id) === String(f.area));
+  });
   var op = function (valor, texto, actual) {
     return '<option value="' + DR.esc(valor) + '"' + (String(valor) === String(actual) ? ' selected' : '') + '>' + DR.esc(texto) + '</option>';
   };
+  var muestra = visibles.slice(0, OBS.LIMITE);
 
   cont.innerHTML = UI.encabezado('Auditoría 5S', 'Observaciones', 'Sustento de los puntajes. Registra el seguimiento de cada hallazgo y, si ya se levantó dentro del plazo, corrige el puntaje del checklist.') +
+    S5.selectorCultivoHtml() +
     '<div class="filtros5s entra">' +
-      '<select id="fArea" aria-label="Área">' + op('', 'Todas las áreas', f.area) + S5.areas.map(function (a) { return op(a.id, a.nombre, f.area); }).join('') + '</select>' +
+      '<select id="fArea" aria-label="Área">' + op('', 'Todas las áreas', f.area) + (cul ? S5.areasDe(cul.id, true) : []).map(function (a) { return op(a.id, a.nombre, f.area); }).join('') + '</select>' +
       '<select id="fZona" aria-label="Zona"' + (f.area ? '' : ' disabled') + '>' + op('', f.area ? 'Todas las zonas' : 'Zona: elige un área', f.zona) +
-        (f.area ? S5.zonasDe(f.area, true).map(function (z) { return op(z.id, S5.nombreZona(z), f.zona); }).join('') : '') + '</select>' +
+        (f.area && cul ? S5.zonasDe(f.area, true, cul.id).map(function (z) { return op(z.id, S5.nombreZona(z), f.zona); }).join('') : '') + '</select>' +
       '<select id="fAud" aria-label="Auditoría">' + op('', 'Todas las auditorías', f.auditoria) + auds.map(function (a) {
-        return op(a.id, a.codigo + ' · ' + ((S5.area(a.area_id) || {}).nombre || '') + ' N° ' + a.numero_auditoria, f.auditoria);
+        return op(a.id, a.codigo + ' · ' + ((S5.area(a.area_id) || {}).nombre || '') + ' N° ' + a.numero_auditoria + ' · ' + S5.fecha(a.fecha), f.auditoria);
       }).join('') + '</select>' +
     '</div>' +
     '<div class="chips entra">' + chips.map(function (c) {
       return '<button type="button" class="filtro' + (f.estado === c.id ? ' activo' : '') + '" data-estado="' + DR.esc(c.id) + '">' + DR.esc(c.t) + '<small>' + c.n + '</small></button>';
     }).join('') + '</div>' +
-    '<div class="conteo">' + visibles.length + ' observación(es)' + (visibles.length > OBS.LIMITE ? ' · se muestran las ' + OBS.LIMITE + ' más recientes' : '') + '</div>' +
-    '<div id="listaObs">' + (visibles.length ? visibles.slice(0, OBS.LIMITE).map(OBS.tarjetaHtml).join('')
-      : '<div class="vacio">' + (OBS.lista.length ? 'Ninguna observación coincide con los filtros.' : 'Aún no hay observaciones. Se registran desde Auditar, dentro de cada zona.') + '</div>') + '</div>';
+    '<div class="obs-herramientas"><div class="vista-toggle" role="tablist">' +
+      '<button type="button" data-vista-obs="tarjetas"' + (f.vista === 'tarjetas' ? ' class="activo"' : '') + '>Tarjetas</button>' +
+      '<button type="button" data-vista-obs="tabla"' + (f.vista === 'tabla' ? ' class="activo"' : '') + '>Tabla</button></div>' +
+      '<button type="button" class="btn azul chico" id="btnExcelObs"' + (visibles.length ? '' : ' disabled') + '>' + DR.ICONOS.subir + '<span>Descargar Excel</span></button></div>' +
+    '<div class="conteo">' + visibles.length + ' observación(es) de ' + DR.esc(cul ? cul.nombre : '') + (visibles.length > OBS.LIMITE ? ' · se muestran las ' + OBS.LIMITE + ' más recientes (el Excel incluye todas)' : '') + '</div>' +
+    '<div id="listaObs">' + (visibles.length
+      ? (f.vista === 'tabla' ? OBS.tablaHtml(muestra) : muestra.map(OBS.tarjetaHtml).join(''))
+      : '<div class="vacio">' + (base.length ? 'Ninguna observación coincide con los filtros.' : 'Aún no hay observaciones de este cultivo. Se registran desde Auditar, dentro de cada zona.') + '</div>') + '</div>';
 
   if (animar) DR.entrarPaneles('#contenido');
   FOTOS.pintar('#listaObs');
+  S5.enlazarSelectorCultivo(cont, function () { f.area = ''; f.zona = ''; f.auditoria = ''; OBS.pintar(true); });
   DR.$('#fArea').onchange = function () { f.area = this.value; f.zona = ''; f.auditoria = ''; OBS.pintar(false); };
   DR.$('#fZona').onchange = function () { f.zona = this.value; OBS.pintar(false); };
   DR.$('#fAud').onchange = function () { f.auditoria = this.value; OBS.pintar(false); };
   DR.$$('[data-estado]', cont).forEach(function (b) { b.onclick = function () { f.estado = this.getAttribute('data-estado'); OBS.pintar(false); }; });
+  DR.$$('[data-vista-obs]', cont).forEach(function (b) {
+    b.onclick = function () { f.vista = this.getAttribute('data-vista-obs'); S5.escribirLocal('agritracer.5s.vistaObs', f.vista); OBS.pintar(false); };
+  });
+  DR.$('#btnExcelObs').onclick = OBS.descargarExcel;
   DR.$$('[data-obs]', cont).forEach(function (b) {
     b.onclick = function () { var o = OBS.buscar(this.getAttribute('data-obs')); if (o) OBS.abrirDetalle(o); };
   });
+  if (f.vista === 'tabla' && muestra.length) OBS.completarNotas(muestra);
 };
 
 OBS.tarjetaHtml = function (o) {
@@ -126,6 +149,66 @@ OBS.tarjetaHtml = function (o) {
     '<span class="obs-texto">' + DR.esc(DR.recortar(o.descripcion, 140)) + '</span>' +
     '<span class="obs-det">' + [area.nombre, a.codigo, S5.fecha(o.fecha_registro)].filter(Boolean).map(DR.esc).join(' · ') +
       (abierta ? ' · hace ' + S5.diasDesde(o.fecha_registro) + ' d' : '') + '</span></span></button>';
+};
+
+/** Tabla con las columnas de la hoja Observaciones del Excel (+ Área cuando se ven todas). */
+OBS.tablaHtml = function (lista) {
+  var conArea = !OBS.filtros.area;
+  var titulos = ['N°', 'Semana', 'Fecha de Registro'].concat(conArea ? ['Área'] : []).concat(['Zona', 'Observaciones', 'Acción correctiva', 'Estado', 'Fecha de cierre', 'Antes', 'Después']);
+  var foto = function (ruta, t) { return ruta ? '<img alt="' + t + '" data-foto="' + DR.esc(ruta) + '" data-ver="' + DR.esc(ruta) + '">' : ''; };
+  return '<div class="tabla-cont tabla-obs-cont"><table class="tabla-obs"><thead><tr>' + titulos.map(function (t) { return '<th>' + t + '</th>'; }).join('') + '</tr></thead><tbody>' +
+    lista.map(function (o) {
+      var a = OBS.audDe(o), z = S5.zona(o.zona_id) || {}, col = OBS.COLOR_XL[o.estado] || ['#A89A8C', '#FFFFFF'];
+      return '<tr data-obs="' + o.id + '"><td class="centro">' + o.numero + '</td><td class="centro">' + DR.esc(o.semana) + '</td><td class="centro">' + S5.fecha(o.fecha_registro) + '</td>' +
+        (conArea ? '<td class="centro">' + DR.esc((S5.area(a.area_id) || {}).nombre || '') + '</td>' : '') +
+        '<td class="centro">' + DR.esc(z.nombre || '') + '</td>' +
+        '<td class="txt">' + DR.esc(o.descripcion) + '</td>' +
+        '<td class="txt" data-accion="' + o.id + '">' + DR.esc(OBS.accionConNotas(o)) + '</td>' +
+        '<td class="centro"><span class="estado-xl" style="background:' + col[0] + ';color:' + col[1] + '">' + DR.esc(o.estado) + '</span></td>' +
+        '<td class="centro">' + (o.fecha_cierre ? S5.fecha(o.fecha_cierre) : '') + '</td>' +
+        '<td class="foto">' + foto(o.foto_antes, 'Antes') + '</td><td class="foto">' + foto(o.foto_despues, 'Después') + '</td></tr>';
+    }).join('') + '</tbody></table></div>';
+};
+
+/** «Acción correctiva // nota de seguimiento // …», como se escribía en el Excel. */
+OBS.accionConNotas = function (o) {
+  return [o.accion_correctiva].concat(OBS.notas[o.id] || []).filter(Boolean).join(' // ');
+};
+
+OBS.completarNotas = function (lista) {
+  var faltan = lista.filter(function (o) { return !OBS.notasPedidas[o.id]; }).map(function (o) { return o.id; });
+  if (!faltan.length) return;
+  faltan.forEach(function (id) { OBS.notasPedidas[id] = true; });
+  INF.notasDe(faltan).then(function (mapa) {
+    faltan.forEach(function (id) {
+      OBS.notas[id] = mapa[id] || [];
+      var td = DR.$('[data-accion="' + id + '"]'), o = OBS.buscar(id);
+      if (td && o) td.textContent = OBS.accionConNotas(o);
+    });
+  }).catch(function () { faltan.forEach(function (id) { delete OBS.notasPedidas[id]; }); });
+};
+
+OBS.descargarExcel = function () {
+  var btn = this, cul = S5.cultivoActual(), f = OBS.filtros, original = btn.innerHTML;
+  var lista = OBS.lista.filter(function (o) { return OBS.coincide(o); });
+  if (!cul || !lista.length) { DR.toast('No hay observaciones con estos filtros.', 'error'); return; }
+  // Auditorías del filtro (también las sin observaciones) para la hoja BD.
+  var auds = {};
+  Object.keys(OBS.auds).forEach(function (k) {
+    var a = OBS.auds[k];
+    if (a.estado !== 'anulada' && a.cultivo_id === cul.id && (!f.area || String(a.area_id) === String(f.area)) && (!f.auditoria || a.id === f.auditoria)) auds[k] = a;
+  });
+  btn.disabled = true;
+  INF.excelObservaciones({ cultivo: cul, obs: lista, auds: auds, areaId: f.area || null, alProgreso: function (t) { btn.textContent = t; } }).then(function (blob) {
+    var area = f.area ? (S5.area(f.area) || {}).nombre : 'Todas las áreas';
+    INF.descargar(blob, INF.nombreArchivo(['Auditoría 5S', cul.nombre, area, 'Observaciones', S5.fecha(S5.hoy()).replace(/\//g, '-')], 'xlsx'));
+    DR.toast('Excel descargado: ' + lista.length + ' observación(es).');
+  }).catch(function (e) {
+    DR.toast('No se generó el Excel: ' + e.message, 'error');
+  }).then(function () {
+    btn.disabled = false;
+    btn.innerHTML = original;
+  });
 };
 
 /** Hoja con una lista de observaciones (p. ej. abiertas de auditorías anteriores de una zona). */
@@ -158,7 +241,7 @@ OBS.abrirDetalle = function (o, opc) {
 };
 
 OBS.pintarDetalle = function (o, a, segs, opc) {
-  var z = S5.zona(o.zona_id) || {}, area = S5.area(a.area_id) || {};
+  var z = S5.zona(o.zona_id) || {}, area = S5.area(a.area_id) || {}, cul = S5.cultivo(a.cultivo_id);
   var puede = AT.puedeCapturar() && a.estado !== 'anulada';
   var editable = puede && (AT.esAdmin() || S5.hoy() <= S5.sumarDias(o.fecha_registro, S5.diasCorreccion()));
   var figura = function (titulo, ruta) {
@@ -181,7 +264,7 @@ OBS.pintarDetalle = function (o, a, segs, opc) {
   UI.abrirHoja('<div class="asa"></div>' +
     '<div class="obs-cab">' + S5.pillEstado(o.estado) + '<span>' + DR.esc(a.codigo) + ' · Auditoría N° ' + a.numero_auditoria + '</span></div>' +
     '<div class="res-nombre">Observación N° ' + o.numero + '</div>' +
-    '<div class="res-dni">' + DR.esc(area.nombre || '') + ' · ' + DR.esc(S5.nombreZona(z)) + (o.s_referencia ? ' · ' + o.s_referencia + 'S ' + S5.NOMBRES[o.s_referencia] : '') + '</div>' +
+    '<div class="res-dni" style="letter-spacing:.02em">' + DR.esc([cul ? cul.nombre : '', area.nombre, S5.nombreZona(z)].filter(Boolean).join(' · ')) + (o.s_referencia ? ' · ' + o.s_referencia + 'S ' + S5.NOMBRES[o.s_referencia] : '') + '</div>' +
     '<div class="fotos-par">' + figura('Antes', o.foto_antes) + figura('Después', o.foto_despues) + '</div>' +
     '<div class="res-obs"><b>Observación</b>' + DR.esc(o.descripcion) + '</div>' +
     (o.accion_correctiva ? '<div class="res-obs accion"><b>Acción correctiva</b>' + DR.esc(o.accion_correctiva) + '</div>' : '') +
@@ -213,7 +296,7 @@ OBS.abrirFormulario = function (opc) {
   UI.abrirHoja('<div class="asa"></div>' +
     '<div class="res-estado" style="color:#F8B68A">' + FOTOS.ICONO + '<span>' + (o ? 'Editar observación N° ' + o.numero : 'Nueva observación') + '</span></div>' +
     '<div class="res-nombre">' + DR.esc(S5.nombreZona(z)) + '</div>' +
-    '<div class="res-dni">' + DR.esc((S5.area(a.area_id) || {}).nombre || '') + ' · ' + DR.esc(a.codigo) + ' · Auditoría N° ' + a.numero_auditoria + '</div>' +
+    '<div class="res-dni" style="letter-spacing:.02em">' + DR.esc(AUD.etiqueta(a)) + '</div>' +
     '<div class="form" style="margin-top:14px">' +
       '<div class="campo ancho"><label for="obsDesc">Observación<em>obligatorio</em></label>' +
         '<textarea id="obsDesc" rows="3" placeholder="Ej. Jabas con precintos sin identificar ni delimitar.">' + DR.esc(o ? o.descripcion : '') + '</textarea></div>' +
@@ -290,7 +373,7 @@ OBS.abrirSeguimiento = function (o, a, opc) {
   UI.abrirHoja('<div class="asa"></div>' +
     '<div class="res-estado" style="color:#F8B68A">' + DR.ICONOS.reloj + '<span>Seguimiento</span></div>' +
     '<div class="res-nombre">Obs. N° ' + o.numero + ' · ' + DR.esc(S5.nombreZona(z)) + '</div>' +
-    '<div class="res-dni">' + DR.esc(DR.recortar(o.descripcion, 120)) + '</div>' +
+    '<div class="res-dni" style="letter-spacing:0">' + DR.esc(DR.recortar(o.descripcion, 120)) + '</div>' +
     '<div class="campo" style="margin-top:16px"><label>Nuevo estado</label><div class="opciones" id="segEstados">' + S5.ESTADOS.map(function (e) {
       return '<button type="button" class="opcion' + (e === o.estado ? ' activa' : '') + '" data-valor="' + e + '" style="--c:' + S5.COLOR_ESTADO[e] + '">' + e + '</button>';
     }).join('') + '</div><div class="ayuda-campo" id="segAyudaEstado"></div></div>' +

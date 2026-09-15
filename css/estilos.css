@@ -606,6 +606,45 @@ tr.fila-cerca td{background:#23170E}
 .fila-cat.item-cat{grid-template-columns:auto minmax(0,1fr);align-items:start}
 .fila-acc{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
 
+/* ---- Auditoría 5S · cultivos, tabla de observaciones e informes ---- */
+.cultivos-bar{display:flex;gap:8px;overflow-x:auto;padding:2px 0 8px;margin-bottom:12px;scrollbar-width:none}
+.cultivos-bar::-webkit-scrollbar{display:none}
+.cultivo-chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:8px;padding:6px 15px 6px 8px;border-radius:999px;border:1.5px solid var(--borde);background:#1A1411;color:var(--texto-2);font:500 15px var(--fuente);cursor:pointer;transition:border-color .15s,background .15s,color .15s}
+.cultivo-chip.activo{border-color:var(--c);background:color-mix(in srgb,var(--c) 24%,#1A1411);color:var(--texto)}
+.cultivo-ico{display:block;flex:0 0 auto}
+.wiz-cab .cultivo-ico{margin-right:-2px}
+.opcion.con-ico{display:inline-flex;align-items:center;gap:8px;padding:7px 15px 7px 9px}
+.opcion.agregar{border-style:dashed;border-color:#4C7A20;background:transparent;color:#B7E27C}
+.zonas-previa{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.zonas-previa span{padding:4px 10px;border-radius:999px;background:#130F0C;border:1px solid var(--borde);font-size:13px;color:var(--texto-2)}
+.obs-herramientas{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-bottom:10px}
+.vista-toggle{display:inline-grid;grid-template-columns:1fr 1fr;gap:3px;padding:3px;border-radius:12px;background:#130F0C;border:1px solid var(--borde)}
+.vista-toggle button{padding:7px 14px;border:0;border-radius:9px;background:transparent;color:var(--texto-3);font:500 13.5px var(--fuente);cursor:pointer}
+.vista-toggle button.activo{background:#33291F;color:var(--texto)}
+.tabla-obs-cont{max-height:none}
+.tabla-obs{min-width:1120px}
+.tabla-obs th{background:#5B9BD5;color:#fff;text-align:center;white-space:normal}
+.tabla-obs td{white-space:normal;vertical-align:middle}
+.tabla-obs td.centro{text-align:center}
+.tabla-obs td.txt{min-width:210px;max-width:320px;line-height:1.4;font-size:13px}
+.tabla-obs td.foto{width:110px;text-align:center}
+.tabla-obs img{display:block;width:100px;height:76px;margin:0 auto;object-fit:cover;border-radius:8px;background:#130F0C;cursor:zoom-in}
+.tabla-obs tbody tr{cursor:pointer}
+.estado-xl{display:inline-block;padding:4px 10px;border-radius:6px;font-weight:600;font-size:12.5px;white-space:nowrap}
+.fechas-lista{display:grid;gap:6px;margin:10px 0}
+.fecha-op{display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px;padding:10px 12px;border-radius:12px;border:1px solid var(--borde);background:#1A1411;cursor:pointer;text-transform:none;letter-spacing:normal;color:var(--texto);font-size:14.5px}
+.fecha-op input{width:20px;height:20px;flex:0 0 20px;accent-color:#76B729}
+.fecha-op b{font-weight:600}
+.fecha-op span{color:var(--texto-3);font-size:13px}
+.fecha-op.activa{border-color:#76B729;background:#15200D}
+.radar{display:flex;justify-content:center;margin:6px 0}
+.radar svg{max-width:100%;height:auto}
+.cultivo-fila{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 12px;align-items:center;padding:14px 0;border-bottom:1px solid #2E251E}
+.cultivo-fila:last-child{border-bottom:0}
+.cultivo-fila > .form,.cultivo-fila > .fila-acc{grid-column:1/-1}
+.cultivo-fila.inactiva > .cultivo-ico{filter:grayscale(1);opacity:.5}
+.cultivo-fila input[type="color"]{padding:4px;height:46px}
+
 @media (prefers-reduced-motion: reduce){
   #splashFondo::before,.cc-pasos i.actual{animation:none}
 }

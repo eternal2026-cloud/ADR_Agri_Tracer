@@ -217,7 +217,7 @@ const fijarParametro = (sb: SupabaseClient, clave: string, valor: string) =>
 /* ------------------------------------------------------------ Auditoría 5S */
 type S5Datos = {
   bd: Fila[]; resumen: Fila[]; obs: Fila[]; auds: Map<string, Fila>; zonas: Map<number, Fila>; areas: Map<number, Fila>;
-  segs: Map<string, Fila[]>; fotos: Map<string, string>; fotosError: string;
+  cultivos: Map<number, Fila>; segs: Map<string, Fila[]>; fotos: Map<string, string>; fotosError: string;
 };
 
 /** URLs firmadas por 7 días del bucket privado; se renuevan en cada sincronización. */
@@ -233,7 +233,7 @@ async function firmarFotos(sb: SupabaseClient, rutas: string[]): Promise<Map<str
 }
 
 async function leerS5(sb: SupabaseClient): Promise<S5Datos> {
-  const [bd, resumen, obs, auds, zonas, areas, segs] = await Promise.all([
+  const [bd, resumen, obs, auds, zonas, areas, segs, cultivos] = await Promise.all([
     leerRpc(sb, 'fn_s5_bd'),
     leerRpc(sb, 'fn_s5_resumen'),
     leerTodo(sb, 's5_observaciones', [['fecha_registro', true], ['zona_id', true], ['numero', true]]),
@@ -241,6 +241,7 @@ async function leerS5(sb: SupabaseClient): Promise<S5Datos> {
     leerTodo(sb, 's5_zonas', [['id', true]]),
     leerTodo(sb, 's5_areas', [['id', true]]),
     leerTodo(sb, 's5_seguimientos', [['fecha', true]]),
+    leerTodo(sb, 's5_cultivos', [['orden', true]]),
   ]);
   const mapaAuds = new Map<string, Fila>(auds.map((a) => [a.id, a]));
   const validas = obs.filter((o) => { const a = mapaAuds.get(o.auditoria_id); return a && a.estado !== 'anulada'; });
@@ -252,6 +253,7 @@ async function leerS5(sb: SupabaseClient): Promise<S5Datos> {
   return {
     bd, resumen, obs: validas, auds: mapaAuds, segs: porObs, fotos, fotosError,
     zonas: new Map<number, Fila>(zonas.map((z) => [z.id, z])), areas: new Map<number, Fila>(areas.map((a) => [a.id, a])),
+    cultivos: new Map<number, Fila>(cultivos.map((c) => [c.id, c])),
   };
 }
 
@@ -264,19 +266,20 @@ function pestanasS5(d: S5Datos | null): Pestana[] {
   const aud = (f: Fila): Fila => d.auds.get(f.auditoria_id) || {};
   const segsDe = (f: Fila): Fila[] => d.segs.get(f.id) || [];
 
-  // Mismos 19 encabezados que la hoja BD del Excel; las columnas extra van al final.
+  // Mismos 19 encabezados que la hoja BD del Excel; las columnas extra (incluido CULTIVO, para no mezclar) van al final.
   const colsBd: Col[] = [
     TX('fecha', 'FECHA'), TX('campana', 'CAMPAÑA'), TX('planta', 'PLANTA'), NU('semana', 'SEMANA', 0), NU('numero_auditoria', 'N° AUDITORIA', 0),
     TX('tipo_auditoria', 'TIPO AUDITORIA'), TX('area', 'ÁREA'), NU('numero_zona', 'N° ZONA', 0), TX('sub_area', 'SUB ÁREA'), TX('zona', 'ZONA'), TX('s', 'S'),
     NU('i1', '1', 1), NU('i2', '2', 1), NU('i3', '3', 1), NU('i4', '4', 1), NU('i5', '5', 1), NU('i6', '6', 1),
     NU('suma', 'SUMA', 1), NU('puntaje', 'PUNTAJE %', 4),
     TX('codigo', 'CÓDIGO'), ['ESTADO AUDITORÍA', (f) => f.estado_auditoria === 'cerrada' ? 'Cerrada' : 'En curso'],
-    ['ESTADO ZONA', (f) => f.estado_zona === 'completa' ? 'Completa' : 'En curso'],
+    ['ESTADO ZONA', (f) => f.estado_zona === 'completa' ? 'Completa' : 'En curso'], TX('cultivo', 'CULTIVO'),
   ];
 
   // Formato de la hoja Observaciones; los seguimientos se concatenan con « // » como en el Excel.
   const colsObs: Col[] = [
     ['N°', (f) => f.numero], ['Semana', (f) => f.semana ?? ''], ['Fecha de Registro', (f) => txt(f.fecha_registro)],
+    ['Cultivo', (f) => seguro((d.cultivos.get(aud(f).cultivo_id) || {}).nombre)],
     ['Área', (f) => seguro((d.areas.get(aud(f).area_id) || {}).nombre)], ['Zona', (f) => seguro((d.zonas.get(f.zona_id) || {}).nombre)],
     ['Observaciones', (f) => seguro(f.descripcion)],
     ['Acción correctiva', (f) => seguro([f.accion_correctiva, ...segsDe(f).map((s) => s.nota).filter((n) => n && n !== 'Registro inicial')].filter(Boolean).join(' // '))],
@@ -289,7 +292,7 @@ function pestanasS5(d: S5Datos | null): Pestana[] {
   ];
 
   const colsRes: Col[] = [
-    TX('codigo', 'Código'), TX('fecha', 'Fecha'), NU('semana', 'Semana', 0), TX('area', 'Área'), NU('numero_auditoria', 'N° auditoría', 0), TX('tipo', 'Tipo'),
+    TX('codigo', 'Código'), TX('cultivo', 'Cultivo'), TX('campana', 'Campaña'), TX('fecha', 'Fecha'), NU('semana', 'Semana', 0), TX('area', 'Área'), NU('numero_auditoria', 'N° auditoría', 0), TX('tipo', 'Tipo'),
     ['Estado auditoría', (f) => f.estado_auditoria === 'cerrada' ? 'Cerrada' : 'En curso'], NU('numero_zona', 'N° zona', 0), TX('zona', 'Zona'),
     ['Estado zona', (f) => f.estado_zona === 'completa' ? 'Completa' : 'En curso'],
     NU('p1', '1S %', 4), NU('p2', '2S %', 4), NU('p3', '3S %', 4), NU('p4', '4S %', 4), NU('p5', '5S %', 4), NU('total', 'Total %', 4), TX('madurez', 'Madurez'),

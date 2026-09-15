@@ -1,6 +1,7 @@
 /* ============================================================================
  * auditar.js — AUDITORÍA 5S SECUENCIAL (móvil)
- * Flujo: auditorías en curso → nueva (cabecera del CHECK LIST) → N° de zona →
+ * Flujo: auditorías en curso del cultivo → nueva (cultivo → área → zonas, con
+ * opción de agregar áreas y zonas antes de iniciar) → N° de zona →
  * 1S → 2S → 3S → 4S → 5S (los pasos son tocables para regresar) → resumen de
  * la zona → siguiente zona → cerrar auditoría.
  * Cada S se guarda en el servidor al continuar; cada toque queda además en el
@@ -43,16 +44,23 @@ VISTAS.auditar = function (cont) {
   }).catch(function (e) { UI.error(cont, e); });
 };
 
+/** Texto «Arándano · Producción · A5S-00003 · N° 3» para cabeceras. */
+AUD.etiqueta = function (a) {
+  return [(S5.cultivo(a.cultivo_id) || {}).nombre, (S5.area(a.area_id) || {}).nombre, a.codigo, 'N° ' + a.numero_auditoria].filter(Boolean).join(' · ');
+};
+
 /* ============================================================ LISTA DE AUDITORÍAS */
 AUD.pintarLista = function () {
-  var cont = DR.$('#contenido');
+  var cont = DR.$('#contenido'), cul = S5.cultivoActual();
   AUD.vista = 'lista'; AUD.aud = null; AUD.zona = null; AUD.sucio = false;
   AUD.quitarBarra();
   cont.scrollTop = 0;
-  cont.innerHTML = UI.encabezado('Auditoría 5S', 'Auditorías', 'Inicia una auditoría por área o continúa una en curso. Cada zona se evalúa S por S, igual que el CHECK LIST.') +
-    '<button class="btn verde grande entra" id="btnNuevaAud" type="button">' + DR.ICONOS.mas + '<span>Nueva auditoría</span></button>' +
+  cont.innerHTML = UI.encabezado('Auditoría 5S', 'Auditorías', 'Elige el cultivo, inicia una auditoría por área o continúa una en curso. Cada zona se evalúa S por S, igual que el CHECK LIST.') +
+    S5.selectorCultivoHtml() +
+    '<button class="btn verde grande entra" id="btnNuevaAud" type="button">' + DR.ICONOS.mas + '<span>Nueva auditoría' + (cul ? ' de ' + DR.esc(cul.nombre) : '') + '</span></button>' +
     '<div id="listaAud" style="margin-top:16px"><div class="vacio">Cargando auditorías…</div></div>';
   DR.entrarPaneles('#contenido');
+  S5.enlazarSelectorCultivo(cont, AUD.pintarLista);
   DR.$('#btnNuevaAud').onclick = function () { DR.desbloquearAudio(); AUD.pintarNueva(); };
   AUD.cargarLista().then(AUD.pintarTarjetas).catch(function (e) {
     var l = DR.$('#listaAud');
@@ -61,9 +69,10 @@ AUD.pintarLista = function () {
 };
 
 AUD.cargarLista = function () {
+  var cul = S5.cultivoId();
   return Promise.all([
-    sb.from('s5_auditorias').select('*').eq('estado', 'en_curso').order('actualizado_en', { ascending: false }).limit(100),
-    sb.from('s5_auditorias').select('*').eq('estado', 'cerrada').order('cerrada_en', { ascending: false }).limit(8)
+    sb.from('s5_auditorias').select('*').eq('cultivo_id', cul).eq('estado', 'en_curso').order('actualizado_en', { ascending: false }).limit(100),
+    sb.from('s5_auditorias').select('*').eq('cultivo_id', cul).eq('estado', 'cerrada').order('cerrada_en', { ascending: false }).limit(8)
   ]).then(function (r) {
     if (r[0].error) throw new Error(r[0].error.message);
     AUD.abiertas = r[0].data || [];
@@ -78,7 +87,7 @@ AUD.cargarLista = function () {
 };
 
 AUD.tarjetaHtml = function (a) {
-  var area = S5.area(a.area_id) || {}, zonas = S5.zonasDe(a.area_id);
+  var area = S5.area(a.area_id) || {}, zonas = S5.zonasDe(a.area_id, false, a.cultivo_id);
   var ev = AUD.evals.filter(function (e) { return e.auditoria_id === a.id; });
   var estadoDe = function (z) { var e = ev.filter(function (x) { return x.zona_id === z.id; })[0]; return e ? e.estado : ''; };
   var hechas = zonas.filter(function (z) { return estadoDe(z) === 'completa'; }).length;
@@ -88,16 +97,17 @@ AUD.tarjetaHtml = function (a) {
   }).join('');
   return '<button type="button" class="ciclo-card entra" data-aud="' + a.id + '" style="--c:' + (a.estado === 'cerrada' ? '#76B729' : '#EF7C3B') + '">' +
     '<div class="cc-top"><span class="cc-codigo">' + DR.esc(area.nombre || '—') + '</span><span class="cc-hace">' + DR.hace(a.actualizado_en) + '</span></div>' +
-    '<div class="cc-sub">' + DR.esc(a.codigo) + ' · N° ' + a.numero_auditoria + ' · ' + DR.esc(a.tipo) + ' · ' + S5.fecha(a.fecha) + '</div>' +
+    '<div class="cc-sub">' + DR.esc(a.codigo) + ' · N° ' + a.numero_auditoria + ' · ' + DR.esc(a.tipo) + ' · ' + S5.fecha(a.fecha) + ' · ' + DR.esc(a.campana) + '</div>' +
     '<div class="cc-pasos" style="grid-template-columns:repeat(' + Math.max(zonas.length, 1) + ',1fr)">' + seg + '</div>' +
     '<div class="cc-sig"><span>' + (a.estado === 'cerrada' ? '<b>Cerrada</b> · ' : '') + hechas + ' de ' + zonas.length + ' zonas completas</span>' + DR.ICONOS.chevron + '</div></button>';
 };
 
 AUD.pintarTarjetas = function () {
-  var cont = DR.$('#listaAud');
+  var cont = DR.$('#listaAud'), cul = S5.cultivoActual();
   if (!cont) return;
   var h = '<div class="conteo">En curso · ' + AUD.abiertas.length + '</div>' +
-    (AUD.abiertas.length ? AUD.abiertas.map(AUD.tarjetaHtml).join('') : '<div class="vacio">No hay auditorías en curso. Inicia una con el botón verde.</div>');
+    (AUD.abiertas.length ? AUD.abiertas.map(AUD.tarjetaHtml).join('')
+      : '<div class="vacio">No hay auditorías de ' + DR.esc(cul ? cul.nombre : '') + ' en curso. Inicia una con el botón verde.</div>');
   if (AUD.recientes.length) h += '<div class="conteo" style="margin-top:18px">Cerradas recientemente · ' + AUD.recientes.length + '</div>' + AUD.recientes.map(AUD.tarjetaHtml).join('');
   cont.innerHTML = h;
   DR.$$('[data-aud]', cont).forEach(function (b) {
@@ -111,50 +121,148 @@ AUD.pintarTarjetas = function () {
 };
 
 /* ============================================================ NUEVA AUDITORÍA */
+AUD.prefsDe = function (cultivoId) { return (S5.leerLocal(AUD.PREF) || {})[cultivoId] || {}; };
+
 AUD.pintarNueva = function () {
-  var cont = DR.$('#contenido'), prefs = S5.leerLocal(AUD.PREF) || {};
-  var areas = S5.areas.filter(function (a) { return a.activo; });
+  var cont = DR.$('#contenido'), cul = S5.cultivoActual();
   AUD.vista = 'nueva';
-  AUD.nueva = { area_id: '', tipo: prefs.tipo || 'Inopinada' };
+  AUD.nueva = { cultivo_id: cul ? cul.id : null, area_id: '', tipo: null, fecha: S5.hoy(), numero: '', campana: null, planta: null };
   cont.scrollTop = 0;
   cont.innerHTML =
     '<div class="wiz-cab"><button type="button" class="wiz-volver" id="btnVolverLista">' + DR.ICONOS.atras + '<span>Auditorías</span></button>' +
     '<div class="wiz-id"><b>Nueva auditoría</b><span>El código se asigna al iniciar</span></div></div>' +
-    '<section class="etapa entra" style="--c:#EF7C3B"><div class="etapa-cab"><span class="etapa-num">Cabecera del CHECK LIST</span><h2>¿Qué área vas a auditar?</h2></div>' +
-    '<div class="datos">' +
-      '<div class="campo ancho"><label>Área<em>obligatorio</em></label><div class="opciones" id="opArea">' + areas.map(function (a) {
-        return '<button type="button" class="opcion" data-valor="' + a.id + '">' + DR.esc(a.nombre) + '<small>' + S5.zonasDe(a.id).length + ' zonas</small></button>';
-      }).join('') + '</div><div class="ayuda-campo" id="zonasPrevia"></div></div>' +
-      '<div class="campo ancho"><label>Tipo de auditoría</label><div class="opciones" id="opTipo">' + ['Opinada', 'Inopinada'].map(function (t) {
-        return '<button type="button" class="opcion' + (t === AUD.nueva.tipo ? ' activa' : '') + '" data-valor="' + t + '">' + t + '</button>';
-      }).join('') + '</div></div>' +
-      '<div class="campo"><label for="inpNumAud">N° de auditoría</label><input id="inpNumAud" type="number" inputmode="numeric" min="1" max="99" placeholder="Auto">' +
-        '<div class="ayuda-campo" id="ayudaNum">Se sugiere al elegir el área.</div></div>' +
-      '<div class="campo"><label for="inpFechaAud">Fecha</label><input id="inpFechaAud" type="date" value="' + S5.hoy() + '" max="' + S5.hoy() + '"></div>' +
-      '<div class="campo"><label for="inpCampana">Campaña</label><input id="inpCampana" autocomplete="off" value="' + DR.esc(prefs.campana || S5.parametros.S5_CAMPANA || '') + '"></div>' +
-      '<div class="campo"><label for="inpPlanta">Planta</label><input id="inpPlanta" autocomplete="off" value="' + DR.esc(prefs.planta || S5.parametros.S5_PLANTA || '') + '"></div>' +
-    '</div></section>' +
+    '<section class="etapa entra" style="--c:#EF7C3B"><div class="etapa-cab"><span class="etapa-num">Cabecera del CHECK LIST</span><h2>¿Qué vas a auditar?</h2></div>' +
+    '<div id="nuevaCuerpo"></div></section>' +
     '<div class="acciones"><button type="button" class="btn verde grande" id="btnIniciarAud">' + DR.ICONOS.checkChico + '<span>Iniciar auditoría</span></button></div>';
   DR.entrarPaneles('#contenido');
   DR.$('#btnVolverLista').onclick = AUD.pintarLista;
-  OBS.chips('#opArea', function (v) { AUD.nueva.area_id = v; AUD.sugerirNumero(); });
-  OBS.chips('#opTipo', function (v) { AUD.nueva.tipo = v; });
-  DR.$('#inpCampana').onchange = AUD.sugerirNumero;
   DR.$('#btnIniciarAud').onclick = AUD.iniciar;
+  AUD.pintarCabeceraNueva();
+};
+
+/** Guarda lo escrito antes de volver a pintar la cabecera (al cambiar cultivo o área). */
+AUD.leerNueva = function () {
+  var n = AUD.nueva;
+  if (DR.$('#inpFechaAud')) n.fecha = DR.$('#inpFechaAud').value;
+  if (DR.$('#inpNumAud')) n.numero = DR.$('#inpNumAud').value;
+  if (DR.$('#inpCampana')) n.campana = DR.$('#inpCampana').value;
+  if (DR.$('#inpPlanta')) n.planta = DR.$('#inpPlanta').value;
+};
+
+AUD.pintarCabeceraNueva = function () {
+  var n = AUD.nueva, cul = S5.cultivo(n.cultivo_id), cuerpo = DR.$('#nuevaCuerpo');
+  if (!cuerpo) return;
+  var prefs = cul ? AUD.prefsDe(cul.id) : {};
+  if (!n.tipo) n.tipo = prefs.tipo || 'Inopinada';
+  if (n.campana === null) n.campana = prefs.campana || (cul && cul.campana) || '';
+  if (n.planta === null) n.planta = prefs.planta || (cul && cul.planta) || '';
+  var areas = cul ? S5.areasDe(cul.id) : [];
+  if (n.area_id && !areas.some(function (a) { return a.id === Number(n.area_id); })) n.area_id = '';
+  var area = n.area_id ? S5.area(n.area_id) : null, zonas = area ? S5.zonasDe(area.id, false, cul.id) : [];
+
+  cuerpo.innerHTML = '<div class="datos">' +
+    '<div class="campo ancho"><label>1 · Cultivo<em>obligatorio</em></label><div class="opciones" id="opCultivo">' + S5.cultivosActivos().map(function (c) {
+      return '<button type="button" class="opcion con-ico' + (cul && c.id === cul.id ? ' activa' : '') + '" data-valor="' + c.id + '" style="--c:' + c.color + '">' + S5.iconoCultivo(c, 24) + DR.esc(c.nombre) + '</button>';
+    }).join('') + '</div></div>' +
+    (cul ? '<div class="campo ancho"><label>2 · Área<em>obligatorio</em></label><div class="opciones" id="opArea">' + areas.map(function (a) {
+      return '<button type="button" class="opcion' + (area && a.id === area.id ? ' activa' : '') + '" data-valor="' + a.id + '">' + DR.esc(a.nombre) + '<small>' + S5.zonasDe(a.id, false, cul.id).length + ' zonas</small></button>';
+    }).join('') + '<button type="button" class="opcion agregar" id="btnAgregarArea">+ Agregar área</button></div>' +
+      (areas.length ? '' : '<div class="ayuda-campo">' + DR.esc(cul.nombre) + ' aún no tiene áreas con zonas. Agrega la primera.</div>') + '</div>' : '') +
+    (area ? '<div class="campo ancho"><label>3 · Zonas que se evaluarán en ' + DR.esc(area.nombre) + '</label>' +
+      '<div class="zonas-previa">' + zonas.map(function (z) { return '<span>' + DR.esc(S5.nombreZona(z)) + '</span>'; }).join('') + '</div>' +
+      '<div><button type="button" class="btn sec chico" id="btnAgregarZonas" style="margin-top:8px">+ Agregar zonas</button></div></div>' : '') +
+    '<div class="campo ancho"><label>Tipo de auditoría</label><div class="opciones" id="opTipo">' + ['Opinada', 'Inopinada'].map(function (t) {
+      return '<button type="button" class="opcion' + (t === n.tipo ? ' activa' : '') + '" data-valor="' + t + '">' + t + '</button>';
+    }).join('') + '</div></div>' +
+    '<div class="campo"><label for="inpNumAud">N° de auditoría</label><input id="inpNumAud" type="number" inputmode="numeric" min="1" max="99" placeholder="Auto" value="' + DR.esc(n.numero) + '">' +
+      '<div class="ayuda-campo" id="ayudaNum">Se sugiere al elegir el área.</div></div>' +
+    '<div class="campo"><label for="inpFechaAud">Fecha</label><input id="inpFechaAud" type="date" value="' + DR.esc(n.fecha) + '" max="' + S5.hoy() + '"></div>' +
+    '<div class="campo"><label for="inpCampana">Campaña</label><input id="inpCampana" autocomplete="off" value="' + DR.esc(n.campana) + '"></div>' +
+    '<div class="campo"><label for="inpPlanta">Planta</label><input id="inpPlanta" autocomplete="off" value="' + DR.esc(n.planta) + '"></div>' +
+  '</div>';
+
+  OBS.chips('#opCultivo', function (v) {
+    AUD.leerNueva();
+    n.cultivo_id = Number(v); n.area_id = ''; n.numero = ''; n.tipo = null; n.campana = null; n.planta = null;
+    S5.fijarCultivo(v);
+    AUD.pintarCabeceraNueva();
+  });
+  OBS.chips('#opArea', function (v) { AUD.leerNueva(); n.area_id = v; n.numero = ''; AUD.pintarCabeceraNueva(); });
+  OBS.chips('#opTipo', function (v) { n.tipo = v; });
+  if (DR.$('#btnAgregarArea')) DR.$('#btnAgregarArea').onclick = function () {
+    AUD.leerNueva();
+    AUD.hojaAgregar({ cultivo: cul, alListo: function (areaId) { n.area_id = areaId; n.numero = ''; AUD.pintarCabeceraNueva(); } });
+  };
+  if (DR.$('#btnAgregarZonas')) DR.$('#btnAgregarZonas').onclick = function () {
+    AUD.leerNueva();
+    AUD.hojaAgregar({ cultivo: cul, area: area, alListo: function () { AUD.pintarCabeceraNueva(); } });
+  };
+  DR.$('#inpCampana').onchange = function () { n.campana = this.value; AUD.sugerirNumero(); };
+  if (area && !n.numero) AUD.sugerirNumero();
+};
+
+/** Hoja para agregar un área (existente o nueva) con sus zonas, o más zonas a un área, para un cultivo. */
+AUD.hojaAgregar = function (opc) {
+  var cul = opc.cultivo, area = opc.area || null;
+  var otras = area ? [] : S5.areas.filter(function (a) { return a.activo && !S5.zonasDe(a.id, true, cul.id).length; });
+  var actuales = area ? S5.zonasDe(area.id, true, cul.id) : [];
+  UI.abrirHoja('<div class="asa"></div>' +
+    '<div class="res-estado" style="color:#B7E27C">' + S5.iconoCultivo(cul, 30) + '<span>' + (area ? 'Agregar zonas' : 'Agregar área') + ' · ' + DR.esc(cul.nombre) + '</span></div>' +
+    '<div class="res-nombre">' + (area ? DR.esc(area.nombre) : 'Área para ' + DR.esc(cul.nombre)) + '</div>' +
+    (area ? '<div class="res-dni" style="letter-spacing:0">Actuales: ' + (actuales.map(S5.nombreZona).map(DR.esc).join(' · ') || 'ninguna') + '</div>' : '') +
+    '<div class="form" style="margin-top:14px">' +
+      (area ? '' :
+        (otras.length ? '<div class="campo ancho"><label for="agrAreaSel">Área existente sin zonas en ' + DR.esc(cul.nombre) + '</label><select id="agrAreaSel"><option value="">— Crear un área nueva —</option>' +
+          otras.map(function (a) { return '<option value="' + a.id + '">' + DR.esc(a.nombre) + '</option>'; }).join('') + '</select></div>' : '') +
+        '<div class="campo ancho" id="agrNuevaCampo"><label for="agrAreaNombre">Nombre del área nueva</label><input id="agrAreaNombre" placeholder="Ej. Limpieza" autocomplete="off"></div>') +
+      '<div class="campo ancho"><label for="agrZonas">Zonas (una por línea)<em>obligatorio</em></label>' +
+        '<textarea id="agrZonas" rows="5" placeholder="Recepción&#10;Sala de proceso&#10;Mezzanine"></textarea>' +
+        '<div class="ayuda-campo">Se numeran en orden después de las existentes. Renombrar, renumerar o desactivar lo hace un administrador en Catálogo.</div></div>' +
+    '</div>' +
+    '<div class="acciones"><button type="button" class="btn sec" id="agrCancelar">Cancelar</button>' +
+    '<button type="button" class="btn verde" id="agrGuardar" style="flex:1">Guardar</button></div>', { fija: true });
+
+  if (DR.$('#agrAreaSel')) DR.$('#agrAreaSel').onchange = function () { DR.$('#agrNuevaCampo').classList.toggle('oculto', !!this.value); };
+  DR.$('#agrCancelar').onclick = UI.cerrarHoja;
+  DR.$('#agrGuardar').onclick = function () {
+    var btn = this;
+    var nombres = DR.$('#agrZonas').value.split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
+    var areaId = area ? area.id : (DR.$('#agrAreaSel') && DR.$('#agrAreaSel').value ? Number(DR.$('#agrAreaSel').value) : null);
+    var nombreArea = (area || areaId) ? '' : DR.$('#agrAreaNombre').value.trim();
+    if (!area && !areaId && !nombreArea) { DR.toast('Elige un área existente o escribe el nombre de la nueva.', 'error'); return; }
+    if (!nombres.length) { DR.toast('Escribe al menos una zona.', 'error'); DR.$('#agrZonas').focus(); return; }
+    btn.disabled = true;
+    btn.classList.add('cargando');
+    var paso = areaId ? Promise.resolve(areaId) : AT.rpc('rpc_s5_guardar_area', { p: { nombre: nombreArea } }).then(function (a) { return a.id; });
+    paso.then(function (id) {
+      areaId = id;
+      return AT.rpc('rpc_s5_agregar_zonas', { p_cultivo: cul.id, p_area: id, p_nombres: nombres });
+    }).then(function () {
+      return S5.cargar(true);
+    }).then(function () {
+      UI.cerrarHoja();
+      DR.toast('Zonas guardadas en ' + ((S5.area(areaId) || {}).nombre || 'el área') + ' · ' + cul.nombre + '.');
+      if (opc.alListo) opc.alListo(areaId);
+    }).catch(function (e) {
+      btn.disabled = false;
+      btn.classList.remove('cargando');
+      DR.toast(e.message, 'error');
+    });
+  };
 };
 
 AUD.sugerirNumero = function () {
   var n = AUD.nueva, ayuda = DR.$('#ayudaNum');
-  if (!n || !n.area_id || !ayuda) return;
-  var zonas = S5.zonasDe(n.area_id), campana = DR.$('#inpCampana').value.trim();
-  DR.$('#zonasPrevia').textContent = zonas.length ? 'Zonas: ' + zonas.map(S5.nombreZona).join(' · ') : 'Esta área no tiene zonas activas: agrégalas en Catálogo.';
+  if (!n || !n.area_id || !n.cultivo_id || !ayuda) return;
+  var campana = DR.$('#inpCampana').value.trim();
   ayuda.textContent = 'Buscando la última auditoría…';
-  sb.from('s5_auditorias').select('numero_auditoria,fecha').eq('area_id', n.area_id).eq('campana', campana).neq('estado', 'anulada')
+  sb.from('s5_auditorias').select('numero_auditoria,fecha').eq('cultivo_id', n.cultivo_id).eq('area_id', n.area_id).eq('campana', campana).neq('estado', 'anulada')
     .order('numero_auditoria', { ascending: false }).limit(1).then(function (r) {
       if (r.error) throw new Error(r.error.message);
       var ult = (r.data || [])[0], inp = DR.$('#inpNumAud');
       if (!inp) return;
       inp.value = ult ? ult.numero_auditoria + 1 : 1;
+      n.numero = inp.value;
       ayuda.textContent = ult ? 'La última de esta campaña fue la N° ' + ult.numero_auditoria + ' (' + S5.fecha(ult.fecha) + ').' : 'Primera auditoría del área en esta campaña.';
     }).catch(function () { if (ayuda) ayuda.textContent = 'Si lo dejas vacío se asigna solo.'; });
 };
@@ -162,21 +270,24 @@ AUD.sugerirNumero = function () {
 AUD.iniciar = function () {
   var n = AUD.nueva, btn = this;
   DR.desbloquearAudio();
+  AUD.leerNueva();
+  if (!n.cultivo_id) { DR.toast('Elige el cultivo.', 'error'); return; }
   if (!n.area_id) {
     DR.toast('Elige el área a auditar.', 'error');
     if (DR.anima) anime({ targets: '#opArea .opcion', translateY: [-8, 0], duration: 600, delay: anime.stagger(40), easing: 'easeOutBack' });
     return;
   }
-  if (!S5.zonasDe(n.area_id).length) { DR.toast('El área no tiene zonas activas. Agrégalas en Catálogo.', 'error'); return; }
-  var num = DR.$('#inpNumAud').value;
+  if (!S5.zonasDe(n.area_id, false, n.cultivo_id).length) { DR.toast('El área no tiene zonas activas para este cultivo. Agrégalas primero.', 'error'); return; }
   var p = {
-    area_id: Number(n.area_id), tipo: n.tipo, fecha: DR.$('#inpFechaAud').value || S5.hoy(),
-    numero_auditoria: num ? Number(num) : null, campana: DR.$('#inpCampana').value.trim(), planta: DR.$('#inpPlanta').value.trim()
+    cultivo_id: Number(n.cultivo_id), area_id: Number(n.area_id), tipo: n.tipo, fecha: n.fecha || S5.hoy(),
+    numero_auditoria: n.numero ? Number(n.numero) : null, campana: (n.campana || '').trim(), planta: (n.planta || '').trim()
   };
   if (!p.campana || !p.planta) { DR.toast('Completa la campaña y la planta.', 'error'); return; }
   btn.disabled = true;
   btn.classList.add('cargando');
-  S5.escribirLocal(AUD.PREF, { tipo: p.tipo, campana: p.campana, planta: p.planta });
+  var prefs = S5.leerLocal(AUD.PREF) || {};
+  prefs[p.cultivo_id] = { tipo: p.tipo, campana: p.campana, planta: p.planta };
+  S5.escribirLocal(AUD.PREF, prefs);
   AT.rpc('rpc_s5_iniciar_auditoria', { p: p }).then(function (a) {
     DR.vibrar(40);
     DR.sonar(true);
@@ -195,17 +306,18 @@ AUD.abrirAuditoria = function (a) {
   AUD.aud = a;
   AUD.vista = 'cargando';
   AUD.quitarBarra();
+  if (a.cultivo_id && a.cultivo_id !== S5.cultivoId()) S5.fijarCultivo(a.cultivo_id);
   cont.innerHTML = '<div class="vacio">Cargando zonas…</div>';
   AUD.cargarAuditoria().then(AUD.pintarZonas).catch(function (e) { UI.error(cont, e); });
 };
 
 AUD.cargarAuditoria = function () {
-  var a = AUD.aud, zonas = S5.zonasDe(a.area_id, true).map(function (z) { return z.id; });
+  var a = AUD.aud, zonas = S5.zonasDe(a.area_id, true, a.cultivo_id).map(function (z) { return z.id; });
   return Promise.all([
     sb.from('s5_auditorias').select('*').eq('id', a.id).single(),
     AT.rpc('fn_s5_resumen', { p_auditoria: a.id }),
     zonas.length
-      ? sb.from('s5_observaciones').select('*, s5_auditorias(codigo,numero_auditoria,area_id,fecha,estado)').in('zona_id', zonas).order('numero')
+      ? sb.from('s5_observaciones').select('*, s5_auditorias(codigo,numero_auditoria,area_id,cultivo_id,fecha,estado)').in('zona_id', zonas).order('numero')
       : Promise.resolve({ data: [] })
   ]).then(function (r) {
     if (r[0].error) throw new Error(r[0].error.message);
@@ -225,11 +337,11 @@ AUD.obsAqui = function (zonaId) {
 };
 AUD.zonasVisibles = function () {
   var a = AUD.aud;
-  return S5.zonasDe(a.area_id, true).filter(function (z) { return z.activo || AUD.filaResumen(z.id); });
+  return S5.zonasDe(a.area_id, true, a.cultivo_id).filter(function (z) { return z.activo || AUD.filaResumen(z.id); });
 };
 
 AUD.pintarZonas = function () {
-  var cont = DR.$('#contenido'), a = AUD.aud, area = S5.area(a.area_id) || {};
+  var cont = DR.$('#contenido'), a = AUD.aud, area = S5.area(a.area_id) || {}, cul = S5.cultivo(a.cultivo_id);
   AUD.vista = 'zonas'; AUD.zona = null; AUD.sucio = false;
   AUD.quitarBarra();
   cont.scrollTop = 0;
@@ -256,7 +368,9 @@ AUD.pintarZonas = function () {
 
   cont.innerHTML =
     '<div class="wiz-cab"><button type="button" class="wiz-volver" id="btnVolverLista">' + DR.ICONOS.atras + '<span>Auditorías</span></button>' +
-    '<div class="wiz-id"><b>' + DR.esc(area.nombre || '—') + '</b><span>' + DR.esc(a.codigo) + ' · N° ' + a.numero_auditoria + ' · ' + DR.esc(a.tipo) + ' · ' + S5.fecha(a.fecha) + ' · semana ' + a.semana + '</span></div></div>' +
+    S5.iconoCultivo(cul, 34) +
+    '<div class="wiz-id"><b>' + DR.esc(area.nombre || '—') + '</b><span>' + DR.esc((cul || {}).nombre || '') + ' · ' + DR.esc(a.codigo) + ' · N° ' + a.numero_auditoria + ' · ' +
+      DR.esc(a.tipo) + ' · ' + S5.fecha(a.fecha) + ' · semana ' + a.semana + '</span></div></div>' +
     '<div class="kpis">' +
       UI.kpi('Avance', completas + '<small>de ' + zonas.length + ' zonas</small>', faltan ? 'Faltan ' + faltan : 'Todas completas', '#EF7C3B') +
       UI.kpi('Puntaje del área', S5.pct(promedio), promedio !== null ? S5.madurez(promedio) + ' · promedio de las S evaluadas' : 'Aún sin puntajes', '#0097CE') +
@@ -274,7 +388,7 @@ AUD.pintarZonas = function () {
   DR.$$('[data-zona]', cont).forEach(function (b) { b.onclick = function () { AUD.abrirZona(Number(this.getAttribute('data-zona'))); }; });
   if (DR.$('#btnCerrarAud')) DR.$('#btnCerrarAud').onclick = AUD.cerrarAuditoria;
   DR.$('#btnObsAud').onclick = function () {
-    OBS.filtros = { estado: 'todas', area: String(a.area_id), zona: '', auditoria: a.id };
+    OBS.filtros.estado = 'todas'; OBS.filtros.area = String(a.area_id); OBS.filtros.zona = ''; OBS.filtros.auditoria = a.id;
     DR.ir('observaciones');
   };
   DR.$('#btnResAud').onclick = function () { RESUL.auditoria = a.id; DR.ir('resultados'); };
@@ -394,7 +508,7 @@ AUD.pintarS = function (direccion) {
 
   cont.innerHTML =
     '<div class="wiz-cab"><button type="button" class="wiz-volver" id="btnVolverZonas">' + DR.ICONOS.atras + '<span>Zonas</span></button>' +
-    '<div class="wiz-id"><b>' + DR.esc(S5.nombreZona(z)) + '</b><span>' + DR.esc((S5.area(a.area_id) || {}).nombre || '') + ' · ' + DR.esc(a.codigo) + ' · N° ' + a.numero_auditoria + '</span></div></div>' +
+    '<div class="wiz-id"><b>' + DR.esc(S5.nombreZona(z)) + '</b><span>' + DR.esc(AUD.etiqueta(a)) + '</span></div></div>' +
     '<div class="pasos cinco"><div class="pasos-pista"><div class="pasos-relleno" id="pasosRelleno" style="width:' + AUD._pct + '%"></div></div>' + AUD.pasosHtml(calc) + '</div>' +
     (previas.length ? '<button type="button" class="aviso alerta aviso-btn" id="btnPrevias"><b>' + previas.length + ' observación(es) abierta(s)</b> de auditorías anteriores en esta zona. Toca para darles seguimiento.</button>' : '') +
     '<section class="etapa" id="etapaCard" style="--c:' + color + '">' +
@@ -589,7 +703,7 @@ AUD.volverZonas = function () {
 /* ============================================================ OBSERVACIONES DESDE LA ZONA */
 AUD.nuevaObservacion = function () {
   OBS.abrirFormulario({ auditoria: AUD.aud, zona: AUD.zona, s: AUD.vista === 'zona' ? AUD.s : null, alGuardar: function (o) {
-    o.s5_auditorias = { codigo: AUD.aud.codigo, numero_auditoria: AUD.aud.numero_auditoria, area_id: AUD.aud.area_id, fecha: AUD.aud.fecha, estado: AUD.aud.estado };
+    o.s5_auditorias = { codigo: AUD.aud.codigo, numero_auditoria: AUD.aud.numero_auditoria, area_id: AUD.aud.area_id, cultivo_id: AUD.aud.cultivo_id, fecha: AUD.aud.fecha, estado: AUD.aud.estado };
     AUD.obsArea.push(o);
     DR.$$('#btnObsZona span, #btnObsZona2 span').forEach(function (el) { el.textContent = AUD.textoObs(); });
   } });
@@ -633,7 +747,7 @@ AUD.pintarResumenZona = function (celebrar) {
       '<div class="fin-ciclo">' +
         (celebrar ? '<svg class="fin-check" viewBox="0 0 120 120" aria-hidden="true"><circle class="fin-aro" cx="60" cy="60" r="52"/><path class="fin-trazo" d="M37 62l15 15 32-34"/></svg>' : '') +
         '<div class="ruta">' + (completa ? 'Zona completa' : 'Zona en curso') + '</div><h1>' + DR.esc(S5.nombreZona(z)) + '</h1>' +
-        '<p>' + DR.esc((S5.area(a.area_id) || {}).nombre || '') + ' · ' + DR.esc(a.codigo) + ' · N° ' + a.numero_auditoria + '</p></div>' +
+        '<p>' + DR.esc(AUD.etiqueta(a)) + '</p></div>' +
       '<div class="kpis">' +
         UI.kpi('Calificación', S5.pct(porS.total), porS.total !== null ? S5.madurez(porS.total) + ' · promedio de las 5 S' : 'Faltan S por evaluar', '#76B729') +
         UI.kpi('Observaciones', DR.num(aqui.length), 'En esta auditoría · ' + AUD.obsPrevias(z.id).length + ' abiertas anteriores', '#EF7C3B') +

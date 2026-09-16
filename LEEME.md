@@ -84,7 +84,7 @@ Protecciones en la base de datos (migración 0011):
 - Cada marca con **Ahora** se guarda de inmediato.
 - Avisa horas en el futuro o fuera de orden antes de avanzar.
 
-## Auditoría 5S (módulo `auditoria5s/`, migraciones 0012 y 0013)
+## Auditoría 5S (módulo `auditoria5s/`, migraciones 0012, 0013 y 0014)
 
 Réplica del proceso de los Excel «TERCERA AUDITORIA 5S - <ÁREA>» (hojas CHECK LIST,
 BD, Observaciones y Resultados), con el mismo estilo secuencial de Captura.
@@ -104,8 +104,11 @@ BD, Observaciones y Resultados), con el mismo estilo secuencial de Captura.
   anchos originales, color por estado, filtros, fotos Antes/Después incrustadas,
   una hoja por área y hoja BD.
 - **Informe PDF** (Resultados): elige área y una o más fechas → resultado por S,
-  gráfico radar, detalle por área o zona y observaciones, con logo y paleta Don
-  Ricardo · Ingeniería de Procesos. Librerías locales: `vendor/jspdf.umd.min.js`
+  gráfico radar, detalle por área o zona y, como **última hoja (apaisada)**, la tabla
+  con el formato de la hoja Observaciones: abiertas del área + las registradas en
+  esas fechas, con la celda de evidencia **dividida** entre las fotos «Antes»
+  (banda superior) y «Después» (banda inferior). Logo y paleta Don Ricardo ·
+  Ingeniería de Procesos. Librerías locales: `vendor/jspdf.umd.min.js`
   y `vendor/exceljs.min.js` (se cargan solo al generar).
 - Checklist de 26 ítems (5-5-6-5-5), puntaje 0 · 1 · 1.5 · 2 por ítem.
   `% de la S = SUMA / (n° de ítems × 2)`; zona = promedio de las 5 S; madurez
@@ -113,14 +116,22 @@ BD, Observaciones y Resultados), con el mismo estilo secuencial de Captura.
   (validado contra la auditoría 3 de Producción: 0.80 · 0.80 · 0.75 · 0.80 · 0.70 → 0.77 BIEN).
 - Cada S se guarda al continuar; cada toque queda además en el celular y se
   recupera si se va la señal o se cierra la app.
-- **Observaciones**: libres por zona, foto «Antes» obligatoria (se comprime en el
-  celular), N° correlativo por zona que continúa entre auditorías. Al entrar a una
-  zona se avisan las observaciones abiertas de auditorías anteriores.
+- **Observaciones por área** (0014): la observación **vive en la zona**, no en la
+  auditoría: persiste entre auditorías y la auditoría queda solo como *origen*
+  (trazabilidad y checklist que sustenta). Se pueden registrar desde la pestaña
+  Observaciones eligiendo área y zona, sin auditoría abierta. N° correlativo por
+  zona que continúa entre auditorías. Al entrar a una zona se avisan las
+  observaciones abiertas anteriores.
+- **Hasta 3 fotos «Antes» y 3 «Después»** (`fotos_antes`/`fotos_despues`, arrays);
+  `foto_antes`/`foto_despues` se mantienen como foto principal (primera del array)
+  por un trigger, para que Sheets y el Excel manual sigan igual. Se comprimen en el
+  celular y se ven en galería con visor navegable.
 - **Seguimiento**: nuevo estado (Pendiente, En ejecución, Cerrado, Cancelado,
   Stand By, Recomendación), nota, foto «Después» y **corrección del puntaje en
   formato checklist**. Se conserva el puntaje original, quién, cuándo y la nota.
-- **Plazo**: `S5_DIAS_CORRECCION` (3) días desde la fecha de la auditoría para el
-  rol captura; después solo admin. Una zona completa solo se reescribe directo el
+- **Plazo**: `S5_DIAS_CORRECCION` (3) días desde la **fecha de registro de la
+  observación** para el rol captura; después solo admin (mismo criterio para editarla
+  y para corregir su puntaje). Una zona completa solo se reescribe directo el
   mismo día de la auditoría; luego, únicamente por seguimiento.
 - **Catálogo** (admin): parámetros, áreas, zonas numeradas, textos del checklist y
   reabrir/anular auditorías. Nada se borra: se desactiva o se anula.

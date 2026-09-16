@@ -244,12 +244,21 @@ async function leerS5(sb: SupabaseClient): Promise<S5Datos> {
     leerTodo(sb, 's5_cultivos', [['orden', true]]),
   ]);
   const mapaAuds = new Map<string, Fila>(auds.map((a) => [a.id, a]));
-  const validas = obs.filter((o) => { const a = mapaAuds.get(o.auditoria_id); return a && a.estado !== 'anulada'; });
+  // La observación vive en la zona/área: sin auditoría también cuenta; con auditoría anulada, no.
+  const validas = obs.filter((o) => {
+    if (!o.auditoria_id) return true;
+    const a = mapaAuds.get(o.auditoria_id);
+    return a && a.estado !== 'anulada';
+  });
   const porObs = new Map<string, Fila[]>();
   segs.forEach((s) => { const l = porObs.get(s.observacion_id) || []; l.push(s); porObs.set(s.observacion_id, l); });
   let fotos = new Map<string, string>();
   let fotosError = '';
-  try { fotos = await firmarFotos(sb, validas.flatMap((o) => [o.foto_antes, o.foto_despues])); } catch (e) { fotosError = (e as Error).message || String(e); }
+  try {
+    fotos = await firmarFotos(sb, validas.flatMap((o) => [
+      ...((o.fotos_antes || []) as string[]), ...((o.fotos_despues || []) as string[]), o.foto_antes, o.foto_despues,
+    ]));
+  } catch (e) { fotosError = (e as Error).message || String(e); }
   return {
     bd, resumen, obs: validas, auds: mapaAuds, segs: porObs, fotos, fotosError,
     zonas: new Map<number, Fila>(zonas.map((z) => [z.id, z])), areas: new Map<number, Fila>(areas.map((a) => [a.id, a])),
@@ -265,6 +274,13 @@ function pestanasS5(d: S5Datos | null): Pestana[] {
   if (!d) return [];
   const aud = (f: Fila): Fila => d.auds.get(f.auditoria_id) || {};
   const segsDe = (f: Fila): Fila[] => d.segs.get(f.id) || [];
+  /** Una columna =IMAGE por foto (hasta 3): «Antes», «Antes 2», «Antes 3». */
+  const listaFotos = (f: Fila, campo: string, principal: string): string[] => {
+    const l = ((f[campo] || []) as string[]).filter(Boolean);
+    return l.length ? l : (f[principal] ? [f[principal] as string] : []);
+  };
+  const fotoCols = (titulo: string, campo: string, principal: string): Col[] =>
+    [0, 1, 2].map((i) => [i ? `${titulo} ${i + 1}` : titulo, (f: Fila) => imagen(d.fotos.get(listaFotos(f, campo, principal)[i]))] as Col);
 
   // Mismos 19 encabezados que la hoja BD del Excel; las columnas extra (incluido CULTIVO, para no mezclar) van al final.
   const colsBd: Col[] = [
@@ -279,12 +295,12 @@ function pestanasS5(d: S5Datos | null): Pestana[] {
   // Formato de la hoja Observaciones; los seguimientos se concatenan con « // » como en el Excel.
   const colsObs: Col[] = [
     ['N°', (f) => f.numero], ['Semana', (f) => f.semana ?? ''], ['Fecha de Registro', (f) => txt(f.fecha_registro)],
-    ['Cultivo', (f) => seguro((d.cultivos.get(aud(f).cultivo_id) || {}).nombre)],
-    ['Área', (f) => seguro((d.areas.get(aud(f).area_id) || {}).nombre)], ['Zona', (f) => seguro((d.zonas.get(f.zona_id) || {}).nombre)],
+    ['Cultivo', (f) => seguro((d.cultivos.get(f.cultivo_id ?? aud(f).cultivo_id) || {}).nombre)],
+    ['Área', (f) => seguro((d.areas.get(f.area_id ?? aud(f).area_id) || {}).nombre)], ['Zona', (f) => seguro((d.zonas.get(f.zona_id) || {}).nombre)],
     ['Observaciones', (f) => seguro(f.descripcion)],
     ['Acción correctiva', (f) => seguro([f.accion_correctiva, ...segsDe(f).map((s) => s.nota).filter((n) => n && n !== 'Registro inicial')].filter(Boolean).join(' // '))],
     ['Estado', (f) => txt(f.estado)], ['Fecha de cierre', (f) => txt(f.fecha_cierre)],
-    ['Antes', (f) => imagen(d.fotos.get(f.foto_antes))], ['Después', (f) => imagen(d.fotos.get(f.foto_despues))],
+    ...fotoCols('Antes', 'fotos_antes', 'foto_antes'), ...fotoCols('Después', 'fotos_despues', 'foto_despues'),
     ['Código auditoría', (f) => txt(aud(f).codigo)], ['N° auditoría', (f) => aud(f).numero_auditoria ?? ''],
     ['S relacionada', (f) => f.s_referencia ? f.s_referencia + 'S' : ''], ['Auditor', (f) => seguro(f.auditor)],
     ['Correcciones de puntaje', (f) => segsDe(f).flatMap((s) => (s.cambios_puntaje || []).map((c: Fila) => `${c.s}S-${c.numero}: ${num(c.antes, 1)}→${num(c.despues, 1)}`)).join(' · ')],
@@ -300,7 +316,8 @@ function pestanasS5(d: S5Datos | null): Pestana[] {
 
   return [
     { titulo: '5S_BD', valores: tabla(colsBd, d.bd) },
-    { titulo: '5S_Observaciones', valores: tabla(colsObs, d.obs), formulas: true, altoFila: 110, anchos: [[5, 320], [6, 320], [9, 150], [10, 150]] },
+    { titulo: '5S_Observaciones', valores: tabla(colsObs, d.obs), formulas: true, altoFila: 110,
+      anchos: [[6, 320], [7, 320], [10, 150], [11, 150], [12, 150], [13, 150], [14, 150], [15, 150]] },
     { titulo: '5S_Resumen', valores: tabla(colsRes, d.resumen) },
   ];
 }

@@ -204,6 +204,23 @@ S5.limiteCorreccion = function (aud) { return S5.sumarDias(aud.fecha, S5.diasCor
 S5.enPlazo = function (aud) { return S5.hoy() <= S5.limiteCorreccion(aud); };
 S5.puedeCorregir = function (aud) { return AT.puedeCapturar() && (AT.esAdmin() || S5.enPlazo(aud)); };
 
+/* El plazo de una observación corre desde su fecha de registro (migración 0014). */
+S5.limiteObs = function (o) { return S5.sumarDias(o.fecha_registro, S5.diasCorreccion()); };
+S5.enPlazoObs = function (o) { return S5.hoy() <= S5.limiteObs(o); };
+S5.puedeCorregirObs = function (o) { return AT.puedeCapturar() && (AT.esAdmin() || S5.enPlazoObs(o)); };
+
+/* La observación vive en la zona: área y cultivo salen de ella (0014) o, si falta, de la zona. */
+S5.areaDeObs = function (o) { return o.area_id || (S5.zona(o.zona_id) || {}).area_id || null; };
+S5.cultivoDeObs = function (o) { return o.cultivo_id || (S5.zona(o.zona_id) || {}).cultivo_id || null; };
+
+/** Fotos de una observación («antes» o «despues»), con respaldo en la foto principal. */
+S5.fotosDe = function (o, tipo) {
+  var arr = o[tipo === 'despues' ? 'fotos_despues' : 'fotos_antes'];
+  if (arr && arr.length) return arr.filter(Boolean);
+  var una = o[tipo === 'despues' ? 'foto_despues' : 'foto_antes'];
+  return una ? [una] : [];
+};
+
 /* ------------------------------------------------ almacenamiento local e identificadores */
 S5.leerLocal = function (clave) {
   try { return JSON.parse(localStorage.getItem(clave) || 'null'); } catch (e) { return null; }

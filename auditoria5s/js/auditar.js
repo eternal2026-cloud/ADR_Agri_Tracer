@@ -329,6 +329,7 @@ AUD.cargarAuditoria = function () {
 };
 
 AUD.filaResumen = function (zonaId) { return AUD.resumen.filter(function (f) { return f.zona_id === zonaId; })[0] || null; };
+/** Abiertas de la zona que no nacieron en esta auditoría (incluye las registradas sin auditoría). */
 AUD.obsPrevias = function (zonaId) {
   return AUD.obsArea.filter(function (o) { return o.zona_id === zonaId && o.auditoria_id !== AUD.aud.id && S5.ABIERTOS.indexOf(o.estado) > -1; });
 };
@@ -703,7 +704,6 @@ AUD.volverZonas = function () {
 /* ============================================================ OBSERVACIONES DESDE LA ZONA */
 AUD.nuevaObservacion = function () {
   OBS.abrirFormulario({ auditoria: AUD.aud, zona: AUD.zona, s: AUD.vista === 'zona' ? AUD.s : null, alGuardar: function (o) {
-    o.s5_auditorias = { codigo: AUD.aud.codigo, numero_auditoria: AUD.aud.numero_auditoria, area_id: AUD.aud.area_id, cultivo_id: AUD.aud.cultivo_id, fecha: AUD.aud.fecha, estado: AUD.aud.estado };
     AUD.obsArea.push(o);
     DR.$$('#btnObsZona span, #btnObsZona2 span').forEach(function (el) { el.textContent = AUD.textoObs(); });
   } });
@@ -711,7 +711,7 @@ AUD.nuevaObservacion = function () {
 
 AUD.verPrevias = function () {
   OBS.hojaLista('Abiertas de auditorías anteriores', AUD.obsPrevias(AUD.zona.id), { alCambiar: function (n) {
-    AUD.obsArea.forEach(function (o, i) { if (o.id === n.id) { n.s5_auditorias = o.s5_auditorias; AUD.obsArea[i] = n; } });
+    AUD.obsArea.forEach(function (o, i) { if (o.id === n.id) AUD.obsArea[i] = n; });
   } });
 };
 

@@ -1,0 +1,1516 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Instructivo AgriTracer · Don Ricardo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  @page { size: A4; margin: 16mm 15mm 17mm; }
+  @page :first { margin: 0; }
+
+  :root{
+    --azul:#0097CE; --naranja:#EF7C3B; --verde:#76B729; --marron:#5D4835; --fuego:#B94516;
+    --tinta:#2B2420; --tinta-2:#5E5249; --tinta-3:#8A7D70; --linea:#E4DAD0; --crema:#FAF6F1; --crema-2:#F3ECE3;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body{font-family:'Jost','Segoe UI',system-ui,sans-serif;font-size:10.2pt;line-height:1.5;color:var(--tinta);background:#fff}
+  b,strong{font-weight:600}
+  p{margin:0 0 2.6mm}
+  code{font-family:Consolas,'Courier New',monospace;font-size:8.8pt;background:var(--crema-2);padding:.2mm 1.2mm;border-radius:1mm;color:var(--marron)}
+
+  /* ---------------- portada ---------------- */
+  .portada{width:210mm;height:297mm;position:relative;overflow:hidden;color:#fff;background:#0B0908;break-after:page}
+  .portada .foto{position:absolute;inset:0;background:url('../img/fondo.jpg') center 60%/cover no-repeat}
+  .portada .velo{position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,9,8,.55) 0%,rgba(11,9,8,.25) 35%,rgba(11,9,8,.80) 70%,rgba(11,9,8,.96) 100%)}
+  .portada .cuerpo{position:absolute;left:20mm;right:20mm;top:30mm;bottom:22mm;display:flex;flex-direction:column}
+  .portada .logo{display:flex;align-items:center;gap:5mm}
+  .portada .logo .txt{font-size:15pt;letter-spacing:.2em;font-weight:500}
+  .portada .logo .baj{font-size:7.5pt;letter-spacing:.3em;color:#E8DCCF}
+  .portada .etq{margin-top:auto;font-size:9pt;letter-spacing:.35em;text-transform:uppercase;color:#FFD2AE}
+  .portada h1{font-size:44pt;font-weight:500;line-height:1.02;margin-top:3mm}
+  .portada .sub{font-size:15pt;color:#EFE6DC;margin-top:4mm;max-width:150mm;line-height:1.35}
+  .portada .franja{display:flex;height:2.2mm;margin:9mm 0 6mm;width:70mm}
+  .portada .franja i{flex:1}
+  .portada .meta{display:flex;gap:10mm;font-size:9pt;color:#D8CCBF}
+  .portada .meta b{display:block;color:#fff;font-size:10.5pt;font-weight:500}
+
+  /* ---------------- estructura ---------------- */
+  .parte{break-before:page;margin-bottom:6mm;padding:7mm 8mm;border-radius:4mm;color:#fff;position:relative;overflow:hidden}
+  .parte small{display:block;font-size:8.5pt;letter-spacing:.3em;text-transform:uppercase;opacity:.85}
+  .parte h1{font-size:22pt;font-weight:500;line-height:1.15;margin-top:1mm}
+  .parte p{margin:2mm 0 0;font-size:10.5pt;opacity:.95;max-width:150mm}
+  .parte.uso{background:linear-gradient(120deg,#3D2F23,#5D4835)}
+  .parte.tecnica{background:linear-gradient(120deg,#0B4F6C,#0097CE)}
+  .parte.anexo{background:linear-gradient(120deg,#3F6414,#76B729)}
+  .parte svg{position:absolute;right:-6mm;bottom:-10mm;width:62mm;opacity:.22}
+
+  .sec{margin-top:7mm}
+  .sec.nueva{break-before:page;margin-top:0}
+  h2{display:flex;align-items:center;gap:3mm;font-size:15pt;font-weight:600;color:var(--tinta);margin-bottom:3mm;break-after:avoid}
+  h2 .n{flex:none;width:9mm;height:9mm;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11pt;color:#fff;background:var(--c,var(--naranja))}
+  h3{font-size:11.5pt;font-weight:600;color:var(--marron);margin:4.5mm 0 1.8mm;break-after:avoid}
+  ul,ol{margin:0 0 3mm 5.5mm}
+  li{margin-bottom:1.1mm}
+  li::marker{color:var(--tinta-3)}
+
+  .caja{border-radius:3mm;padding:3mm 4mm;margin:3mm 0;border:1px solid;break-inside:avoid;font-size:9.6pt}
+  .caja b.t{display:block;font-size:8pt;letter-spacing:.18em;text-transform:uppercase;margin-bottom:.8mm}
+  .caja p:last-child,.caja ul:last-child{margin-bottom:0}
+  .caja.tip{background:#F2F8EA;border-color:#C9E2A8}.caja.tip b.t{color:#4C7A1A}
+  .caja.ojo{background:#FDF1E8;border-color:#F3C6A5}.caja.ojo b.t{color:var(--fuego)}
+  .caja.info{background:#EAF6FB;border-color:#B5DDEE}.caja.info b.t{color:#0A6F97}
+
+  table{width:100%;border-collapse:collapse;margin:2mm 0 3.5mm;font-size:9pt;break-inside:auto}
+  thead{display:table-header-group}
+  tr{break-inside:avoid}
+  th{background:var(--marron);color:#fff;text-align:left;font-weight:500;padding:1.8mm 2.4mm;font-size:8.6pt}
+  th:first-child{border-radius:1.6mm 0 0 0} th:last-child{border-radius:0 1.6mm 0 0}
+  td{padding:1.7mm 2.4mm;border-bottom:1px solid var(--linea);vertical-align:top}
+  tbody tr:nth-child(even) td{background:var(--crema)}
+  td.c{text-align:center}
+  .si{color:#4C7A1A;font-weight:700}.no{color:#C0B3A6}
+
+  .dos{display:grid;grid-template-columns:1fr 1fr;gap:5mm}
+  .tres{display:grid;grid-template-columns:repeat(3,1fr);gap:4mm}
+  .tarjeta{border:1px solid var(--linea);border-top:1.4mm solid var(--c,var(--naranja));border-radius:3mm;padding:3mm 3.5mm;background:#fff;break-inside:avoid;font-size:9.3pt}
+  .tarjeta h4{font-size:10.5pt;font-weight:600;margin-bottom:1mm}
+  .tarjeta p{margin:0 0 1.5mm}
+  .tarjeta .ej{font-size:8.3pt;color:var(--tinta-3)}
+
+  .indice{columns:2;column-gap:10mm;margin-top:4mm}
+  .indice div{break-inside:avoid;margin-bottom:4mm}
+  .indice h4{font-size:9pt;letter-spacing:.2em;text-transform:uppercase;color:var(--tinta-3);font-weight:500;margin-bottom:1.5mm}
+  .indice ol{margin-left:0;list-style:none}
+  .indice li{display:flex;gap:2.5mm;padding:1.1mm 0;border-bottom:1px dotted var(--linea);font-size:10pt}
+  .indice li span{color:var(--tinta-3);min-width:6mm}
+
+  /* pasos numerados */
+  .pasos{list-style:none;margin:2mm 0 3mm;counter-reset:p}
+  .pasos li{position:relative;padding:0 0 2.6mm 10mm;counter-increment:p;break-inside:avoid}
+  .pasos li::before{content:counter(p);position:absolute;left:0;top:.2mm;width:6.4mm;height:6.4mm;border-radius:50%;background:var(--c,var(--naranja));color:#fff;font-size:8.6pt;font-weight:600;display:flex;align-items:center;justify-content:center}
+  .pasos li::after{content:'';position:absolute;left:3.1mm;top:7.2mm;bottom:.6mm;width:.3mm;background:var(--linea)}
+  .pasos li:last-child::after{display:none}
+
+  /* flujo horizontal */
+  .flujo{display:flex;align-items:stretch;gap:0;margin:3mm 0 4mm;break-inside:avoid}
+  .flujo .f{flex:1;border:1px solid var(--linea);border-radius:3mm;padding:2.6mm 3mm;background:var(--crema);font-size:8.8pt;position:relative}
+  .flujo .f b{display:block;font-size:9.6pt;color:var(--c,var(--marron))}
+  .flujo .fl{flex:none;width:6mm;display:flex;align-items:center;justify-content:center;color:var(--tinta-3);font-size:13pt}
+
+  /* ---------------- maquetas de celular ---------------- */
+  .demo{display:grid;grid-template-columns:60mm 1fr;gap:7mm;align-items:start;margin:3mm 0 4mm;break-inside:avoid}
+  .demo.doble{grid-template-columns:60mm 60mm 1fr;gap:5mm}
+  .pie-tel{font-size:8pt;color:var(--tinta-3);text-align:center;margin-top:1.5mm}
+  .tel{width:60mm;background:#0E0C0A;border-radius:7mm;padding:2.4mm;box-shadow:0 0 0 .5mm #3a302a inset}
+  .pant{background:#15110E;border-radius:5mm;overflow:hidden;color:#F7F2EC;font-size:6.8pt;line-height:1.35;position:relative;min-height:112mm;display:flex;flex-direction:column}
+  .m-top{display:flex;justify-content:space-between;align-items:center;padding:2.4mm 3mm;border-bottom:1px solid #2c241e}
+  .m-chip{font-size:5.8pt;padding:.7mm 2mm;border-radius:5mm;border:1px solid #3B3129;color:#D6CABE;display:flex;align-items:center;gap:1mm}
+  .m-chip i{width:1.4mm;height:1.4mm;border-radius:50%;background:var(--verde)}
+  .m-body{padding:2.6mm 3mm;flex:1;display:flex;flex-direction:column;gap:1.8mm}
+  .m-ruta{font-size:5.4pt;letter-spacing:.2em;text-transform:uppercase;color:#A89A8C}
+  .m-h1{font-size:11pt;font-weight:500;line-height:1.1}
+  .m-p{color:#D6CABE;font-size:6.2pt}
+  .m-campo{display:flex;flex-direction:column;gap:.6mm}
+  .m-campo span{font-size:5.6pt;color:#A89A8C;letter-spacing:.05em}
+  .m-inp{height:6.6mm;border-radius:1.8mm;background:#0F0C0A;border:1px solid #3B3129;padding:0 2mm;display:flex;align-items:center;color:#D6CABE;font-size:6.4pt}
+  .m-btn{height:7.4mm;border-radius:2.2mm;display:flex;align-items:center;justify-content:center;gap:1.2mm;font-weight:600;font-size:6.8pt;color:#1A1208;background:linear-gradient(135deg,#F59A5C,#E0692A)}
+  .m-btn.verde{background:linear-gradient(135deg,#8FD046,#62A01E)}
+  .m-btn.azul{background:linear-gradient(135deg,#27B4E8,#0085B8)}
+  .m-btn.sec{background:transparent;border:1px solid #4A3E34;color:#D6CABE;font-weight:500}
+  .m-card{border:1px solid #3B3129;border-left:1mm solid var(--c);border-radius:2.6mm;padding:2mm 2.4mm;background:#221B16;display:flex;align-items:center;gap:2mm}
+  .m-card .ico{width:6mm;height:6mm;border-radius:1.8mm;background:var(--c);opacity:.9;flex:none}
+  .m-card b{display:block;font-size:6.8pt;font-weight:600}
+  .m-card small{display:block;font-size:5.4pt;color:#A89A8C}
+  .m-seg{display:flex;gap:.6mm;margin-top:1mm}
+  .m-seg i{flex:1;height:1.1mm;border-radius:1mm;background:#3B3129}
+  .m-seg i.h{background:var(--verde)} .m-seg i.a{background:var(--naranja)}
+  .m-pasos{display:flex;justify-content:space-between;padding:0 .5mm}
+  .m-pasos i{width:5mm;height:5mm;border-radius:50%;border:.5mm solid #43382F;background:#241D18;color:#A89A8C;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:5.4pt;font-weight:600}
+  .m-pasos i.h{background:var(--verde);border-color:var(--verde);color:#14100C}
+  .m-pasos i.a{border-color:var(--naranja);color:#fff;box-shadow:0 0 0 .6mm rgba(239,124,59,.25)}
+  .m-etapa{border:1px solid #3B3129;border-top:1mm solid var(--naranja);border-radius:2.6mm;padding:2mm 2.2mm;background:#1D1713;display:flex;flex-direction:column;gap:1.4mm}
+  .m-hora{display:flex;align-items:center;gap:1.6mm;border:1px solid #3B3129;border-radius:2.2mm;padding:1.4mm 1.6mm;background:#1A1411}
+  .m-hora.llena{border-color:#4C7A20}
+  .m-hora div{flex:1}
+  .m-hora span{display:block;font-size:5.6pt;color:#A89A8C}
+  .m-hora.llena span{color:#B7E27C}
+  .m-hora em{font-style:normal;font-size:6.6pt}
+  .m-ahora{background:var(--naranja);color:#14100C;font-weight:600;border-radius:1.8mm;padding:1.3mm 2mm;font-size:6pt}
+  .m-barra{padding:2mm 3mm 2.6mm;border-top:1px solid #2c241e;background:#100D0B}
+  .m-nav{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid #2c241e;background:#100D0B;padding:1.6mm 0}
+  .m-nav span{text-align:center;font-size:5.6pt;color:#A89A8C}
+  .m-nav span.a{color:#fff;font-weight:600}
+  .m-kpis{display:grid;grid-template-columns:1fr 1fr;gap:1.4mm}
+  .m-kpi{border:1px solid #3B3129;border-radius:2mm;padding:1.4mm 1.8mm;background:#211B16;border-left:.8mm solid var(--c)}
+  .m-kpi span{display:block;font-size:5pt;color:#A89A8C;text-transform:uppercase;letter-spacing:.06em}
+  .m-kpi b{font-size:8.4pt;font-weight:500}
+  .m-tabla{border:1px solid #3B3129;border-radius:2mm;overflow:hidden;font-size:5.6pt}
+  .m-tabla div{display:grid;grid-template-columns:1.4fr .8fr .9fr;padding:1mm 1.6mm;border-bottom:1px solid #2c241e}
+  .m-tabla div:first-child{color:#A89A8C;background:#1c1612}
+  .m-tabla div.x{text-decoration:line-through;color:#FF8A8A}
+  .m-tabla div.t{font-weight:600;background:#241c16}
+  .m-graf{display:flex;flex-direction:column;gap:1mm;position:relative;padding-right:2mm}
+  .m-graf div{display:grid;grid-template-columns:12mm 1fr;align-items:center;gap:1mm;font-size:5.4pt;color:#D6CABE}
+  .m-graf i{height:2.4mm;border-radius:1mm;background:linear-gradient(90deg,#0097CE,#76B729)}
+  .m-graf .umbral{position:absolute;top:-1mm;bottom:-1mm;left:calc(13mm + 70%);border-left:.35mm dashed #EF7C3B}
+  .m-res{display:grid;grid-template-columns:1fr 1fr;gap:1.4mm}
+  .m-res div{border-radius:2.4mm;padding:1.8mm 2mm;min-height:11mm;border:1px solid}
+  .m-res span{display:block;font-size:5pt;letter-spacing:.18em;text-transform:uppercase;font-weight:600}
+  .m-res b{font-size:11pt;font-weight:500}
+  .m-res .l{background:#0C2C3B;border-color:#1F5E79}.m-res .l span{color:#7FD3F2}
+  .m-res .d{background:#38200E;border-color:#80461F}.m-res .d span{color:#F8B68A}
+  .m-res .b{grid-column:1/-1;background:#1D2E0F;border-color:#4C7A20}.m-res .b span{color:#B7E27C}
+  .m-check{width:9mm;height:9mm;border-radius:50%;border:.6mm solid var(--verde);display:flex;align-items:center;justify-content:center;color:var(--verde);font-size:10pt;margin:1mm auto 0}
+  .m-hoja{margin-top:auto;background:#211B16;border-top-left-radius:4mm;border-top-right-radius:4mm;padding:2.4mm 3mm 3mm;border-top:1px solid #3B3129;display:flex;flex-direction:column;gap:1.5mm}
+  .m-asa{width:9mm;height:.9mm;border-radius:1mm;background:#4A3E34;margin:0 auto 1mm}
+  .m-visor{height:30mm;border-radius:2.6mm;background:radial-gradient(circle at 50% 45%,#2d2620,#0f0c0a);position:relative;border:1px solid #3B3129}
+  .m-visor::before{content:'';position:absolute;left:22%;right:22%;top:18%;bottom:18%;border:.5mm solid rgba(255,255,255,.75);border-radius:2mm}
+  .m-visor::after{content:'';position:absolute;left:24%;right:24%;top:50%;height:.4mm;background:var(--naranja);box-shadow:0 0 2mm var(--naranja)}
+
+  .call{position:absolute;width:4.6mm;height:4.6mm;border-radius:50%;background:#FFD400;color:#1A1208;font-size:6.4pt;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 .6mm #15110E;z-index:5}
+  .rel{position:relative}
+  .leyenda{list-style:none;margin:0}
+  .leyenda li{display:flex;gap:2.5mm;margin-bottom:2.4mm;font-size:9.6pt}
+  .leyenda li > i{flex:none;width:5.4mm;height:5.4mm;border-radius:50%;background:#FFD400;color:#1A1208;font-style:normal;font-size:7.6pt;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:.3mm}
+
+  /* maquetas 5S */
+  .m-nav.cuatro{grid-template-columns:repeat(4,1fr)}
+  .m-cults{display:flex;gap:1mm;flex-wrap:wrap}
+  .m-cult{display:flex;align-items:center;gap:.8mm;font-size:5.8pt;padding:.7mm 1.8mm;border-radius:5mm;border:1px solid #3B3129;color:#D6CABE}
+  .m-cult i{width:2.2mm;height:2.2mm;border-radius:50%;background:var(--c)}
+  .m-cult.a{border-color:var(--c);color:#fff;background:#2a211b}
+  .m-zonas{display:grid;grid-template-columns:1fr 1fr;gap:1.2mm}
+  .m-zona{border:1px solid #3B3129;border-radius:2mm;padding:1.2mm 1.6mm;background:#211B16;font-size:5.4pt;color:#A89A8C}
+  .m-zona b{display:block;font-size:6.2pt;color:#F7F2EC;font-weight:600}
+  .m-zona.ok{border-color:#4C7A20}.m-zona.ok em{color:#B7E27C;font-style:normal}
+  .m-zona.cur{border-color:var(--naranja)}.m-zona.cur em{color:#F8B68A;font-style:normal}
+  .m-item{border:1px solid #3B3129;border-radius:2mm;padding:1.3mm 1.7mm;background:#1D1713;font-size:5.7pt;display:flex;flex-direction:column;gap:1mm;color:#D6CABE}
+  .m-pt{display:grid;grid-template-columns:repeat(4,1fr);gap:.8mm}
+  .m-pt i{font-style:normal;text-align:center;border:1px solid #43382F;border-radius:1.4mm;padding:.7mm 0;font-size:6pt;color:#D6CABE}
+  .m-pt i.s{background:var(--verde);border-color:var(--verde);color:#14100C;font-weight:700}
+  .m-pill{display:inline-block;font-size:5.2pt;padding:.3mm 1.6mm;border-radius:3mm;font-weight:600;color:#14100C;background:var(--c)}
+  td .m-pill{font-size:8.4pt;padding:.5mm 2.6mm;white-space:nowrap}
+  .m-foto{height:15mm;border-radius:2mm;border:1px dashed #5a4c40;display:flex;align-items:center;justify-content:center;color:#A89A8C;font-size:6pt;background:repeating-linear-gradient(45deg,#1d1713 0 2mm,#241c16 2mm 4mm)}
+  .m-sub{display:flex;justify-content:space-between;align-items:center;border:1px solid #3B3129;border-radius:2mm;padding:1.2mm 1.8mm;background:#211B16;font-size:5.8pt}
+  .m-sub b{font-size:8pt;font-weight:500}
+  .esc5s{display:grid;grid-template-columns:repeat(4,1fr);gap:2mm;margin:2mm 0 3mm;break-inside:avoid}
+  .esc5s div{border-radius:2.4mm;padding:2mm 2.6mm;color:#fff;font-size:8.4pt;line-height:1.3}
+  .esc5s b{display:block;font-size:10pt;letter-spacing:.06em}
+
+  /* diagramas */
+  .diagrama{border:1px solid var(--linea);border-radius:3mm;padding:3mm;margin:3mm 0 4mm;background:var(--crema);break-inside:avoid}
+  .diagrama svg{width:100%;height:auto;display:block}
+  .diagrama .pie{font-size:8.4pt;color:var(--tinta-3);text-align:center;margin-top:1.5mm}
+
+  .tabla-bd{display:grid;grid-template-columns:1fr 1fr;gap:3.5mm;margin:3mm 0}
+  .bd{border:1px solid var(--linea);border-radius:3mm;overflow:hidden;break-inside:avoid;font-size:8.8pt}
+  .bd .cab{padding:2mm 3mm;background:var(--c,var(--marron));color:#fff;display:flex;justify-content:space-between;align-items:baseline}
+  .bd .cab b{font-family:Consolas,monospace;font-size:9.4pt;font-weight:700}
+  .bd .cab span{font-size:8pt;opacity:.9}
+  .bd .cu{padding:2mm 3mm}
+  .bd .cu p{margin:0 0 1.2mm}
+  .bd .cols{font-size:8pt;color:var(--tinta-2)}
+
+  table.compacta td{padding:1.1mm 2.4mm}
+  .ficha td:first-child{width:48mm;color:var(--tinta-2)}
+  .firma{margin-top:8mm;padding-top:3mm;border-top:1px solid var(--linea);font-size:8.6pt;color:var(--tinta-3);display:flex;justify-content:space-between}
+</style>
+</head>
+<body>
+
+<!-- ===================================================== PORTADA -->
+<section class="portada">
+  <div class="foto"></div><div class="velo"></div>
+  <div class="cuerpo">
+    <div class="logo">
+      <svg width="96" viewBox="0 0 650 300" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M0,0 A150,150 0 0 1 0,300 Z" fill="#0097CE"/><circle cx="262" cy="188" r="112" fill="#EF7C3B"/><path d="M350,300 A150,150 0 0 1 650,300 Z" fill="#76B729"/>
+      </svg>
+      <div><div class="txt">DON RICARDO</div><div class="baj">– A <b>FRUTURA</b> COMPANY –</div></div>
+    </div>
+    <div class="etq">Ingeniería de Procesos · Instructivo</div>
+    <h1>AgriTracer</h1>
+    <div class="sub">Cómo usar la aplicación de <b>Tiempos de ciclo</b>, <b>Reubicación de personal</b> y <b>Auditoría 5S</b>, y cómo funciona por dentro — explicado sin tecnicismos.</div>
+    <div class="franja"><i style="background:#0097CE"></i><i style="background:#EF7C3B"></i><i style="background:#76B729"></i></div>
+    <div class="meta">
+      <div>Versión de la app<b>3.1</b></div>
+      <div>Fecha del documento<b>16 de septiembre de 2026</b></div>
+      <div>Dirigido a<b>Usuarios, supervisores y administradores</b></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================================================== ÍNDICE -->
+<section>
+  <h2 style="font-size:18pt;margin-bottom:1mm">Contenido</h2>
+  <p style="color:var(--tinta-2)">El documento tiene dos partes. La <b>Parte 1</b> es para cualquier persona que use la app en el celular. La <b>Parte 2</b> explica, en lenguaje simple, con qué está hecha, dónde se guardan los datos y cómo se actualiza.</p>
+  <div class="indice">
+    <div>
+      <h4>Parte 1 · Usar la aplicación</h4>
+      <ol>
+        <li><span>1</span>¿Qué es AgriTracer?</li>
+        <li><span>2</span>Antes de empezar</li>
+        <li><span>3</span>Tipos de usuario (roles)</li>
+        <li><span>4</span>Ingresar por primera vez</li>
+        <li><span>5</span>Captura de tiempos de ciclo</li>
+        <li><span>6</span>Resumen de tiempos</li>
+        <li><span>7</span>Reubicación de personal</li>
+        <li><span>8</span>Auditoría 5S</li>
+        <li><span>9</span>Administración (solo administradores)</li>
+        <li><span>10</span>Problemas frecuentes</li>
+      </ol>
+    </div>
+    <div>
+      <h4>Parte 2 · Cómo funciona por dentro</h4>
+      <ol>
+        <li><span>11</span>La idea general en un dibujo</li>
+        <li><span>12</span>Los lenguajes y qué hace cada uno</li>
+        <li><span>13</span>Mapa de carpetas del proyecto</li>
+        <li><span>14</span>La base de datos</li>
+        <li><span>15</span>Cómo se calculan los tiempos y los puntajes 5S</li>
+        <li><span>16</span>Seguridad y permisos</li>
+        <li><span>17</span>El viaje de un dato</li>
+        <li><span>18</span>Actualizaciones: datos, Google Sheets y la app</li>
+      </ol>
+    </div>
+    <div>
+      <h4>Anexos</h4>
+      <ol>
+        <li><span>A</span>Glosario</li>
+        <li><span>B</span>Ficha técnica e historial de versiones</li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="caja info" style="margin-top:6mm">
+    <b class="t">Cómo leer este documento</b>
+    <p>Los textos en <b>negrita</b> son botones o pestañas tal como aparecen en la pantalla. Las flechas indican el camino: <b>Config → Ajustes</b> significa “entra a la pestaña Config y luego a Ajustes”. Las pantallas dibujadas son ilustrativas: los valores son de ejemplo.</p>
+  </div>
+</section>
+
+<!-- ===================================================== PARTE 1 -->
+<div class="parte uso">
+  <small>Parte 1</small>
+  <h1>Usar la aplicación</h1>
+  <p>Todo lo que necesitas para registrar ciclos, escanear fotochecks, auditar las 5S de planta, consultar resultados y administrar el equipo desde el celular.</p>
+  <svg viewBox="0 0 650 300"><path d="M0,0 A150,150 0 0 1 0,300 Z" fill="#fff"/><circle cx="262" cy="188" r="112" fill="#fff"/><path d="M350,300 A150,150 0 0 1 650,300 Z" fill="#fff"/></svg>
+</div>
+
+<section class="sec" style="margin-top:0">
+  <h2><span class="n">1</span>¿Qué es AgriTracer?</h2>
+  <p>AgriTracer es una <b>página web con forma de aplicación</b>, pensada para usarse en el celular en campo. No se instala desde una tienda: se abre en el navegador (Chrome o Safari) con un enlace. Reúne tres herramientas de Ingeniería de Procesos:</p>
+  <div class="tres">
+    <div class="tarjeta" style="--c:var(--verde)">
+      <h4>Tiempos de ciclo</h4>
+      <p>Registra, etapa por etapa, cuánto demora la fruta desde que empieza la cosecha hasta que llega a planta. Calcula automáticamente cada tramo, el tiempo total y los promedios por semana y fundo.</p>
+      <div class="ej">Reemplaza el llenado manual del Excel «5.1. TIEMPO DE CICLO».</div>
+    </div>
+    <div class="tarjeta" style="--c:var(--naranja)">
+      <h4>Reubicación de personal</h4>
+      <p>Escanea el fotocheck de un trabajador (o escribe su DNI) y muestra al instante a qué <b>línea</b>, <b>lado</b> y <b>labor</b> debe ir. No requiere iniciar sesión.</p>
+      <div class="ej">La lista de personal se carga desde un Excel.</div>
+    </div>
+    <div class="tarjeta" style="--c:#D9622B">
+      <h4>Auditoría 5S</h4>
+      <p>Evalúa zona por zona el checklist de las <b>5S</b> (Seleccionar, Ordenar, Limpieza, Estandarizar, Disciplina), registra observaciones con <b>foto</b>, hace su seguimiento y genera informes <b>Excel</b> y <b>PDF</b> por cultivo.</p>
+      <div class="ej">Reemplaza los Excel «TERCERA AUDITORIA 5S - &lt;ÁREA&gt;».</div>
+    </div>
+  </div>
+  <p style="margin-top:3mm">Todo lo que se registra queda guardado en una <b>base de datos en internet</b> (compartida por todos los celulares) y se copia automáticamente a una <b>Google Sheet</b> para reportes.</p>
+</section>
+
+<section class="sec">
+  <h2><span class="n">2</span>Antes de empezar</h2>
+  <table>
+    <thead><tr><th style="width:42mm">Necesitas</th><th>Detalle</th></tr></thead>
+    <tbody>
+      <tr><td><b>Un celular o computadora</b></td><td>Con Chrome (Android) o Safari (iPhone) actualizados. Para escanear, el celular debe tener cámara.</td></tr>
+      <tr><td><b>Internet</b></td><td>Datos móviles o wifi. La captura de tiempos y la auditoría 5S necesitan señal para guardar (la auditoría conserva un borrador en el celular si la señal se corta). El escáner puede funcionar un tiempo sin señal con la última lista descargada.</td></tr>
+      <tr><td><b>El enlace de la app</b></td><td>Dirección web: <span style="display:inline-block;min-width:70mm;border-bottom:1px solid var(--tinta-3)">&nbsp;</span> (te lo comparte el administrador; empieza con <code>https://</code>).</td></tr>
+      <tr><td><b>Usuario y contraseña</b></td><td>Para Captura, Resumen, Auditoría 5S y Configuración. Los crea un administrador (ver sección 9). Para escanear fotochecks no hace falta.</td></tr>
+      <tr><td><b>Cámara con permiso</b></td><td>Para escanear fotochecks y para las fotos «Antes» y «Después» de las observaciones 5S. El navegador pide el permiso la primera vez.</td></tr>
+    </tbody>
+  </table>
+  <div class="caja tip">
+    <b class="t">Consejo</b>
+    <p>Abre el enlace en el celular y, desde el menú del navegador (⋮ en Chrome o el botón Compartir en Safari), elige <b>Agregar a pantalla principal</b>. Quedará un ícono como si fuera una app.</p>
+  </div>
+</section>
+
+<section class="sec">
+  <h2><span class="n">3</span>Tipos de usuario (roles)</h2>
+  <p>Cada persona tiene un <b>rol</b> que define lo que puede ver y hacer. La pantalla de inicio solo muestra las opciones permitidas para ese rol.</p>
+  <table>
+    <thead><tr><th>Función</th><th class="c" style="width:26mm">Administrador</th><th class="c" style="width:26mm">Captura en campo</th><th class="c" style="width:24mm">Solo consulta</th><th class="c" style="width:22mm">Sin usuario</th></tr></thead>
+    <tbody>
+      <tr><td>Registrar tiempos de ciclo (Captura)</td><td class="c si">✔</td><td class="c si">✔</td><td class="c no">—</td><td class="c no">—</td></tr>
+      <tr><td>Ver Resumen, promedios y gráficos</td><td class="c si">✔</td><td class="c si">✔</td><td class="c si">✔</td><td class="c no">—</td></tr>
+      <tr><td>Escanear fotochecks y buscar personal</td><td class="c si">✔</td><td class="c si">✔</td><td class="c si">✔</td><td class="c si">✔</td></tr>
+      <tr><td>Subir la lista de reubicación (Excel)</td><td class="c si">✔</td><td class="c no">—</td><td class="c no">—</td><td class="c no">—</td></tr>
+      <tr><td>Crear usuarios, cambiar roles, restablecer contraseñas</td><td class="c si">✔</td><td class="c no">—</td><td class="c no">—</td><td class="c no">—</td></tr>
+      <tr><td>Listas de captura, Google Sheets, umbral, importar Excel, papelera</td><td class="c si">✔</td><td class="c no">—</td><td class="c no">—</td><td class="c no">—</td></tr>
+      <tr><td>Eliminar un ciclo (va a la papelera)</td><td class="c si">✔</td><td class="c no">—</td><td class="c no">—</td><td class="c no">—</td></tr>
+      <tr><td colspan="5" style="background:#FBE9DF;color:#B94516;font-weight:600;font-size:8.4pt;letter-spacing:.08em">AUDITORÍA 5S</td></tr>
+      <tr><td>Ver Resultados, radar y Observaciones · descargar Excel y PDF</td><td class="c si">✔</td><td class="c si">✔</td><td class="c si">✔</td><td class="c no">—</td></tr>
+      <tr><td>Auditar: iniciar, puntuar zonas, registrar observaciones con foto</td><td class="c si">✔</td><td class="c si">✔</td><td class="c no">—</td><td class="c no">—</td></tr>
+      <tr><td>Agregar áreas y zonas nuevas antes de iniciar</td><td class="c si">✔</td><td class="c si">✔</td><td class="c no">—</td><td class="c no">—</td></tr>
+      <tr><td>Registrar seguimiento y corregir puntaje <b>dentro del plazo</b> (3 días)</td><td class="c si">✔</td><td class="c si">✔</td><td class="c no">—</td><td class="c no">—</td></tr>
+      <tr><td>Corregir puntaje <b>pasado el plazo</b></td><td class="c si">✔</td><td class="c no">—</td><td class="c no">—</td><td class="c no">—</td></tr>
+      <tr><td>Catálogo: cultivos, renombrar o desactivar áreas y zonas, checklist, plazo, reabrir o anular auditorías</td><td class="c si">✔</td><td class="c no">—</td><td class="c no">—</td><td class="c no">—</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="sec">
+  <h2><span class="n">4</span>Ingresar por primera vez</h2>
+  <div class="demo doble">
+    <div>
+      <div class="tel"><div class="pant rel">
+        <div class="m-body" style="justify-content:center;text-align:center;gap:2.2mm">
+          <svg width="70" viewBox="0 0 650 300" style="margin:0 auto"><path d="M0,0 A150,150 0 0 1 0,300 Z" fill="#0097CE"/><circle cx="262" cy="188" r="112" fill="#EF7C3B"/><path d="M350,300 A150,150 0 0 1 650,300 Z" fill="#76B729"/></svg>
+          <div style="letter-spacing:.2em;font-size:7pt">DON RICARDO</div>
+          <div class="m-ruta" style="color:#FFE2C8">Ingeniería de Procesos</div>
+          <div class="m-h1">AgriTracer</div>
+          <div class="m-p">Tiempos de ciclo · Reubicación · Auditoría 5S</div>
+          <div style="text-align:left;display:flex;flex-direction:column;gap:1.6mm;margin-top:2mm" class="rel">
+            <span class="call" style="left:-3.5mm;top:2mm">1</span>
+            <div class="m-campo"><span>Usuario</span><div class="m-inp">juan.perez</div></div>
+            <div class="m-campo"><span>Contraseña</span><div class="m-inp">••••••••</div></div>
+            <div class="m-btn rel">Ingresar<span class="call" style="right:-3.5mm;top:1.4mm">2</span></div>
+            <div class="m-p" style="font-size:5.6pt;text-align:center">¿Solo vienes a escanear un fotocheck? <u style="color:#4FC3F0">Entra sin iniciar sesión</u><span class="call" style="position:relative;display:inline-flex;margin-left:1mm;width:3.8mm;height:3.8mm;font-size:5.4pt">3</span></div>
+          </div>
+        </div>
+      </div></div>
+      <div class="pie-tel">Puerta de entrada</div>
+    </div>
+    <div>
+      <div class="tel"><div class="pant rel">
+        <div class="m-top"><svg width="30" viewBox="0 0 650 300"><path d="M0,0 A150,150 0 0 1 0,300 Z" fill="#0097CE"/><circle cx="262" cy="188" r="112" fill="#EF7C3B"/><path d="M350,300 A150,150 0 0 1 650,300 Z" fill="#76B729"/></svg><span class="m-chip rel"><i></i>Juan Pérez<span class="call" style="right:-3mm;top:-3mm">5</span></span></div>
+        <div class="m-body">
+          <div class="m-ruta">Ingeniería de Procesos · Don Ricardo</div>
+          <div class="m-h1">Buenos días, Juan</div>
+          <div class="m-p">¿A dónde vamos hoy?</div>
+          <div class="rel" style="display:flex;flex-direction:column;gap:1.6mm;margin-top:1mm">
+            <span class="call" style="left:-3.5mm;top:-2mm">4</span>
+            <div class="m-card" style="--c:#76B729"><div class="ico"></div><div><b>Captura de tiempos</b><small>Registra un ciclo etapa por etapa</small></div></div>
+            <div class="m-card" style="--c:#0097CE"><div class="ico"></div><div><b>Resumen de tiempos de ciclo</b><small>Promedios por semana y fundo</small></div></div>
+            <div class="m-card" style="--c:#EF7C3B"><div class="ico"></div><div><b>Reubicación de personal</b><small>Escanear fotocheck, buscar personal</small></div></div>
+            <div class="m-card" style="--c:#D9622B"><div class="ico"></div><div><b>Auditoría 5S</b><small>Checklist por zona, observaciones e informes</small></div></div>
+            <div class="m-card" style="--c:#E8B04A"><div class="ico"></div><div><b>Usuarios y configuración</b><small>Solo administradores</small></div></div>
+          </div>
+          <div class="m-btn sec" style="margin:auto auto 0;width:26mm">Cerrar sesión</div>
+        </div>
+      </div></div>
+      <div class="pie-tel">Pantalla de inicio (administrador)</div>
+    </div>
+    <ul class="leyenda">
+      <li><i>1</i><span>Escribe el <b>usuario</b> (ej. <i>juan.perez</i>) y la contraseña que te dio el administrador.</span></li>
+      <li><i>2</i><span>Toca <b>Ingresar</b>. La primera vez el sistema te pide <b>crear tu propia contraseña</b> (mínimo 6 caracteres, repetida dos veces) y luego <b>Guardar y continuar</b>.</span></li>
+      <li><i>3</i><span>Si solo necesitas escanear fotochecks, usa este enlace: no pide usuario.</span></li>
+      <li><i>4</i><span>En el inicio verás una tarjeta por cada herramienta permitida para tu rol. Tócala para entrar.</span></li>
+      <li><i>5</i><span>Tu nombre aparece arriba. Tocándolo (o con <b>Cerrar sesión</b>) sales de la cuenta en ese celular.</span></li>
+    </ul>
+  </div>
+  <div class="caja ojo">
+    <b class="t">Importante</b>
+    <p>La sesión queda abierta en el celular hasta que la cierres. Si el celular es compartido, <b>cierra sesión</b> al terminar. Si olvidas tu contraseña, pide a un administrador una <b>Nueva contraseña</b>.</p>
+  </div>
+</section>
+
+<section class="sec">
+  <h2 style="--c:var(--verde)"><span class="n">5</span>Captura de tiempos de ciclo</h2>
+  <p>Un <b>ciclo</b> es el recorrido completo de un lote de fruta: desde el inicio de la cosecha hasta que termina el traslado a planta. La captura está organizada como un <b>asistente de 7 etapas</b>: la app siempre te dice qué toca marcar a continuación.</p>
+
+  <h3>5.1 Las 7 etapas y qué se registra en cada una</h3>
+  <table>
+    <thead><tr><th style="width:8mm">#</th><th style="width:40mm">Etapa</th><th>Horas que se marcan</th><th>Otros datos</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><b>Cosecha</b></td><td>Inicio cosecha · Fin cosecha</td><td><b>Fundo (obligatorio)</b>, lote, líder de grupo, variedad, calibre, presentación, fecha</td></tr>
+      <tr><td>2</td><td><b>Jabero</b></td><td>Inicio jabero · Fin jabero</td><td>N° de jabas, observación de jaba</td></tr>
+      <tr><td>3</td><td><b>Motocarga</b></td><td>Llegada de motocarga · Inicio carga · Fin carga</td><td>Placa de motocarga</td></tr>
+      <tr><td>4</td><td><b>Traslado a Centro de Acopio</b></td><td>Inicio traslado a C.A. · Fin traslado a C.A.</td><td>—</td></tr>
+      <tr><td>5</td><td><b>Descarga y armado en C.A.</b></td><td>Inicio descarga y armado · Fin descarga y armado</td><td>N° de jabas, N° de pallets, presentaciones, placa de camión, observación</td></tr>
+      <tr><td>6</td><td><b>Carga al camión</b></td><td>Inicio carga al camión · Fin carga al camión</td><td>—</td></tr>
+      <tr><td>7</td><td><b>Traslado a planta</b></td><td>Inicio traslado a planta · Fin traslado a planta</td><td>Tareadora, observación Casa Sombra, observación C. Acopio</td></tr>
+    </tbody>
+  </table>
+
+  <h3>5.2 Iniciar o continuar un ciclo</h3>
+  <ol class="pasos" style="--c:var(--verde)">
+    <li>Desde el inicio toca <b>Captura de tiempos</b>. Verás la lista <b>En curso</b>: cada tarjeta muestra el código, fundo, lote, líder y una barra de 7 segmentos (verde = etapa hecha, naranja = la que sigue).</li>
+    <li>Para uno nuevo toca <b>Iniciar nuevo ciclo</b>. Para seguir uno existente, <b>toca su tarjeta</b>: se abre directamente en la etapa pendiente. Puedes buscar por código, fundo, lote o líder.</li>
+    <li>En la etapa Cosecha, elige el <b>fundo</b> (sin fundo no se puede guardar). La app recuerda en ese celular el último fundo, líder, variedad, calibre y presentación que usaste.</li>
+    <li>Al guardar por primera vez el ciclo recibe su <b>código</b> automático (ej. <code>C-000123</code>). Anótalo si lo continuará otra persona.</li>
+  </ol>
+
+  <div class="demo">
+    <div>
+      <div class="tel"><div class="pant rel">
+        <div class="m-top rel" style="justify-content:flex-start;gap:3mm"><span style="color:#D6CABE">‹ Ciclos</span><span class="call" style="left:1mm;top:5.5mm">4</span><div><b style="font-size:7.4pt">C-000123</b><div style="font-size:5.4pt;color:#A89A8C">Fundo Ejemplo · Lote 12 · J. Pérez</div></div></div>
+        <div class="m-body">
+          <div class="m-pasos rel"><i class="h">✓</i><i class="a">2</i><i>3</i><i>4</i><i>5</i><i>6</i><i>7</i><span class="call" style="right:-3mm;top:-3.5mm">1</span></div>
+          <div class="m-etapa">
+            <div class="m-ruta">Etapa 2 de 7</div>
+            <div style="font-size:9.6pt;font-weight:500">Jabero</div>
+            <div class="m-hora llena"><div><span>✓ Inicio jabero</span><em>14/09 07:42</em></div><div class="m-ahora">⏱ Ahora</div></div>
+            <div class="m-hora rel"><div><span>Fin jabero</span><em style="color:#6f6258">dd/mm --:--</em></div><div class="m-ahora">⏱ Ahora</div><span class="call" style="right:-3mm;top:-3mm">2</span></div>
+            <div class="m-ruta" style="margin-top:1mm">Datos de la etapa</div>
+            <div class="m-campo"><span>N° de jabas</span><div class="m-inp">&nbsp;</div></div>
+            <div class="m-campo"><span>Observación de jaba</span><div class="m-inp">&nbsp;</div></div>
+          </div>
+        </div>
+        <div class="m-barra rel"><div class="m-btn">⏱ Marcar <b style="margin-left:.6mm">fin jabero</b>&nbsp;ahora</div><span class="call" style="right:1mm;top:-2mm">3</span></div>
+      </div></div>
+      <div class="pie-tel">Asistente por etapas</div>
+    </div>
+    <div>
+      <ul class="leyenda">
+        <li><i>1</i><span><b>Barra de etapas.</b> Los círculos verdes con ✓ ya están completos. Puedes tocar una etapa completada para corregirla.</span></li>
+        <li><i>2</i><span><b>Botón Ahora.</b> Pone la hora exacta del celular en ese campo y la <b>guarda al instante</b>. También puedes escribir la fecha y hora a mano tocando el campo.</span></li>
+        <li><i>3</i><span><b>Botón grande inferior.</b> Siempre dice lo que toca: «Marcar fin jabero ahora», luego «Guardar y continuar», y en la última etapa «Guardar y cerrar ciclo». Si solo cambiaste un dato, aparece además un botón <b>Guardar</b>.</span></li>
+        <li><i>4</i><span><b>‹ Ciclos</b> vuelve a la lista. Si hay cambios sin guardar, la app te pregunta antes de salir.</span></li>
+      </ul>
+      <div class="caja ojo" style="margin-top:2mm">
+        <b class="t">Avisos de revisión</b>
+        <p>Antes de avanzar, la app revisa las horas y te avisa si una está <b>en el futuro</b>, si es <b>anterior</b> a la marca previa o si <b>falta</b> alguna. No te bloquea: corrige o toca <b>Guardar igual y continuar</b>.</p>
+      </div>
+    </div>
+  </div>
+
+  <h3>5.3 Cerrar el ciclo</h3>
+  <p>Al guardar la última etapa (Fin traslado a planta) aparece la pantalla <b>Ciclo cerrado</b> con el <b>tiempo de ciclo total</b> en minutos y horas, la <b>semana</b> y una barra por cada tramo. Una barra <b style="color:#C62828">roja</b> indica un tramo negativo: dos horas quedaron fuera de orden y conviene corregirlas con <b>Corregir una etapa</b>. Desde ahí también puedes <b>Iniciar otro ciclo</b> o <b>Ver ciclos en curso</b>.</p>
+  <div class="caja tip">
+    <b class="t">Buenas prácticas en campo</b>
+    <ul>
+      <li>Usa <b>Ahora</b> en el momento exacto del evento; es más preciso que escribir la hora después.</li>
+      <li>Si aparece <b>«No se guardó: …»</b> (por ejemplo, sin señal), no cierres la pantalla: el dato sigue escrito. Cuando vuelva la señal toca <b>Guardar</b>.</li>
+      <li>Varias personas pueden avanzar el mismo ciclo desde celulares distintos. Toca <b>Actualizar lista</b> para ver lo último que registraron los demás.</li>
+      <li>La lista muestra además los ciclos <b>cerrados en las últimas 36 horas</b>, por si necesitas corregir algo.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="sec nueva">
+  <h2 style="--c:var(--azul)"><span class="n">6</span>Resumen de tiempos</h2>
+  <p>La pestaña <b>Resumen</b> muestra los promedios calculados con los <b>ciclos cerrados</b>. Funciona como un embudo de tres niveles: tocas una fila y bajas al detalle.</p>
+  <div class="demo">
+    <div>
+      <div class="tel"><div class="pant rel">
+        <div class="m-top"><span style="font-size:5.6pt;color:#A89A8C">Todas las semanas › Semana 37</span></div>
+        <div class="m-body">
+          <div class="m-ruta">Tiempos de ciclo</div>
+          <div class="m-h1 rel">Semana 37<span class="call" style="left:22mm;top:0">1</span></div>
+          <div class="m-kpis rel">
+            <div class="m-kpi" style="--c:#0097CE"><span>Ciclo promedio</span><b>312,4 min</b></div>
+            <div class="m-kpi" style="--c:#76B729"><span>Muestras válidas</span><b>28</b></div>
+            <span class="call" style="right:-3mm;top:-3mm">2</span>
+          </div>
+          <div class="m-tabla rel">
+            <div><span>Fundo</span><span>Muestras</span><span>Total (min)</span></div>
+            <div><span>Fundo A</span><span>12</span><span>335,1</span></div>
+            <div><span>Fundo B</span><span>9</span><span>301,8</span></div>
+            <div><span>Fundo C</span><span>7</span><span>288,0</span></div>
+            <div class="t"><span>Total general</span><span>28</span><span>312,4</span></div>
+            <span class="call" style="right:-3mm;top:5mm">3</span>
+          </div>
+          <div class="m-ruta" style="margin-top:1mm">Tiempo de ciclo por fundo</div>
+          <div class="m-graf rel">
+            <div><span>Fundo A</span><i style="width:74%"></i></div>
+            <div><span>Fundo B</span><i style="width:66%"></i></div>
+            <div><span>Fundo C</span><i style="width:63%"></i></div>
+            <span class="umbral"></span>
+            <span class="call" style="right:-3mm;top:-3mm">4</span>
+          </div>
+        </div>
+        <div class="m-nav"><span class="a">Resumen</span><span>Captura</span><span>Config</span></div>
+      </div></div>
+      <div class="pie-tel">Nivel «Semana» (valores de ejemplo)</div>
+    </div>
+    <div>
+      <ul class="leyenda">
+        <li><i>1</i><span><b>Migas de pan y selector de semana.</b> Arriba ves en qué nivel estás; tócalo para regresar. Con el selector cambias de semana.</span></li>
+        <li><i>2</i><span><b>Indicadores.</b> Tiempo de ciclo promedio (minutos y horas), muestras válidas, fundos con datos.</span></li>
+        <li><i>3</i><span><b>Tabla por fundo.</b> Promedio de cada uno de los 13 tramos y del total. Toca un fundo para ver sus <b>muestras</b> (cada ciclo individual).</span></li>
+        <li><i>4</i><span><b>Gráfico.</b> Una barra por fundo; la línea punteada naranja es el <b>umbral</b>.</span></li>
+      </ul>
+      <table style="margin-top:3mm">
+        <thead><tr><th>Nivel</th><th>Qué muestra</th></tr></thead>
+        <tbody>
+          <tr><td><b>Promedio general</b></td><td>Todas las semanas juntas, por fundo.</td></tr>
+          <tr><td><b>Semana</b></td><td>Solo la semana elegida, por fundo.</td></tr>
+          <tr><td><b>Muestras</b></td><td>Cada ciclo del fundo: fecha, código, lote, líder, tramos y total.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="caja info">
+    <b class="t">¿Qué es el umbral?</b>
+    <p>Es un límite de minutos (por defecto <b>480 min = 8 horas</b>). Un ciclo que lo supera probablemente tiene un error de digitación, así que <b>no entra en los promedios</b>. No se borra: en el detalle de muestras aparece <b style="color:#C62828">tachado en rojo</b>, y los que están cerca del límite (85 % o más) aparecen resaltados. El administrador puede cambiarlo en <b>Config → Ajustes</b>.</p>
+  </div>
+</section>
+
+<section class="sec nueva">
+  <h2><span class="n">7</span>Reubicación de personal</h2>
+  <p>Se abre desde la tarjeta <b>Reubicación de personal</b> o con el enlace <b>Entra sin iniciar sesión</b> de la puerta de entrada. Tras la animación, toca <b>Ingresar</b>. Tiene tres pestañas abajo: <b>Escanear</b>, <b>Personal</b> y <b>Datos</b>.</p>
+  <div class="demo">
+    <div>
+      <div class="tel"><div class="pant rel">
+        <div class="m-top"><svg width="30" viewBox="0 0 650 300"><path d="M0,0 A150,150 0 0 1 0,300 Z" fill="#0097CE"/><circle cx="262" cy="188" r="112" fill="#EF7C3B"/><path d="M350,300 A150,150 0 0 1 650,300 Z" fill="#76B729"/></svg><span class="m-chip"><i></i>412 en lista</span></div>
+        <div class="m-body">
+          <div class="m-ruta">Planta · Reubicación</div>
+          <div class="m-h1">Escanear fotocheck</div>
+          <div class="m-visor rel"><span class="call" style="right:-3mm;top:-3mm">1</span></div>
+          <div class="m-campo rel"><span>¿No lee el código? Escribe el DNI</span><div style="display:flex;gap:1.2mm"><div class="m-inp" style="flex:1">Ej. 72374767</div><div class="m-btn azul" style="height:6.6mm;padding:0 2mm">Buscar</div></div><span class="call" style="right:-3mm;top:-3mm">2</span></div>
+        </div>
+        <div class="m-hoja rel">
+          <div class="m-asa"></div>
+          <div class="m-check">✓</div>
+          <div style="text-align:center;font-size:8.6pt;font-weight:500">QUISPE ROJAS, MARÍA</div>
+          <div style="text-align:center;font-size:5.8pt;color:#A89A8C">DNI 00000000</div>
+          <div class="m-res">
+            <div class="l"><span>Línea</span><b>3</b></div>
+            <div class="d"><span>Lado</span><b>Izq.</b></div>
+            <div class="b"><span>Labor</span><b style="font-size:8.6pt">Selección</b></div>
+          </div>
+          <span class="call" style="right:1mm;top:1mm">3</span>
+        </div>
+        <div class="m-nav"><span class="a">Escanear</span><span>Personal</span><span>Datos</span></div>
+      </div></div>
+      <div class="pie-tel">Resultado de un escaneo (datos ficticios)</div>
+    </div>
+    <div>
+      <ul class="leyenda">
+        <li><i>1</i><span><b>Activar cámara</b> y centrar el <b>código QR</b> del fotocheck dentro del recuadro, a unos 15 cm. También lee códigos de barras. Si hay poca luz, aparece el botón de <b>linterna</b> (en celulares compatibles).</span></li>
+        <li><i>2</i><span>Si el código no se lee, <b>escribe el DNI</b> y toca <b>Buscar</b>.</span></li>
+        <li><i>3</i><span>El resultado muestra <b>nombre, DNI, línea, lado y labor</b>, con sonido y vibración. Si el DNI no está, dice <b>«No está en la lista»</b>.</span></li>
+      </ul>
+      <h3 style="margin-top:2mm">Las otras pestañas</h3>
+      <p><b>Personal:</b> busca por nombre o DNI, filtra por línea y mira la distribución de trabajadores por línea. Toca a una persona para ver su ubicación.</p>
+      <p><b>Datos:</b> muestra cuántos trabajadores tiene la lista y cuándo se actualizó. <b>Actualizar ahora</b> vuelve a descargarla. Un administrador con sesión iniciada ve además <b>Subir Excel</b> y <b>Descargar plantilla</b>.</p>
+      <p><b>Últimos escaneos:</b> debajo del escáner quedan las lecturas hechas <b>en ese celular</b>. <b>Limpiar</b> las borra solo de ese celular.</p>
+    </div>
+  </div>
+
+  <h3>7.1 Actualizar la lista de reubicación (administrador)</h3>
+  <ol class="pasos">
+    <li>Prepara el Excel con las columnas <b>DNI, NOMBRE, LÍNEA, LADO</b> y <b>LABOR</b> (OBSERVACIÓN es opcional). Lo más fácil es usar <b>Descargar plantilla</b>. En LADO escribe <b>IZQUIERDO</b> o <b>DERECHO</b>.</li>
+    <li>Entra con tu usuario administrador, abre <b>Reubicación de personal → Datos → Subir Excel</b> y elige el archivo (.xlsx, .xls o .csv).</li>
+    <li>La app te dice cuántos registros se actualizaron o insertaron y cuántos se <b>desactivaron</b>.</li>
+  </ol>
+  <div class="caja ojo">
+    <b class="t">Ojo: el Excel reemplaza la lista completa</b>
+    <p>Los DNI que <b>no</b> vengan en el archivo pasan a <b>inactivos</b> (no se borran; si vuelven en otro Excel se reactivan). Los DNI con menos de 8 dígitos se completan con ceros a la izquierda, porque Excel suele quitarlos.</p>
+  </div>
+  <div class="caja tip">
+    <b class="t">Sin señal en planta</b>
+    <p>El celular guarda una <b>copia de la última lista</b>. Si no hay internet, el escáner sigue funcionando con esa copia (la pestaña Datos dirá «Copia sin conexión»). Los escaneos hechos sin señal se guardan en el celular y se envían solos cuando vuelve la conexión.</p>
+  </div>
+</section>
+
+<section class="sec">
+  <h2 style="--c:#D9622B"><span class="n">8</span>Auditoría 5S</h2>
+  <p>Reemplaza los Excel «TERCERA AUDITORIA 5S» (hojas CHECK LIST, BD, Observaciones y Resultados) con el mismo estilo paso a paso de la captura de tiempos. Se abre desde la tarjeta <b>Auditoría 5S</b> y tiene cuatro pestañas abajo: <b>Resultados</b>, <b>Auditar</b>, <b>Observaciones</b> y <b>Catálogo</b> (esta última solo para administradores).</p>
+  <div class="flujo">
+    <div class="f" style="--c:#D9622B"><b>1. Cultivo y área</b>Arándano, Uva o Cítrico, y el área a auditar.</div><div class="fl">›</div>
+    <div class="f" style="--c:#D9622B"><b>2. Zona</b>Se elige el N° de zona.</div><div class="fl">›</div>
+    <div class="f" style="--c:var(--verde)"><b>3. 1S → 5S</b>Checklist de 26 ítems con puntaje 0 a 2.</div><div class="fl">›</div>
+    <div class="f" style="--c:var(--naranja)"><b>4. Observaciones</b>Hallazgos con foto «Antes».</div><div class="fl">›</div>
+    <div class="f" style="--c:var(--azul)"><b>5. Seguimiento</b>Estado, foto «Después» y corrección del puntaje.</div><div class="fl">›</div>
+    <div class="f" style="--c:var(--marron)"><b>6. Informes</b>Radar, Excel y PDF.</div>
+  </div>
+
+  <h3>8.1 Todo va por cultivo</h3>
+  <p>Cada cultivo tiene su <b>campaña</b>, su <b>planta</b> y <b>sus propias zonas</b> en cada área: la Producción de Uva no tiene las mismas zonas que la de Arándano. Por eso, arriba de cada pestaña hay un <b>selector de cultivo</b> (con su ícono y color) y la app recuerda en el celular el último que elegiste. <b>Los puntajes, observaciones, informes y la Google Sheet nunca mezclan cultivos.</b></p>
+  <table class="compacta" style="font-size:8.2pt">
+    <thead><tr><th style="width:30mm">Área</th><th><span style="color:#C9D1F2">●</span> Arándano · <i>Arándano 2025</i> · Planta Don Carlos</th><th><span style="color:#D9B3E6">●</span> Uva · <i>Uva 2025 - 2026</i> · Planta Don Carlos</th><th><span style="color:#FFD2AE">●</span> Cítrico · <i>Cítrico 2025</i> · Planta Casa Chica</th></tr></thead>
+    <tbody>
+      <tr><td><b>Producción</b></td><td><b>6</b> · Recepción y Gasificado · Pesado · Zona de Lavado de Jabas · Sellado · Mezzanine · Almacén de EPPS</td><td><b>5</b> · Precámara · Sala de Proceso · Paletizado · Mezzanine · Mercado Nacional</td><td><b>7</b> · Recepción · Zona de Volcado · Zona de Tratamiento · Sala de Proceso · Mezzanine · Mercado Nacional · Venta de Mercado Nacional</td></tr>
+      <tr><td><b>Frío</b></td><td><b>3</b> · Antecámara · Zona de pre enfriado · Túneles y cámaras</td><td><b>3</b> · Termometría · Túneles · Cámara de producto terminado</td><td><b>2</b> · Oficina de Termometría · Zona de Enfriamiento</td></tr>
+      <tr><td><b>Limpieza</b></td><td class="no">—</td><td><b>4</b> · Recepción · Sala de Limpieza · Zona de granos · Gasificado</td><td class="no">—</td></tr>
+      <tr><td><b>Mantenimiento</b></td><td><b>5</b> · Oficina · SADEMA · Zona de carga · Almacén · Taller de soldadura y pintura</td><td><b>4</b> · Oficina · Taller y Almacén · Estación de Carga · SADEMA</td><td><b>4</b> · Oficina · Taller y Almacén · Estación frigorista · Estación de carga</td></tr>
+      <tr><td><b>Manejo de Información</b></td><td><b>4</b> · Estación pesado - Recepción · Estación Etiquetado - Pesado · Estación Etiquetado - Embalaje · Almacén Temporal</td><td><b>5</b> · Estación Limpieza · Estación Pesado · Estación Packing · Almacén Temporal · Zona de rendimiento</td><td><b>2</b> · Estación Etiquetado · Almacén Temporal</td></tr>
+      <tr><td><b>Calidad</b></td><td><b>1</b> · Zona de inspección</td><td><b>3</b> · Calidad Limpieza · D-1 · Calidad Packing</td><td><b>1</b> · Zona de Inspección</td></tr>
+      <tr><td><b>Despacho</b></td><td><b>3</b> · Oficina · Sala de Despacho · SENASA</td><td><b>3</b> · Oficina · Sala de Despacho · SENASA</td><td><b>3</b> · Oficina de Despacho · Sala de Despacho · SENASA</td></tr>
+      <tr><td><b>Sanitización</b></td><td><b>3</b> · Lavandería · Zona de Ingreso · Zonas de Proceso</td><td><b>3</b> · Lavandería · Zona de Ingreso - Limpieza · Zonas de Proceso</td><td class="no">—</td></tr>
+      <tr class="t"><td><b>Total de zonas</b></td><td><b>25</b></td><td><b>30</b></td><td><b>19</b></td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:8.6pt;color:var(--tinta-3)">Zonas activas al 15/09/2026, tomadas de los Excel de cada cultivo. Las zonas se numeran dentro de cada área («1. Recepción»), igual que la columna ZONA de la hoja BD. «—» = el área aún no tiene zonas en ese cultivo: se agregan al iniciar la auditoría (8.2).</p>
+
+  <h3>8.2 Iniciar una auditoría</h3>
+  <div class="demo">
+    <div>
+      <div class="tel"><div class="pant rel">
+        <div class="m-top" style="justify-content:flex-start;gap:3mm"><span style="color:#D6CABE">‹ Auditorías</span><div><b style="font-size:7.4pt">Nueva auditoría</b><div style="font-size:5.4pt;color:#A89A8C">El código se asigna al iniciar</div></div></div>
+        <div class="m-body">
+          <div class="m-campo rel"><span>Cultivo</span><div class="m-cults"><span class="m-cult a" style="--c:#4B5FA8"><i></i>Arándano</span><span class="m-cult" style="--c:#7A3E8E"><i></i>Uva</span><span class="m-cult" style="--c:#EF7C3B"><i></i>Cítrico</span></div><span class="call" style="right:-3mm;top:-2mm">1</span></div>
+          <div class="m-campo rel"><span>Área</span><div class="m-cults"><span class="m-cult a" style="--c:#D9622B">Producción</span><span class="m-cult">Frío</span><span class="m-cult">Mantenimiento</span><span class="m-cult">Calidad</span><span class="m-cult">Despacho</span><span class="m-cult" style="border-style:dashed;color:#F8B68A">+ Agregar área</span></div><span class="call" style="right:-3mm;top:-2mm">2</span></div>
+          <div class="m-item rel"><span style="color:#A89A8C">6 zonas a auditar</span><span>1. Recepción y Gasificado · 2. Pesado · 3. Zona de Lavado de Jabas · 4. Sellado · 5. Mezzanine · 6. Almacén de EPPS</span><span style="color:#F8B68A">+ Agregar zonas</span><span class="call" style="right:-3mm;top:-2mm">3</span></div>
+          <div class="m-campo rel"><span>Tipo de auditoría</span><div class="m-cults"><span class="m-cult">Opinada</span><span class="m-cult a" style="--c:#76B729">Inopinada</span></div><span class="call" style="right:-3mm;top:-2mm">4</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1.5fr;gap:1.2mm"><div class="m-campo"><span>N° de auditoría</span><div class="m-inp">4</div></div><div class="m-campo"><span>Fecha</span><div class="m-inp">15/09/2026</div></div></div>
+          <div class="m-campo"><span>Campaña · Planta</span><div class="m-inp">Arándano 2025 · Planta Don Carlos</div></div>
+        </div>
+        <div class="m-barra rel"><div class="m-btn verde">Iniciar auditoría</div><span class="call" style="right:1mm;top:-2mm">5</span></div>
+      </div></div>
+      <div class="pie-tel">Pestaña Auditar → Nueva auditoría</div>
+    </div>
+    <div>
+      <ul class="leyenda">
+        <li><i>1</i><span><b>Cultivo.</b> Define qué zonas, campaña y planta se usan. Cada cultivo tiene su ícono y color.</span></li>
+        <li><i>2</i><span><b>Área.</b> Solo aparecen las activas. Si falta una, <b>+ Agregar área</b> la crea al momento.</span></li>
+        <li><i>3</i><span><b>Zonas del área</b> en ese cultivo. Si falta alguna, <b>+ Agregar zonas</b>: escribe una por línea y se numeran solas a continuación de las existentes.</span></li>
+        <li><i>4</i><span><b>Opinada</b> (avisada) o <b>Inopinada</b> (sin aviso). El <b>N°</b> se sugiere como el último del cultivo y área + 1; la fecha es la de hoy y la campaña y planta vienen del cultivo (se pueden editar).</span></li>
+        <li><i>5</i><span><b>Iniciar auditoría</b> crea el código (ej. <code>A5S-00012</code>) y abre la grilla de zonas.</span></li>
+      </ul>
+      <div class="caja tip" style="margin-top:2mm">
+        <b class="t">Agregar sí, cambiar no</b>
+        <p>Un auditor (rol Captura) puede <b>agregar</b> áreas y zonas. <b>Renombrar, renumerar o desactivar</b> solo lo hace un administrador desde <b>Catálogo</b> (sección 9.6), para que las auditorías anteriores conserven sus nombres.</p>
+      </div>
+      <p style="margin-top:2mm">La pestaña <b>Auditar</b> muestra primero las auditorías <b>en curso</b> del cultivo elegido, con su barra de zonas completadas. Toca una para continuarla, desde cualquier celular.</p>
+    </div>
+  </div>
+  <h3>8.3 Evaluar una zona: 1S → 2S → 3S → 4S → 5S</h3>
+  <div class="demo doble">
+    <div>
+      <div class="tel"><div class="pant rel">
+        <div class="m-top" style="justify-content:flex-start;gap:3mm"><span style="color:#D6CABE">‹ Auditorías</span><div><b style="font-size:7.4pt">A5S-00012</b><div style="font-size:5.4pt;color:#A89A8C">Arándano · Producción · N° 4 · Inopinada</div></div></div>
+        <div class="m-body">
+          <div class="m-ruta">Zonas de la auditoría</div>
+          <div class="m-zonas rel">
+            <div class="m-zona ok"><b>1. Recepción y Gasificado</b><em>✓ 77 % · BIEN</em></div>
+            <div class="m-zona cur"><b>2. Pesado</b><em>3 de 5 S</em></div>
+            <div class="m-zona"><b>3. Zona de Lavado de Jabas</b>Sin evaluar</div>
+            <div class="m-zona"><b>4. Sellado</b>Sin evaluar</div>
+            <div class="m-zona"><b>5. Mezzanine</b>Sin evaluar</div>
+            <div class="m-zona"><b>6. Almacén de EPPS</b>Sin evaluar</div>
+            <span class="call" style="right:-3mm;top:-3mm">1</span>
+          </div>
+          <div class="m-item rel" style="border-color:#80461F;color:#F8B68A">⚠ 2 observaciones abiertas de auditorías anteriores en esta zona<span class="call" style="right:-3mm;top:-3mm">2</span></div>
+        </div>
+        <div class="m-barra rel"><div class="m-btn verde">Cerrar auditoría (faltan 5)</div><span class="call" style="right:1mm;top:-2mm">6</span></div>
+      </div></div>
+      <div class="pie-tel">Grilla de zonas</div>
+    </div>
+    <div>
+      <div class="tel"><div class="pant rel">
+        <div class="m-top" style="justify-content:flex-start;gap:3mm"><span style="color:#D6CABE">‹ Zonas</span><div><b style="font-size:7.4pt">2. Pesado</b><div style="font-size:5.4pt;color:#A89A8C">A5S-00012 · Producción</div></div></div>
+        <div class="m-body">
+          <div class="m-pasos rel"><i class="h">✓</i><i class="h">✓</i><i class="a">3S</i><i>4S</i><i>5S</i><span class="call" style="right:-3mm;top:-3.5mm">3</span></div>
+          <div class="m-ruta">3S · Limpieza · 6 ítems</div>
+          <div class="m-item rel">1. Los pisos, paredes, tuberías y techo se encuentran libres de polvo…<div class="m-pt"><i>0</i><i>1</i><i>1.5</i><i class="s">2</i></div><span class="call" style="right:-3mm;top:-3mm">4</span></div>
+          <div class="m-item">2. Las máquinas o equipos están limpios…<div class="m-pt"><i>0</i><i class="s">1</i><i>1.5</i><i>2</i></div></div>
+          <div class="m-item">3. Los letreros, avisos y rótulos se encuentran libres de polvo…<div class="m-pt"><i>0</i><i>1</i><i class="s">1.5</i><i>2</i></div></div>
+          <div class="m-sub rel"><span>Subtotal 3S · 9 / 12</span><b>75 % · BIEN</b><span class="call" style="right:-3mm;top:-3mm">5</span></div>
+          <div class="m-btn sec">+ Observación de la zona</div>
+        </div>
+        <div class="m-barra"><div class="m-btn">Guardar y continuar · 4S</div></div>
+      </div></div>
+      <div class="pie-tel">Checklist de una S</div>
+    </div>
+    <ul class="leyenda">
+      <li><i>1</i><span><b>Zonas.</b> Toca el N° de zona a evaluar, en el orden que quieras. Verde = completa con su % y madurez; naranja = a medias.</span></li>
+      <li><i>2</i><span><b>Aviso de pendientes.</b> Si la zona tiene observaciones sin cerrar de auditorías anteriores, la app lo recuerda antes de empezar.</span></li>
+      <li><i>3</i><span><b>Pasos 1S a 5S.</b> Toca un paso ya hecho para <b>regresar</b> y corregirlo.</span></li>
+      <li><i>4</i><span><b>Puntaje por ítem:</b> 0 · 1 · 1.5 · 2 (tabla de abajo). Todos los ítems de la S deben tener puntaje para continuar.</span></li>
+      <li><i>5</i><span><b>Subtotal en vivo:</b> suma, % de la S y madurez mientras puntúas.</span></li>
+      <li><i>6</i><span><b>Cerrar auditoría</b> cuando todas las zonas estén completas. Si faltan zonas, la app avisa cuántas y pide confirmar.</span></li>
+    </ul>
+  </div>
+
+  <div class="dos">
+    <table style="margin-top:0">
+      <thead><tr><th style="width:16mm">Puntaje</th><th>Significado</th></tr></thead>
+      <tbody>
+        <tr><td class="c"><b>0</b></td><td>No cumple</td></tr>
+        <tr><td class="c"><b>1</b></td><td>Cumple parcialmente</td></tr>
+        <tr><td class="c"><b>1.5</b></td><td>Casi cumple (detalle menor)</td></tr>
+        <tr><td class="c"><b>2</b></td><td>Cumple</td></tr>
+      </tbody>
+    </table>
+    <div>
+      <p style="margin-bottom:1.5mm"><b>Escala de madurez</b> (igual a la hoja Resultados del Excel):</p>
+      <div class="esc5s" style="grid-template-columns:1fr 1fr">
+        <div style="background:#76B729"><b>EXCELENTE</b>90 % a 100 %</div>
+        <div style="background:#0097CE"><b>BIEN</b>75 % a 89 %</div>
+        <div style="background:#EF7C3B"><b>REGULAR</b>65 % a 74 %</div>
+        <div style="background:#C62828"><b>CRÍTICO</b>menos de 65 %</div>
+      </div>
+    </div>
+  </div>
+
+  <p>Al terminar la 5S toca <b>Guardar y cerrar zona</b>: aparece el <b>resumen de la zona</b> con una barra por S, el total y la madurez, y los botones <b>Siguiente zona</b>, <b>Volver a zonas</b> y <b>Corregir una S</b>.</p>
+  <div class="caja tip">
+    <b class="t">No se pierde nada</b>
+    <ul>
+      <li>Cada S se guarda en la base al tocar <b>Guardar y continuar</b>. Además, <b>cada toque</b> queda en el celular: si se va la señal o se cierra la app, al volver aparece «<b>Recuperamos n puntajes</b>».</li>
+      <li>Otro auditor puede continuar la misma auditoría desde su celular: las zonas completas se ven al instante.</li>
+    </ul>
+  </div>
+  <div class="caja ojo">
+    <b class="t">Corregir una zona ya completa</b>
+    <p>Solo se reescribe directamente <b>el mismo día</b> de la auditoría. Después, cualquier cambio de puntaje debe hacerse con un <b>seguimiento</b> en la observación que lo sustenta (8.5), para que quede constancia de quién, cuándo y por qué.</p>
+  </div>
+  <h3>8.4 Registrar una observación (hallazgo)</h3>
+  <p>Las observaciones son el <b>sustento</b> de los puntajes, igual que la hoja Observaciones del Excel. <b>Pertenecen a la zona, no a la auditoría</b>: siguen ahí en la siguiente auditoría del área para revisar si se cumplieron. Se registran con <b>+ Observación de la zona</b> mientras auditas, o con <b>Nueva observación</b> desde la pestaña Observaciones (eligiendo área y zona) cualquier día, sin auditoría abierta.</p>
+  <div class="demo doble">
+    <div>
+      <div class="tel"><div class="pant rel">
+        <div class="m-top" style="justify-content:flex-start;gap:3mm;opacity:.45"><span style="color:#D6CABE">‹ Zonas</span><b style="font-size:7.4pt">2. Pesado</b></div>
+        <div class="m-hoja" style="margin-top:0;flex:1;border-radius:0">
+          <div class="m-asa"></div>
+          <div style="font-size:6pt;color:#F8B68A;font-weight:600">📷 Nueva observación</div>
+          <div class="m-h1" style="font-size:9pt">2. Pesado</div>
+          <div class="m-campo rel"><span>Observación · obligatorio</span><div class="m-inp" style="height:10mm;align-items:flex-start;padding-top:1mm">Jabas con precintos sin identificar ni delimitar.</div><span class="call" style="right:-3mm;top:-2mm">1</span></div>
+          <div class="m-campo"><span>Acción correctiva</span><div class="m-inp">Rotular con el formato estandarizado.</div></div>
+          <div class="m-campo rel"><span>Estado inicial</span><div class="m-cults"><span class="m-cult a" style="--c:#F06A6E"><i></i>Pendiente</span><span class="m-cult" style="--c:#4FC3F0"><i></i>Recomendación</span></div><span class="call" style="right:-3mm;top:-2mm">2</span></div>
+          <div class="m-campo rel"><span>S relacionada (opcional)</span><div class="m-cults"><span class="m-cult">Ninguna</span><span class="m-cult">1S</span><span class="m-cult a" style="--c:#76B729">2S</span><span class="m-cult">3S</span><span class="m-cult">4S</span><span class="m-cult">5S</span></div><span class="call" style="right:-3mm;top:-2mm">3</span></div>
+          <div class="m-campo rel"><span>Fotos «Antes» · obligatorio · hasta 3</span><div class="m-foto">📷 Agregar foto &nbsp;·&nbsp; 2 de 3</div><span class="call" style="right:-3mm;top:-2mm">4</span></div>
+          <div class="m-btn verde rel">Registrar observación<span class="call" style="right:1mm;top:-2mm">5</span></div>
+        </div>
+      </div></div>
+      <div class="pie-tel">Hoja «Nueva observación»</div>
+    </div>
+    <div>
+      <div class="tel"><div class="pant rel">
+        <div class="m-top" style="justify-content:flex-start;gap:3mm;opacity:.45"><span style="color:#D6CABE">‹ Observaciones</span></div>
+        <div class="m-hoja" style="margin-top:0;flex:1;border-radius:0">
+          <div class="m-asa"></div>
+          <div style="font-size:6pt;color:#F8B68A;font-weight:600">⏱ Seguimiento</div>
+          <div class="m-h1" style="font-size:9pt">Obs. N° 3 · 2. Pesado</div>
+          <div class="m-campo rel"><span>Nuevo estado</span><div class="m-cults"><span class="m-cult" style="--c:#F06A6E"><i></i>Pendiente</span><span class="m-cult a" style="--c:#EF7C3B"><i></i>En ejecución</span><span class="m-cult" style="--c:#76B729"><i></i>Cerrado</span><span class="m-cult" style="--c:#A89A8C"><i></i>Cancelado</span><span class="m-cult" style="--c:#0097CE"><i></i>Stand By</span></div><span class="call" style="right:-3mm;top:-2mm">6</span></div>
+          <div class="m-campo"><span>Nota del seguimiento</span><div class="m-inp">Se rotularon las jabas.</div></div>
+          <div class="m-campo"><span>Fotos «Después» (opcional · hasta 3)</span><div class="m-foto" style="height:10mm">📷 Agregar foto después</div></div>
+          <div class="m-item rel" style="border-color:#4C7A20"><span><b style="color:#B7E27C">● Corregir puntaje del checklist</b><br><span style="color:#A89A8C">Disponible hasta el 18/09/2026 (3 días desde el registro)</span></span><span>2S-2 · Se usan letreros y rótulos…  <b style="color:#F8B68A">1 → 2</b></span><div class="m-pt"><i>0</i><i>1</i><i>1.5</i><i class="s">2</i></div><span class="call" style="right:-3mm;top:-3mm">7</span></div>
+          <div class="m-sub rel"><span>2S 70 % → 80 %</span><b>Zona 75 % → 77 %</b><span class="call" style="right:-3mm;top:-3mm">8</span></div>
+          <div class="m-btn verde">Guardar seguimiento</div>
+        </div>
+      </div></div>
+      <div class="pie-tel">Hoja «Seguimiento»</div>
+    </div>
+    <ul class="leyenda">
+      <li><i>1</i><span>Describe el <b>hallazgo</b> y, si ya se sabe, la <b>acción correctiva</b>.</span></li>
+      <li><i>2</i><span><b>Pendiente</b> = no cumple. <b>Recomendación</b> = mejora sugerida que no descuenta.</span></li>
+      <li><i>3</i><span>La <b>S relacionada</b> es opcional: solo ayuda a ubicar el ítem si luego se corrige el puntaje.</span></li>
+      <li><i>4</i><span>La <b>foto «Antes» es obligatoria</b> y puedes agregar <b>hasta 3</b> (el hallazgo desde varios ángulos). Se comprimen en el celular antes de subir y cada una se puede quitar con la ✕.</span></li>
+      <li><i>5</i><span>La base asigna el <b>N°</b> (correlativo por zona, continúa entre auditorías) y la <b>semana</b>. Si registras fuera de una auditoría, la fecha es la de hoy.</span></li>
+      <li><i>6</i><span><b>Seguimiento:</b> nuevo estado, nota y hasta <b>3 fotos «Después»</b>, que se van acumulando.</span></li>
+      <li><i>7</i><span>Si el hallazgo ya se levantó, activa <b>Corregir puntaje del checklist</b>: aparece el checklist de esa zona con el puntaje actual y cada cambio se ve como «1 → 2».</span></li>
+      <li><i>8</i><span>El % de la S, el total de la zona y la madurez se <b>recalculan en vivo</b> antes de guardar.</span></li>
+    </ul>
+  </div>
+
+  <h3>8.5 Estados y corrección de puntajes</h3>
+  <table>
+    <thead><tr><th style="width:30mm">Estado</th><th>Cuándo usarlo</th><th style="width:22mm">¿Abierta?</th></tr></thead>
+    <tbody>
+      <tr><td><span class="m-pill" style="--c:#9DC3E6">Pendiente</span></td><td>El ítem no cumple. Estado inicial normal de un hallazgo.</td><td>Sí</td></tr>
+      <tr><td><span class="m-pill" style="--c:#ED7D31;color:#fff">En ejecución</span></td><td>Al inicio no cumplía, pero se levantó después: el auditor puede <b>corregir el puntaje</b> a su criterio dentro del plazo.</td><td>Sí</td></tr>
+      <tr><td><span class="m-pill" style="--c:#BDD7EE">Stand By</span></td><td>En espera (depende de un tercero, compra, etc.).</td><td>Sí</td></tr>
+      <tr><td><span class="m-pill" style="--c:#92D050;color:#fff">Cerrado</span></td><td>Hallazgo levantado. La <b>fecha de cierre</b> se pone sola.</td><td>No</td></tr>
+      <tr><td><span class="m-pill" style="--c:#FF0000;color:#fff">Cancelado</span></td><td>Ya no aplica.</td><td>No</td></tr>
+      <tr><td><span class="m-pill" style="--c:#FFC000;color:#fff">Recomendación</span></td><td>Mejora sugerida; no descuenta puntaje.</td><td>No</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:8.6pt;color:var(--tinta-3);margin-top:-2mm">Colores del formato condicional de la hoja Observaciones del Excel (se usan en la vista Tabla y en el Excel descargado).</p>
+  <div class="caja ojo">
+    <b class="t">Plazo para corregir puntajes: 3 días</b>
+    <ul>
+      <li>Un auditor (rol Captura) puede corregir puntajes hasta <b>3 días después de la fecha de registro de la observación</b> (el administrador cambia este número en Catálogo). El mismo plazo vale para editar la observación. La hoja de seguimiento muestra hasta qué fecha está disponible.</li>
+      <li>Pasado el plazo aparece «<b>El plazo venció el dd/mm. Pide a un administrador que lo corrija.</b>» El administrador puede corregir siempre.</li>
+      <li>Nada se pisa sin rastro: se guarda el <b>puntaje original</b>, quién lo cambió, cuándo, la nota y la observación que lo sustenta. En el detalle de la observación, la <b>línea de tiempo</b> muestra, por ejemplo, «Puntaje corregido · 2S-2: 1 → 2».</li>
+    </ul>
+  </div>
+  <h3>8.6 Pestaña Observaciones: tarjetas, tabla y Excel</h3>
+  <ul>
+    <li><b>Filtros:</b> cultivo (arriba), <b>área</b>, <b>zona</b> y auditoría de origen, más botones por estado con su cantidad. Como la observación vive en la zona, filtrando por área ves <b>todo el historial del área</b>, de todas las auditorías.</li>
+    <li><b>Nueva observación:</b> registra un hallazgo sin auditoría abierta; solo pide área, zona, descripción y la foto.</li>
+    <li><b>Tarjetas:</b> miniatura «Antes» (con el número de fotos si hay más de una), N° y zona, estado y días que lleva abierta. Tócala para ver el <b>detalle</b>: galería Antes/Después, línea de tiempo, <b>Registrar seguimiento</b> y <b>Editar</b> (dentro del plazo o si eres administrador).</li>
+    <li><b>Tabla:</b> las mismas columnas de la hoja Observaciones del Excel — N° · Semana · Fecha de Registro · (Área) · Zona · Observaciones · Acción correctiva · Estado · Fecha de cierre · Antes · Después. Las notas de seguimiento se agregan a la acción correctiva con « // », como se hacía a mano.</li>
+    <li><b>Descargar Excel</b> genera el archivo con el <b>formato manual</b>: encabezado «Evidencia Fotográfica», colores y anchos originales, color por estado, filtros, <b>fotos Antes/Después incrustadas</b>, una hoja por área y una hoja <b>BD</b>. Respeta los filtros elegidos. Si una observación tiene varias fotos, la celda se <b>divide en bandas</b> y las muestra todas sin cambiar el formato.</li>
+  </ul>
+
+  <h3>8.7 Resultados e informe PDF</h3>
+  <div class="demo">
+    <div>
+      <div class="tel"><div class="pant rel">
+        <div class="m-top"><span class="m-ruta" style="letter-spacing:.1em">Auditoría 5S · Resultados</span></div>
+        <div class="m-body">
+          <div class="m-cults rel"><span class="m-cult a" style="--c:#4B5FA8"><i></i>Arándano</span><span class="m-cult" style="--c:#7A3E8E"><i></i>Uva</span><span class="m-cult" style="--c:#EF7C3B"><i></i>Cítrico</span><span class="call" style="right:-3mm;top:-2mm">1</span></div>
+          <div class="m-kpis rel">
+            <div class="m-kpi" style="--c:#4B5FA8"><span>Nivel de Arándano</span><b>77 % · BIEN</b></div>
+            <div class="m-kpi" style="--c:#76B729"><span>Auditorías</span><b>7</b></div>
+            <span class="call" style="right:-3mm;top:-3mm">2</span>
+          </div>
+          <div class="m-ruta">Nivel por S</div>
+          <div class="rel" style="border:1px solid #3B3129;border-radius:2mm;background:#1D1713;padding:1mm">
+            <svg viewBox="-8 -4 116 108" style="width:100%;display:block" font-family="Jost, sans-serif">
+              <polygon points="50,10 88.04,37.64 73.51,82.36 26.49,82.36 11.96,37.64" fill="none" stroke="#3B3129" stroke-width=".8"/>
+              <polygon points="50,14 84.24,38.88 71.16,79.12 28.84,79.12 15.76,38.88" fill="none" stroke="#76B729" stroke-width=".7" stroke-dasharray="2 1.5"/>
+              <polygon points="50,20 78.53,40.73 67.63,74.27 32.37,74.27 21.47,40.73" fill="none" stroke="#0097CE" stroke-width=".7" stroke-dasharray="2 1.5"/>
+              <line x1="50" y1="50" x2="50" y2="10" stroke="#3B3129" stroke-width=".5"/><line x1="50" y1="50" x2="88.04" y2="37.64" stroke="#3B3129" stroke-width=".5"/><line x1="50" y1="50" x2="73.51" y2="82.36" stroke="#3B3129" stroke-width=".5"/><line x1="50" y1="50" x2="26.49" y2="82.36" stroke="#3B3129" stroke-width=".5"/><line x1="50" y1="50" x2="11.96" y2="37.64" stroke="#3B3129" stroke-width=".5"/>
+              <polygon points="50,18 79.67,40.36 67.63,74.27 30.72,76.54 23.37,41.35" fill="rgba(0,151,206,.35)" stroke="#27B4E8" stroke-width="1.2"/>
+              <g font-size="6" fill="#D6CABE" text-anchor="middle"><text x="50" y="5">1S</text><text x="97" y="37">2S</text><text x="80" y="93">3S</text><text x="20" y="93">4S</text><text x="3" y="37">5S</text></g>
+            </svg>
+            <span class="call" style="right:-2mm;top:-2mm">3</span>
+          </div>
+          <div class="m-ruta">Madurez por área</div>
+          <div class="m-graf rel">
+            <div><span>Producción</span><i style="width:77%;background:#0097CE"></i></div>
+            <div><span>Frío</span><i style="width:83%;background:#0097CE"></i></div>
+            <div><span>Calidad</span><i style="width:92%;background:#76B729"></i></div>
+            <div><span>Despacho</span><i style="width:68%;background:#EF7C3B"></i></div>
+            <span class="call" style="right:-3mm;top:-3mm">4</span>
+          </div>
+          <div class="m-item rel"><span style="color:#fff;font-weight:600">Informe PDF</span><span>Área: Todas las áreas</span><span>☑ 15/09/2026 · ☑ 18/11/2025 · ☐ 15/10/2025</span><div class="m-btn verde" style="height:6mm">Generar informe PDF · 2 fechas</div><span class="call" style="right:-3mm;top:-3mm">5</span></div>
+        </div>
+        <div class="m-nav cuatro"><span class="a">Resultados</span><span>Auditar</span><span>Observ.</span><span>Catálogo</span></div>
+      </div></div>
+      <div class="pie-tel">Pestaña Resultados (valores de ejemplo)</div>
+    </div>
+    <div>
+      <ul class="leyenda">
+        <li><i>1</i><span><b>Cultivo.</b> Todos los resultados son de un solo cultivo.</span></li>
+        <li><i>2</i><span><b>Indicadores:</b> nivel del cultivo (última auditoría de cada área) con su madurez, número de auditorías (y cuántas en curso) y áreas evaluadas.</span></li>
+        <li><i>3</i><span><b>Radar por S:</b> cuanto más grande el pentágono, mejor. Las líneas punteadas marcan <b>90 % (EXCELENTE)</b> y <b>75 % (BIEN)</b>.</span></li>
+        <li><i>4</i><span><b>Madurez por área</b> con su color. Toca un área para ver el <b>detalle de la auditoría</b>: puntaje del área, zonas completas, observaciones, radar, promedio por S y tabla por zona (1S…5S, total y madurez).</span></li>
+        <li><i>5</i><span><b>Informe PDF:</b> elige el <b>área</b> (o todas) y marca <b>una o más fechas</b> (máximo 6). La vista previa del radar compara las fechas antes de generar.</span></li>
+      </ul>
+      <div class="caja info" style="margin-top:2mm">
+        <b class="t">Qué trae el informe PDF</b>
+        <ul>
+          <li>Encabezado con el <b>logo Don Ricardo</b>, «Ingeniería de Procesos», la franja de colores de la empresa y el ícono del cultivo.</li>
+          <li>Una tarjeta por fecha con puntaje y madurez, <b>radar comparativo</b> (un color por fecha) y tabla de resultados <b>por S</b>.</li>
+          <li>Escala de madurez, detalle por área (o por zona si elegiste un área) y cantidad de observaciones por estado.</li>
+          <li><b>Última hoja, en horizontal:</b> la tabla con el formato de la hoja Observaciones (N° · Semana · Fecha · Zona · Observaciones · Acción correctiva · Estado · Fecha de cierre · Evidencia). Incluye las <b>abiertas del área</b> y las <b>registradas en las fechas del informe</b>, y la celda de evidencia va <b>dividida</b>: arriba las fotos «Antes», abajo las «Después».</li>
+          <li>Pie con número de página. Desde el detalle de una auditoría también está <b>Informe PDF de esta auditoría</b>.</li>
+        </ul>
+      </div>
+      <p>Debajo del informe está la tabla <b>Auditorías</b> del cultivo: área, N°, fecha, tipo, zonas, 1S…5S, total, madurez y estado. Toca una fila para abrir su detalle.</p>
+    </div>
+  </div>
+
+  <h3>8.8 El checklist (26 ítems)</h3>
+  <p>Son los mismos textos del CHECK LIST del Excel, idénticos para todas las áreas y cultivos. El administrador puede editarlos en Catálogo.</p>
+  <table class="compacta" style="font-size:8.3pt">
+    <thead><tr><th style="width:12mm">Ítem</th><th>Qué se verifica</th></tr></thead>
+    <tbody>
+      <tr><td colspan="2" style="background:#EEF6E4;color:#3F6414;font-weight:600">1S · Seleccionar (5 ítems)</td></tr>
+      <tr><td>1S-1</td><td>Solo hay elementos necesarios para el trabajo (no existen elementos inutilizados, obsoletos, defectuosos).</td></tr>
+      <tr><td>1S-2</td><td>Los elementos están en las cantidades necesarias (no hay acumulación en exceso).</td></tr>
+      <tr><td>1S-3</td><td>Los elementos innecesarios son retirados a la zona de merma, cuarentena o almacenamiento temporal.</td></tr>
+      <tr><td>1S-4</td><td>Los pasillos se encuentran libres de elementos innecesarios que permita realizar las actividades con normalidad y salvaguardando la seguridad.</td></tr>
+      <tr><td>1S-5</td><td>Existen objetos personales en la zona de trabajo.</td></tr>
+      <tr><td colspan="2" style="background:#EEF6E4;color:#3F6414;font-weight:600">2S · Ordenar (5 ítems)</td></tr>
+      <tr><td>2S-1</td><td>Se usan líneas trazadas en el piso para delimitar pasillos, áreas de trabajo, máquinas, equipos, mesas, muebles, estantes, etc.</td></tr>
+      <tr><td>2S-2</td><td>Se usan letreros y rótulos para identificar las áreas, sub áreas, zonas y estaciones; así como también coincide el rótulo con lo almacenado.</td></tr>
+      <tr><td>2S-3</td><td>Los materiales, herramientas e insumos cuentan con un lugar asignado apropiado según la frecuencia de uso.</td></tr>
+      <tr><td>2S-4</td><td>Cada cajón, cajas de herramientas, nivel de muebles y racks tiene un listado actualizado de artículos necesarios e indica las cantidades permitidas.</td></tr>
+      <tr><td>2S-5</td><td>Los archivos físicos están ordenados y clasificados de tal manera que agiliza el trabajo diario.</td></tr>
+      <tr><td colspan="2" style="background:#EEF6E4;color:#3F6414;font-weight:600">3S · Limpieza (6 ítems)</td></tr>
+      <tr><td>3S-1</td><td>Los pisos, paredes, tuberías y techo se encuentran libres de polvo acumulado, manchas, huecos, etc.</td></tr>
+      <tr><td>3S-2</td><td>Las máquinas o equipos están limpios, libres de manchas de aceite, polvo o residuos.</td></tr>
+      <tr><td>3S-3</td><td>Los letreros, avisos, rótulos y planos se encuentran libres de polvo, manchas, roturas, despintados, entre otros.</td></tr>
+      <tr><td>3S-4</td><td>Existe y se cumple el cronograma de limpieza.</td></tr>
+      <tr><td>3S-5</td><td>Se cuenta con los elementos de limpieza y están en óptimas condiciones.</td></tr>
+      <tr><td>3S-6</td><td>Se tiene suficientes tachos de residuos debidamente identificados y se realiza una correcta segregación.</td></tr>
+      <tr><td colspan="2" style="background:#EEF6E4;color:#3F6414;font-weight:600">4S · Estandarización (5 ítems)</td></tr>
+      <tr><td>4S-1</td><td>Las áreas e instalaciones están debidamente identificadas con los rótulos y letreros (respetando las reglas de estandarización en modelo, color y tamaño).</td></tr>
+      <tr><td>4S-2</td><td>Se cuenta con delimitación de acuerdo a colores estandarizados (zona de peligro, de tránsito, etc.).</td></tr>
+      <tr><td>4S-3</td><td>Existen procedimientos, instructivos y formatos del área estandarizados vigentes, difundidos y puestos en práctica.</td></tr>
+      <tr><td>4S-4</td><td>Hay controles visuales en el lugar de trabajo como guías de labor, LUPs o estándares que facilitan el trabajo.</td></tr>
+      <tr><td>4S-5</td><td>El personal usa correctamente el uniforme de trabajo y EPPs.</td></tr>
+      <tr><td colspan="2" style="background:#EEF6E4;color:#3F6414;font-weight:600">5S · Disciplina (5 ítems)</td></tr>
+      <tr><td>5S-1</td><td>El personal conoce la importancia de la implementación y se garantiza la continuidad de 5S.</td></tr>
+      <tr><td>5S-2</td><td>Se cumple con la subsanación de hallazgos (levantamiento de observaciones) realizado en conjunto con el personal.</td></tr>
+      <tr><td>5S-3</td><td>Se cuenta con el panel de 5S y se encuentra actualizado.</td></tr>
+      <tr><td>5S-4</td><td>Existe la norma y el hábito para devolver las cosas al lugar donde se guardan.</td></tr>
+      <tr><td>5S-5</td><td>Se realiza el Barrido de 5S con el personal con la finalidad de que ellos sean partícipes y se comprometan en todo momento.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="sec">
+  <h2 style="--c:#E8B04A"><span class="n">9</span>Administración (solo administradores)</h2>
+  <p>Desde el inicio toca <b>Usuarios y configuración</b> (o la pestaña <b>Config</b> dentro de Tiempos de ciclo). Hay cuatro sub-pestañas (9.1 a 9.4). La configuración propia de la Auditoría 5S está en su pestaña <b>Catálogo</b> (9.6).</p>
+
+  <h3>9.1 Usuarios — dar acceso a una persona</h3>
+  <ol class="pasos" style="--c:#E8B04A">
+    <li>Escribe el <b>nombre completo</b>. El <b>usuario</b> se sugiere solo (ej. «Juan Pérez Quispe» → <i>juan.perez</i>); puedes cambiarlo. El <b>área</b> es opcional.</li>
+    <li>Elige qué podrá hacer: <b>Captura en campo</b>, <b>Solo consulta</b> o <b>Administrador</b>.</li>
+    <li>Deja la contraseña vacía para que se genere una temporal y toca <b>Crear usuario</b>.</li>
+    <li>Aparece una hoja con la página, el usuario y la contraseña, y los botones <b>Copiar datos</b> y <b>Enviar por WhatsApp</b>. <b>Compártelos en ese momento:</b> por seguridad no se vuelven a mostrar.</li>
+    <li>La persona entra con esos datos y el sistema le pide crear su propia contraseña.</li>
+  </ol>
+  <p>En la lista <b>Usuarios con acceso</b> puedes: cambiar el <b>rol</b> con el selector, generar una <b>Nueva contraseña</b> (la anterior deja de funcionar) o <b>Desactivar / Reactivar</b>. Las etiquetas indican si alguien «Aún no crea su contraseña». No puedes cambiar tu propio rol ni desactivarte.</p>
+
+  <h3>9.2 Listas — opciones de los botones de captura</h3>
+  <p>Aquí se gestionan <b>Fundos, Variedades, Calibres, Presentaciones y Tareadoras</b>. Toca una opción para <b>ocultarla o mostrarla</b> en la captura (atenuada = oculta). Para agregar una, escríbela y toca <b>Agregar</b>. Las opciones no se borran, solo se ocultan, para que los ciclos antiguos conserven su valor.</p>
+
+  <h3>9.3 Sheets — copia automática en Google Sheets</h3>
+  <table>
+    <thead><tr><th style="width:44mm">Elemento</th><th>Para qué sirve</th></tr></thead>
+    <tbody>
+      <tr><td><b>Estado del espejo</b></td><td>Cuatro indicadores: credencial de Google cargada, hoja destino, sincronización automática activa y fecha de la última sincronización. Si hubo un problema, aparece el <b>Último error</b> en texto.</td></tr>
+      <tr><td><b>Enlace de la Google Sheet</b></td><td>La hoja donde se copian los datos. Debe estar compartida como <b>Editor</b> con el correo de la cuenta de servicio (botón <b>Copiar</b>).</td></tr>
+      <tr><td><b>Frecuencia</b></td><td>Cada 15 min, 30 min, 1 h (por defecto), 2 h, 4 h, 12 h o una vez al día.</td></tr>
+      <tr><td><b>Sincronizar ahora</b></td><td>Fuerza la copia en ese momento y muestra cuántas filas escribió.</td></tr>
+      <tr><td><b>Credencial de Google</b></td><td>El archivo .json de la cuenta de servicio. Ya está cargado; solo se vuelve a subir si se genera una clave nueva.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>9.4 Ajustes</h3>
+  <ul>
+    <li><b>Umbral de calidad de datos:</b> los minutos máximos de un ciclo para entrar en los promedios (sección 6).</li>
+    <li><b>Importar histórico desde Excel:</b> elige «5.1. TIEMPO DE CICLO ACTUALIZADO.xlsx». La app lee la hoja <b>BD</b> en el propio dispositivo y muestra un resumen (ciclos, fechas, fundos y si los tiempos coinciden con los del Excel) antes de <b>Importar</b>. Se puede repetir cada vez que el Excel tenga filas nuevas: <b>no duplica</b> (reconoce cada fila por fundo + lote + inicio de cosecha) y <b>nunca modifica</b> los ciclos capturados en la app. Los importados reciben códigos <code>H-00001</code>…</li>
+    <li><b>Papelera de ciclos:</b> los ciclos eliminados quedan aquí con su motivo y se pueden <b>Restaurar</b>.</li>
+  </ul>
+
+  <h3>9.5 Borrar un ciclo de prueba sin riesgo</h3>
+  <ol class="pasos" style="--c:var(--fuego)">
+    <li>En <b>Captura</b>, abre el ciclo (desde En curso o Cerrados recientemente).</li>
+    <li>Al final de la pantalla toca <b>Eliminar este ciclo</b>, escribe el motivo y confirma con <b>Mover a la papelera</b>.</li>
+    <li>Si fue un error: <b>Config → Ajustes → Papelera de ciclos → Restaurar</b>.</li>
+  </ol>
+  <div class="caja ojo">
+    <b class="t">Nunca borres datos desde el panel de Supabase</b>
+    <p>Borrar filas directamente en la base de datos ya causó la pérdida de la configuración una vez. Usa siempre la app. Los ciclos importados del Excel no se eliminan desde la app: se corrigen en el Excel y se vuelve a importar.</p>
+  </div>
+
+  <h3>9.6 Catálogo de la Auditoría 5S</h3>
+  <p>Dentro de <b>Auditoría 5S</b>, la pestaña <b>Catálogo</b> (solo administradores) tiene cinco bloques:</p>
+  <table>
+    <thead><tr><th style="width:40mm">Bloque</th><th>Qué se puede hacer</th></tr></thead>
+    <tbody>
+      <tr><td><b>Plazo de corrección</b></td><td>Días desde la fecha de la auditoría en que un auditor puede corregir puntajes desde un seguimiento (3 por defecto) → <b>Guardar plazo</b>.</td></tr>
+      <tr><td><b>Cultivos</b></td><td>Editar nombre, <b>campaña</b> (ej. «Uva 2025 - 2026»), <b>planta</b>, ícono (arándano, uva, cítrico u otro cultivo), color y activar o desactivar. <b>Nuevo cultivo → Agregar cultivo</b>. Al cambiar de campaña, basta con editarla aquí: las auditorías nuevas la toman sola.</td></tr>
+      <tr><td><b>Áreas y zonas por cultivo</b></td><td>Elige cultivo y área. Renombrar el área (<b>Guardar nombre</b>); cambiar el N° o el nombre de cada zona, o desactivarla; <b>Agregar zonas</b> (una por línea); <b>Nueva área → Agregar área</b>.</td></tr>
+      <tr><td><b>Checklist</b></td><td>Textos de los ítems de cada S, desactivar un ítem o agregar uno nuevo. Los cambios valen para las zonas que se evalúen desde ese momento.</td></tr>
+      <tr><td><b>Auditorías</b></td><td><b>Reabrir</b> una auditoría cerrada, o <b>Anular</b> con motivo (ej. «Auditoría de prueba»): deja de contar en Resultados y en Google Sheets y libera su N°; sus puntajes, observaciones y fotos se conservan.</td></tr>
+    </tbody>
+  </table>
+  <div class="caja info">
+    <b class="t">En el catálogo nada se borra</b>
+    <p>Áreas, zonas, ítems y cultivos se <b>desactivan</b>; las auditorías se <b>anulan</b>. Así las auditorías antiguas conservan los nombres y puntajes con que se hicieron.</p>
+  </div>
+</section>
+
+<section class="sec">
+  <h2><span class="n">10</span>Problemas frecuentes</h2>
+  <table>
+    <thead><tr><th style="width:56mm">Lo que ves</th><th>Qué significa y qué hacer</th></tr></thead>
+    <tbody>
+      <tr><td>«Usuario o contraseña incorrectos.»</td><td>Revisa que el usuario esté en minúsculas y con punto (ej. <i>juan.perez</i>). Si no la recuerdas, pide una <b>Nueva contraseña</b> al administrador.</td></tr>
+      <tr><td>«Este usuario está desactivado.»</td><td>Un administrador te desactivó. Pídele que te <b>Reactive</b>.</td></tr>
+      <tr><td>«Tu cuenta no tiene permiso de captura…»</td><td>Tu rol es «Solo consulta». Un administrador puede cambiarlo a «Captura en campo».</td></tr>
+      <tr><td>No aparece la tarjeta que necesito en el inicio</td><td>Tu rol no la incluye (ver tabla de la sección 3).</td></tr>
+      <tr><td>«No se guardó: …» en la captura</td><td>Normalmente es falta de señal. No cierres la pantalla; cuando vuelva la señal toca <b>Guardar</b>. Si dice «No autorizado», vuelve a iniciar sesión.</td></tr>
+      <tr><td>En un campo de lista dice «Sin opciones»</td><td>No hay opciones activas de ese tipo. Un administrador puede agregarlas o mostrarlas en <b>Config → Listas</b>.</td></tr>
+      <tr><td>El resumen no muestra un ciclo</td><td>Solo cuentan los <b>ciclos cerrados</b> y que no superan el umbral. Revisa que tenga «Fin traslado a planta» y mira las muestras tachadas.</td></tr>
+      <tr><td>La cámara no enciende</td><td>Acepta el permiso de cámara del navegador. La app debe abrirse con su enlace <code>https://</code>. Si sigue sin funcionar, escribe el DNI.</td></tr>
+      <tr><td>«No está en la lista» al escanear</td><td>El DNI no está en la lista activa. Verifica el DNI escrito o pide al administrador que actualice el Excel de reubicación.</td></tr>
+      <tr><td>La Google Sheet no se actualiza</td><td>Mira <b>Config → Sheets</b>: el «Último error» explica la causa (por ejemplo, hoja no compartida como Editor). Luego toca <b>Sincronizar ahora</b>.</td></tr>
+      <tr><td colspan="2" style="background:#FBE9DF;color:#B94516;font-weight:600;font-size:8.4pt;letter-spacing:.08em">AUDITORÍA 5S</td></tr>
+      <tr><td>No veo una auditoría, zona u observación</td><td>Revisa el <b>selector de cultivo</b> de arriba: cada cultivo muestra solo lo suyo. Las auditorías anuladas no aparecen en Resultados.</td></tr>
+      <tr><td>El área no tiene zonas en ese cultivo</td><td>En <b>Nueva auditoría</b> toca <b>+ Agregar zonas</b> (una por línea). Si la zona existía pero está desactivada, un administrador la activa en <b>Catálogo</b>.</td></tr>
+      <tr><td>No me deja continuar a la siguiente S</td><td>Falta puntuar algún ítem de esa S. Todos deben tener 0, 1, 1.5 o 2.</td></tr>
+      <tr><td>«Toma la foto «Antes»: es el sustento del hallazgo.»</td><td>La foto inicial es obligatoria para registrar una observación.</td></tr>
+      <tr><td>«No se subió la foto (…)»</td><td>Suele ser falta de señal. El texto no se pierde: espera señal y toca <b>Reintentar</b>. No se duplica.</td></tr>
+      <tr><td>«Recuperamos n puntajes»</td><td>Es normal: la app guardó en el celular los toques que no llegaron a la base. Revisa y toca <b>Guardar y continuar</b>.</td></tr>
+      <tr><td>«El plazo venció el …»</td><td>Pasaron más de 3 días desde la auditoría. Pide a un administrador que corrija el puntaje.</td></tr>
+      <tr><td>El Excel o el PDF tarda en generarse</td><td>El Excel descarga e incrusta todas las fotos; con muchas observaciones puede tardar un minuto (el botón muestra el avance). El PDF acepta hasta <b>6 fechas</b>. No cierres la pantalla mientras se genera.</td></tr>
+      <tr><td>La app se ve “antigua” tras una mejora</td><td>Recarga la página (desliza hacia abajo o cierra y abre la pestaña).</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ===================================================== PARTE 2 -->
+<div class="parte tecnica">
+  <small>Parte 2</small>
+  <h1>Cómo funciona por dentro</h1>
+  <p>No necesitas saber programar para entender esta parte. La idea es que sepas qué piezas componen AgriTracer, qué hace cada una y qué pasa cuando algo se actualiza.</p>
+  <svg viewBox="0 0 650 300"><path d="M0,0 A150,150 0 0 1 0,300 Z" fill="#fff"/><circle cx="262" cy="188" r="112" fill="#fff"/><path d="M350,300 A150,150 0 0 1 650,300 Z" fill="#fff"/></svg>
+</div>
+
+<section class="sec" style="margin-top:0">
+  <h2 style="--c:var(--azul)"><span class="n">11</span>La idea general en un dibujo</h2>
+  <p>Piensa en AgriTracer como un <b>restaurante</b>: el <b>salón</b> es lo que ves en el celular (las pantallas); la <b>cocina y el almacén</b> es la base de datos, donde se guarda y procesa todo; y la <b>vitrina</b> es la Google Sheet, una copia ordenada para mostrar. El <b>recetario</b>, con todas sus versiones, está en GitHub.</p>
+  <div class="diagrama">
+    <svg viewBox="0 0 720 330" xmlns="http://www.w3.org/2000/svg" font-family="Jost, Segoe UI, sans-serif">
+      <defs>
+        <marker id="fl" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5E5249"/></marker>
+      </defs>
+      <!-- Vercel -->
+      <rect x="20" y="20" width="175" height="84" rx="12" fill="#fff" stroke="#2B2420" stroke-width="2"/>
+      <text x="107" y="50" text-anchor="middle" font-size="17" font-weight="600" fill="#2B2420">Vercel</text>
+      <text x="107" y="70" text-anchor="middle" font-size="11.5" fill="#5E5249">Publica la app en internet</text>
+      <text x="107" y="87" text-anchor="middle" font-size="11.5" fill="#5E5249">(el “salón”)</text>
+      <!-- GitHub -->
+      <rect x="272" y="20" width="175" height="84" rx="12" fill="#fff" stroke="#5D4835" stroke-width="2"/>
+      <text x="359" y="50" text-anchor="middle" font-size="17" font-weight="600" fill="#5D4835">GitHub</text>
+      <text x="359" y="70" text-anchor="middle" font-size="11.5" fill="#5E5249">Guarda el código y</text>
+      <text x="359" y="87" text-anchor="middle" font-size="11.5" fill="#5E5249">cada versión (“recetario”)</text>
+      <!-- Excel -->
+      <rect x="525" y="20" width="175" height="84" rx="12" fill="#fff" stroke="#8A7D70" stroke-width="2" stroke-dasharray="6 4"/>
+      <text x="612" y="50" text-anchor="middle" font-size="17" font-weight="600" fill="#5E5249">Archivos Excel</text>
+      <text x="612" y="70" text-anchor="middle" font-size="11.5" fill="#5E5249">Histórico de ciclos y</text>
+      <text x="612" y="87" text-anchor="middle" font-size="11.5" fill="#5E5249">lista de reubicación</text>
+      <!-- Celular -->
+      <rect x="20" y="215" width="175" height="96" rx="12" fill="#FDF1E8" stroke="#EF7C3B" stroke-width="2.4"/>
+      <text x="107" y="248" text-anchor="middle" font-size="17" font-weight="600" fill="#B94516">Tu celular</text>
+      <text x="107" y="268" text-anchor="middle" font-size="11.5" fill="#5E5249">Abre la app en el</text>
+      <text x="107" y="285" text-anchor="middle" font-size="11.5" fill="#5E5249">navegador</text>
+      <!-- Supabase -->
+      <rect x="272" y="215" width="175" height="96" rx="12" fill="#F2F8EA" stroke="#76B729" stroke-width="2.4"/>
+      <text x="359" y="248" text-anchor="middle" font-size="17" font-weight="600" fill="#4C7A1A">Supabase</text>
+      <text x="359" y="268" text-anchor="middle" font-size="11.5" fill="#5E5249">Base de datos, usuarios,</text>
+      <text x="359" y="285" text-anchor="middle" font-size="11.5" fill="#5E5249">reglas y cálculos (“cocina”)</text>
+      <!-- Sheets -->
+      <rect x="525" y="215" width="175" height="96" rx="12" fill="#EAF6FB" stroke="#0097CE" stroke-width="2.4"/>
+      <text x="612" y="248" text-anchor="middle" font-size="17" font-weight="600" fill="#0A6F97">Google Sheets</text>
+      <text x="612" y="268" text-anchor="middle" font-size="11.5" fill="#5E5249">Copia para reportes</text>
+      <text x="612" y="285" text-anchor="middle" font-size="11.5" fill="#5E5249">(“vitrina”)</text>
+      <!-- flechas -->
+      <line x1="272" y1="62" x2="199" y2="62" stroke="#5E5249" stroke-width="2" marker-end="url(#fl)"/>
+      <text x="235" y="54" text-anchor="middle" font-size="10.5" fill="#5E5249">publica</text>
+      <line x1="107" y1="104" x2="107" y2="211" stroke="#5E5249" stroke-width="2" marker-end="url(#fl)"/>
+      <text x="115" y="152" font-size="11" fill="#2B2420" font-weight="600">1</text>
+      <text x="126" y="152" font-size="10.5" fill="#5E5249">entrega las</text>
+      <text x="126" y="166" font-size="10.5" fill="#5E5249">pantallas</text>
+      <line x1="199" y1="263" x2="268" y2="263" stroke="#5E5249" stroke-width="2" marker-start="url(#fl)" marker-end="url(#fl)"/>
+      <text x="234" y="253" text-anchor="middle" font-size="11" fill="#2B2420" font-weight="600">2</text>
+      <text x="234" y="282" text-anchor="middle" font-size="10.5" fill="#5E5249">datos</text>
+      <line x1="451" y1="263" x2="521" y2="263" stroke="#5E5249" stroke-width="2" marker-end="url(#fl)"/>
+      <text x="486" y="253" text-anchor="middle" font-size="11" fill="#2B2420" font-weight="600">3</text>
+      <text x="486" y="282" text-anchor="middle" font-size="10.5" fill="#5E5249">c/ 60 min</text>
+      <path d="M612,104 L612,192 L150,192 L150,211" fill="none" stroke="#8A7D70" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#fl)"/>
+      <text x="470" y="185" text-anchor="middle" font-size="10.5" fill="#5E5249">el admin los sube desde la app</text>
+    </svg>
+    <div class="pie">① Vercel entrega las pantallas al celular · ② el celular guarda y consulta datos en Supabase · ③ Supabase copia todo a Google Sheets con la frecuencia elegida.</div>
+  </div>
+  <div class="tres">
+    <div class="tarjeta" style="--c:#2B2420"><h4>Vercel</h4><p>Empresa de <i>hosting</i>: guarda los archivos de la app y los entrega a quien abre el enlace. No guarda datos de ciclos ni de personal.</p></div>
+    <div class="tarjeta" style="--c:var(--verde)"><h4>Supabase</h4><p>Servicio en la nube que incluye una base de datos <b>PostgreSQL</b>, el sistema de usuarios, funciones de servidor, un almacén privado de <b>fotos</b> (Storage), una caja fuerte de claves y un reloj de tareas.</p></div>
+    <div class="tarjeta" style="--c:var(--azul)"><h4>Google Sheets</h4><p>Copia de consulta (“espejo”). Sirve para reportes, gráficos y tablas dinámicas. <b>La fuente oficial es Supabase</b>, no la hoja.</p></div>
+  </div>
+</section>
+
+<section class="sec nueva">
+  <h2 style="--c:var(--azul)"><span class="n">12</span>Los lenguajes y qué hace cada uno</h2>
+  <p>Un programa se escribe en <b>lenguajes</b>: formas de dar instrucciones a una computadora. AgriTracer usa varios porque cada pieza tiene un trabajo distinto. Siguiendo con la comparación de una casa:</p>
+  <table>
+    <thead><tr><th style="width:36mm">Lenguaje</th><th style="width:30mm">En la casa sería…</th><th>Qué hace en AgriTracer</th><th style="width:36mm">Dónde está</th></tr></thead>
+    <tbody>
+      <tr><td><b>HTML</b></td><td>Las paredes y muebles</td><td>Define <b>qué hay</b> en cada pantalla: títulos, campos, botones, pestañas.</td><td><code>index.html</code> de cada módulo</td></tr>
+      <tr><td><b>CSS</b></td><td>La pintura y decoración</td><td>Define <b>cómo se ve</b>: colores oficiales Don Ricardo, tipografía, tamaños y adaptación a la pantalla del celular.</td><td><code>css/estilos.css</code></td></tr>
+      <tr><td><b>JavaScript</b></td><td>La electricidad</td><td>Define <b>qué pasa</b> al tocar algo: marcar la hora con «Ahora», revisar horas fuera de orden, animaciones, leer la cámara y el Excel, comprimir fotos, dibujar el radar, generar el Excel y el PDF de la auditoría 5S, y conversar con la base de datos. Se ejecuta <b>dentro del celular</b>.</td><td>Carpetas <code>js/</code></td></tr>
+      <tr><td><b>SQL</b> (PostgreSQL)</td><td>El almacén y sus reglas</td><td>El idioma de la base de datos: crea las <b>tablas</b>, hace los <b>cálculos</b> de tiempos y promedios, y aplica las <b>reglas de permisos</b>. Se ejecuta <b>en Supabase</b>.</td><td><code>supabase/migrations/</code></td></tr>
+      <tr><td><b>TypeScript</b></td><td>El personal de seguridad</td><td>Es JavaScript con reglas más estrictas. Corre <b>en el servidor</b> para tareas delicadas que no deben hacerse desde el celular: <b>crear usuarios</b> y <b>escribir en Google Sheets</b>.</td><td><code>supabase/functions/</code></td></tr>
+      <tr><td><b>JSON</b></td><td>Fichas con datos</td><td>No es un lenguaje de instrucciones sino un <b>formato de texto</b> para guardar datos ordenados: configuración de Vercel, ícono de la app y la clave de Google.</td><td><code>vercel.json</code>, <code>manifest.webmanifest</code></td></tr>
+      <tr><td><b>Markdown</b></td><td>Notas en la puerta</td><td>Texto con formato simple para documentación técnica.</td><td><code>LEEME.md</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Piezas prestadas (librerías)</h3>
+  <p>En lugar de programar todo desde cero, se usan componentes gratuitos y probados, guardados en la carpeta <code>vendor/</code>:</p>
+  <table>
+    <thead><tr><th style="width:40mm">Librería</th><th>Para qué se usa</th></tr></thead>
+    <tbody>
+      <tr><td><b>supabase-js</b></td><td>El “teléfono” que conecta la app con Supabase: iniciar sesión, leer y guardar datos.</td></tr>
+      <tr><td><b>anime.js</b></td><td>Las animaciones: el logo al abrir, las transiciones entre etapas, las barras que crecen.</td></tr>
+      <tr><td><b>html5-qrcode</b> y <b>jsQR</b></td><td>Encender la cámara y leer códigos QR y de barras. jsQR es un segundo lector para fotochecks borrosos.</td></tr>
+      <tr><td><b>SheetJS (xlsx)</b></td><td>Leer archivos Excel dentro del celular (lista de reubicación e histórico de ciclos).</td></tr>
+      <tr><td><b>ExcelJS</b> 4.4.0</td><td>Crear el Excel de observaciones 5S con el formato manual: colores, anchos, filtros y fotos incrustadas.</td></tr>
+      <tr><td><b>jsPDF</b> 2.5.2</td><td>Crear el informe PDF de la auditoría 5S (logo, radar, tablas). Estas dos librerías se cargan <b>solo al generar</b> un informe, para no hacer más lenta la app.</td></tr>
+    </tbody>
+  </table>
+  <div class="caja info">
+    <b class="t">¿Por qué es tan liviana?</b>
+    <p>La app está hecha con <b>HTML, CSS y JavaScript “planos”</b>: los archivos se publican tal cual, sin programas intermedios de compilación. Eso la hace rápida en celulares de gama media y fácil de mantener.</p>
+  </div>
+</section>
+
+<section class="sec">
+  <h2 style="--c:var(--azul)"><span class="n">13</span>Mapa de carpetas del proyecto</h2>
+  <table>
+    <thead><tr><th style="width:62mm">Carpeta o archivo</th><th>Qué contiene</th></tr></thead>
+    <tbody>
+      <tr><td><code>index.html</code></td><td>Puerta de entrada: inicio de sesión, cambio de contraseña y tarjetas de módulos.</td></tr>
+      <tr><td><code>ciclos/</code></td><td>Módulo Tiempos de ciclo. <code>captura.js</code> (asistente de etapas), <code>resumen.js</code> (promedios), <code>config.js</code> (administración), <code>importar-excel.js</code> (lector del histórico), <code>grafico.js</code>, <code>ui.js</code>.</td></tr>
+      <tr><td><code>reubicacion/</code></td><td>Módulo Reubicación. <code>escaner.js</code> (cámara), <code>datos.js</code> (lista y copia sin conexión), <code>vistas.js</code> (pestañas) y la plantilla Excel.</td></tr>
+      <tr><td><code>auditoria5s/</code></td><td>Módulo Auditoría 5S. <code>catalogo.js</code> (cultivos, áreas, zonas, checklist y fórmulas), <code>auditar.js</code> (asistente 1S…5S), <code>observaciones.js</code> (hallazgos, seguimiento y corrección), <code>fotos.js</code> (cámara y compresión), <code>resultados.js</code> (radar e informe por fechas), <code>informes.js</code> (Excel y PDF), <code>config.js</code> (Catálogo).</td></tr>
+      <tr><td><code>js/</code></td><td>Piezas comunes: <code>supabase-cliente.js</code> (conexión y sesión) y <code>nucleo.js</code> (animaciones, avisos, íconos, sonido).</td></tr>
+      <tr><td><code>css/</code> · <code>img/</code></td><td>Estilos visuales, foto del fundo e isotipo.</td></tr>
+      <tr><td><code>vendor/</code></td><td>Librerías prestadas (sección 12).</td></tr>
+      <tr><td><code>supabase/migrations/</code></td><td>Los “planos” de la base de datos, numerados del 0001 al 0013.</td></tr>
+      <tr><td><code>supabase/functions/</code></td><td>Funciones de servidor: <code>admin-usuarios</code> y <code>sync-sheets</code>.</td></tr>
+      <tr><td><code>documentacion/</code></td><td>Este instructivo (HTML) y su PDF.</td></tr>
+      <tr><td><code>JSON/</code></td><td>Clave de Google. <b>Nunca se sube a GitHub</b> (está excluida a propósito).</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="sec nueva">
+  <h2 style="--c:var(--verde)"><span class="n">14</span>La base de datos</h2>
+  <p>Una <b>base de datos</b> es como un libro de Excel muy disciplinado que vive en internet: cada <b>tabla</b> es una hoja, cada <b>fila</b> es un registro (un ciclo, una persona) y cada <b>columna</b> es un dato con un tipo fijo (fecha, número, texto). A diferencia de un Excel, <b>muchas personas escriben a la vez sin pisarse</b>, las fórmulas no se pueden romper y cada acción pasa por reglas de permisos.</p>
+  <p>AgriTracer usa <b>PostgreSQL</b>, una de las bases de datos más usadas del mundo, alojada en <b>Supabase</b> (proyecto <i>agritracer-don-ricardo</i>). Estas son sus tablas:</p>
+
+  <div class="tabla-bd">
+    <div class="bd" style="--c:#4C7A1A"><div class="cab"><b>ciclos_cosecha</b><span>el corazón</span></div><div class="cu">
+      <p>Una fila por ciclo. Guarda los datos de cosecha, las <b>15 marcas de hora</b> de las 7 etapas y los datos de cada etapa.</p>
+      <p class="cols">Además tiene columnas que <b>calcula la propia base</b>: semana, los 13 tramos, tiempo total, si está cerrado y su origen (<i>app</i> o <i>excel</i>). Códigos: <code>C-000001</code> app · <code>H-00001</code> Excel.</p>
+    </div></div>
+    <div class="bd" style="--c:#B94516"><div class="cab"><b>perfiles</b><span>usuarios</span></div><div class="cu">
+      <p>Una fila por persona con acceso: nombre, usuario, área, <b>rol</b>, si está activo y si aún debe crear su contraseña.</p>
+      <p class="cols">Las contraseñas no están aquí: las guarda cifradas el sistema de usuarios de Supabase.</p>
+    </div></div>
+    <div class="bd" style="--c:#0A6F97"><div class="cab"><b>reub_personal</b><span>lista de reubicación</span></div><div class="cu">
+      <p>Una fila por trabajador: <b>DNI</b> (identificador único), nombre, línea, lado, labor, observación y si está activo.</p>
+      <p class="cols">Se llena al subir el Excel desde la pestaña Datos.</p>
+    </div></div>
+    <div class="bd" style="--c:#0A6F97"><div class="cab"><b>reub_escaneos</b><span>auditoría</span></div><div class="cu">
+      <p>Una fila por cada escaneo o búsqueda: fecha y hora, DNI leído, si se encontró, lo que se mostró, origen (cámara o manual) y el celular.</p>
+    </div></div>
+    <div class="bd" style="--c:#5D4835"><div class="cab"><b>listas_maestras</b><span>opciones</span></div><div class="cu">
+      <p>Las opciones de los botones de captura: fundos, variedades, calibres, presentaciones y tareadoras, con su estado visible u oculto.</p>
+    </div></div>
+    <div class="bd" style="--c:#5D4835"><div class="cab"><b>parametros</b><span>configuración</span></div><div class="cu">
+      <p>Ajustes de la app: umbral de minutos, enlace de la Google Sheet, frecuencia, fecha de la última sincronización y último error.</p>
+      <p class="cols">Protegida: sus filas no se pueden borrar, y si faltara alguna la base la vuelve a crear sola.</p>
+    </div></div>
+    <div class="bd" style="--c:#8A7D70"><div class="cab"><b>bitacora</b><span>quién hizo qué</span></div><div class="cu">
+      <p>Registro automático de acciones: ciclo iniciado, etapa guardada, lista reemplazada, sincronización correcta o con error, ciclo eliminado o restaurado.</p>
+      <p class="cols">Protegida: no se puede borrar.</p>
+    </div></div>
+    <div class="bd" style="--c:#8A7D70"><div class="cab"><b>ciclos_papelera</b><span>respaldo</span></div><div class="cu">
+      <p>Copia completa de cada ciclo eliminado, con motivo, quién y cuándo. Desde aquí se restaura.</p>
+    </div></div>
+  </div>
+
+  <h3>Tablas de la Auditoría 5S</h3>
+  <div class="tabla-bd">
+    <div class="bd" style="--c:#B94516"><div class="cab"><b>s5_cultivos</b><span>cultivos</span></div><div class="cu">
+      <p>Arándano, Uva, Cítrico…: nombre, ícono, color, <b>campaña</b> y <b>planta</b> vigentes.</p>
+    </div></div>
+    <div class="bd" style="--c:#B94516"><div class="cab"><b>s5_areas · s5_zonas</b><span>dónde se audita</span></div><div class="cu">
+      <p>Áreas comunes a todos los cultivos. Cada <b>zona</b> pertenece a un cultivo y un área, con su N° («1. Recepción»).</p>
+    </div></div>
+    <div class="bd" style="--c:#B94516"><div class="cab"><b>s5_items</b><span>checklist</span></div><div class="cu">
+      <p>Los 26 ítems del CHECK LIST: S a la que pertenecen, número y texto.</p>
+    </div></div>
+    <div class="bd" style="--c:#D9622B"><div class="cab"><b>s5_auditorias</b><span>cabecera</span></div><div class="cu">
+      <p>Una fila por auditoría: código <code>A5S-00001</code>, cultivo, área, N°, tipo, fecha, semana, campaña, planta y estado (en curso, cerrada o anulada).</p>
+    </div></div>
+    <div class="bd" style="--c:#D9622B"><div class="cab"><b>s5_evaluaciones · s5_puntajes</b><span>el checklist lleno</span></div><div class="cu">
+      <p>Una evaluación por zona auditada y un puntaje por ítem.</p>
+      <p class="cols">Cada puntaje guarda también el <b>puntaje original</b>, quién y cuándo lo corrigió, el motivo y la observación que lo sustenta.</p>
+    </div></div>
+    <div class="bd" style="--c:#D9622B"><div class="cab"><b>s5_observaciones · s5_seguimientos</b><span>hallazgos</span></div><div class="cu">
+      <p>Observación: pertenece a la <b>zona</b> (guarda también su área y cultivo) y persiste entre auditorías; la auditoría de origen es opcional. N° por zona, semana, descripción, acción correctiva, estado, fechas y las rutas de hasta <b>3 fotos «Antes» y 3 «Después»</b>.</p>
+      <p class="cols">Seguimiento: cada cambio de estado, nota, foto y los puntajes corregidos («antes → después»).</p>
+    </div></div>
+  </div>
+  <div class="caja info">
+    <b class="t">Vault: la caja fuerte</b>
+    <p>Supabase tiene un espacio cifrado llamado <b>Vault</b>. Ahí se guardan la <b>clave de la cuenta de Google</b> y un código interno para la sincronización automática. Ningún celular puede leerlos; solo las funciones de servidor.</p>
+  </div>
+  <div class="caja info">
+    <b class="t">Storage: el archivo de fotos</b>
+    <p>Las fotos de las observaciones no van dentro de la base: se guardan en el almacén <b>privado</b> <code>auditoria-5s</code> de Supabase, ordenadas por código de auditoría y N° de zona. La base solo guarda la ruta. Para mostrarlas, la app pide un <b>enlace firmado</b> que vence a los pocos minutos (en Google Sheets, a los 7 días, y se renueva en cada sincronización).</p>
+  </div>
+</section>
+
+<section class="sec nueva">
+  <h2 style="--c:var(--verde)"><span class="n">15</span>Cómo se calculan los tiempos y los puntajes 5S</h2>
+  <p>El celular <b>solo envía las horas</b>. Los cálculos los hace la <b>base de datos</b> cada vez que se guarda un ciclo, mediante un <b>disparador</b> (una regla automática que se ejecuta sola). Usa las <b>mismas fórmulas del Excel</b>: al importar los 234 ciclos históricos, los 234 tiempos de ciclo coincidieron exactamente.</p>
+  <table>
+    <thead><tr><th style="width:8mm">#</th><th style="width:48mm">Tramo (minutos)</th><th>Fórmula</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Cosecha</td><td>Fin cosecha − Inicio cosecha</td></tr>
+      <tr><td>2</td><td>Espera jabero</td><td>Inicio jabero − Fin cosecha</td></tr>
+      <tr><td>3</td><td>Jabero</td><td>Fin jabero − Inicio jabero</td></tr>
+      <tr><td>4</td><td>Estadía en Casa Sombra</td><td>Inicio carga motocarga − Fin jabero</td></tr>
+      <tr><td>5</td><td>Carga motocarga</td><td>Fin carga motocarga − Inicio carga motocarga</td></tr>
+      <tr><td>6</td><td>Espera traslado a C.A.</td><td>Inicio traslado a C.A. − Fin carga motocarga</td></tr>
+      <tr><td>7</td><td>Traslado a C.A.</td><td>Fin traslado a C.A. − Inicio traslado a C.A.</td></tr>
+      <tr><td>8</td><td>Espera descarga/armado</td><td>Inicio descarga − Fin traslado a C.A.</td></tr>
+      <tr><td>9</td><td>Descarga y armado</td><td>Fin descarga − Inicio descarga</td></tr>
+      <tr><td>10</td><td>Estadía en C.A.</td><td>Inicio carga al camión − Fin descarga</td></tr>
+      <tr><td>11</td><td>Carga al camión</td><td>Fin carga al camión − Inicio carga al camión</td></tr>
+      <tr><td>12</td><td>Espera traslado a planta</td><td>Inicio traslado a planta − Fin carga al camión</td></tr>
+      <tr><td>13</td><td>Traslado a planta</td><td>Fin traslado a planta − Inicio traslado a planta</td></tr>
+      <tr><td></td><td><b>Tiempo de ciclo total</b></td><td><b>Suma de los 13 tramos</b> (equivale a: Fin traslado a planta − Inicio cosecha). Solo se calcula si están los 13 tramos.</td></tr>
+    </tbody>
+  </table>
+  <div class="dos">
+    <div class="tarjeta" style="--c:var(--verde)">
+      <h4>Otras reglas automáticas</h4>
+      <ul style="margin-bottom:0">
+        <li><b>Semana:</b> igual que <code>NUM.DE.SEMANA</code> de Excel (la semana empieza el domingo; la que contiene el 1 de enero es la semana 1).</li>
+        <li><b>Cerrado:</b> un ciclo pasa a cerrado cuando tiene «Fin traslado a planta».</li>
+        <li><b>Llegada de motocarga:</b> se usa para calcular la estadía de la moto en Casa Sombra, un dato informativo que no suma al total.</li>
+      </ul>
+    </div>
+    <div class="tarjeta" style="--c:var(--azul)">
+      <h4>Cómo se arman los promedios</h4>
+      <ul style="margin-bottom:0">
+        <li>Se toman solo los ciclos <b>cerrados</b>, con total calculado y <b>dentro del umbral</b>.</li>
+        <li>Se agrupan por <b>fundo</b> (y por semana si se elige una) y se promedia cada tramo y el total.</li>
+        <li>La fila <b>Total general</b> promedia todos los ciclos válidos juntos.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Puntajes de la Auditoría 5S</h3>
+  <p>Aquí también se usan las <b>mismas fórmulas del Excel</b>. Se validó con la auditoría 3 de Producción (zona 1): la app dio 0.80 · 0.80 · 0.75 · 0.80 · 0.70 → <b>0.77 BIEN</b>, igual que la hoja Resultados.</p>
+  <table>
+    <thead><tr><th style="width:44mm">Resultado</th><th>Fórmula</th><th style="width:44mm">Ejemplo</th></tr></thead>
+    <tbody>
+      <tr><td><b>% de una S</b> (PUNTAJE % de BD)</td><td>Suma de los puntajes ÷ (n° de ítems × 2)</td><td>3S: 9 ÷ (6 × 2) = 75 %</td></tr>
+      <tr><td><b>Puntaje de la zona</b></td><td>Promedio de los % de las 5 S</td><td>(80+80+75+80+70) ÷ 5 = 77 %</td></tr>
+      <tr><td><b>Puntaje del área</b> (auditoría)</td><td>Promedio de todas las filas PUNTAJE % (zonas × S), igual que la tabla dinámica del Excel</td><td>—</td></tr>
+      <tr><td><b>Nivel del cultivo</b></td><td>Promedio de la <b>última auditoría de cada área</b> de ese cultivo</td><td>—</td></tr>
+      <tr><td><b>Madurez</b></td><td>≥ 90 % EXCELENTE · ≥ 75 % BIEN · ≥ 65 % REGULAR · resto CRÍTICO</td><td>77 % → BIEN</td></tr>
+      <tr><td><b>Semana</b></td><td>En BD, semana ISO (<code>NUM.DE.SEMANA(fecha;21)</code>); en Observaciones, <code>NUM.DE.SEMANA(fecha)</code>, como en cada hoja del Excel</td><td>—</td></tr>
+      <tr><td><b>Informe por fechas</b></td><td>Las auditorías de la misma fecha (y área elegida) se juntan en una serie del radar</td><td>—</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="sec">
+  <h2 style="--c:var(--fuego)"><span class="n">16</span>Seguridad y permisos</h2>
+  <div class="dos">
+    <div>
+      <h3 style="margin-top:0">Capas de protección</h3>
+      <ul>
+        <li><b>Inicio de sesión:</b> lo maneja Supabase. Internamente cada usuario se guarda como <i>usuario@agritracer.interno</i>, así nadie necesita un correo real.</li>
+        <li><b>Porteros en cada tabla (RLS):</b> la base revisa en cada consulta quién eres y qué rol tienes. Un «Solo consulta» no puede escribir aunque lo intente.</li>
+        <li><b>Ventanillas (RPC):</b> el celular no escribe directamente en las tablas. Pide a funciones de la base («iniciar ciclo», «agregar etapa»…) que primero verifican tu rol y dejan constancia en la bitácora.</li>
+        <li><b>Funciones de servidor:</b> crear usuarios y escribir en Google Sheets se hace en Supabase, nunca desde el celular.</li>
+        <li><b>Excepción intencional:</b> registrar un escaneo no exige sesión, para no frenar el trabajo en planta.</li>
+        <li><b>Auditoría 5S:</b> la base verifica el rol, que la zona sea del cultivo de la auditoría y el <b>plazo de corrección</b>; cambiar la fecha del celular no sirve para saltarlo.</li>
+        <li><b>Fotos privadas:</b> solo usuarios con sesión pueden subirlas y verlas, y siempre con enlaces temporales.</li>
+      </ul>
+    </div>
+    <div>
+      <h3 style="margin-top:0">Protección contra borrados</h3>
+      <ul>
+        <li>Todo ciclo borrado, incluso desde el panel de Supabase, se copia a la <b>papelera</b>.</li>
+        <li><b>Vaciar una tabla completa</b> está bloqueado en las tablas principales, incluidas las de la Auditoría 5S.</li>
+        <li>Las auditorías 5S no se borran: se <b>anulan</b> con motivo, y sus puntajes, observaciones y fotos se conservan.</li>
+        <li><b>parametros</b> y <b>bitacora</b> no permiten borrar filas.</li>
+        <li>Si falta un parámetro de configuración, la base lo recrea sola.</li>
+      </ul>
+      <div class="caja ojo" style="margin-top:3mm">
+        <b class="t">Reglas de oro</b>
+        <ul>
+          <li>No compartas tu contraseña; cada persona tiene su usuario.</li>
+          <li>No borres ni edites filas desde el panel de Supabase.</li>
+          <li>No subas la carpeta <code>JSON/</code> (clave de Google) a ningún sitio.</li>
+          <li>No edites las pestañas que la app escribe en la Google Sheet.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec nueva">
+  <h2 style="--c:var(--naranja)"><span class="n">17</span>El viaje de un dato</h2>
+  <p>¿Qué pasa exactamente cuando un supervisor toca <b>Ahora</b> en «Fin jabero»? En menos de un segundo ocurre esto:</p>
+  <ol class="pasos">
+    <li><b>En el celular (JavaScript):</b> toma la hora del teléfono, la escribe en el campo, vibra y revisa si la hora tiene sentido respecto a las anteriores.</li>
+    <li><b>Envío (supabase-js):</b> manda a Supabase «guarda en el ciclo C-000123, etapa jabero, fin jabero = 08:15», junto con el pase de tu sesión.</li>
+    <li><b>Portero (permisos):</b> la base comprueba que tu usuario está activo y tiene rol de Captura o Administrador. Si no, responde «No autorizado».</li>
+    <li><b>Guardado (SQL):</b> se actualiza solo la columna de esa etapa en la tabla <code>ciclos_cosecha</code>.</li>
+    <li><b>Disparador:</b> la base recalcula al instante semana, tramos, tiempo total y si el ciclo quedó cerrado.</li>
+    <li><b>Bitácora:</b> se anota «Etapa guardada: jabero · C-000123» con tu usuario y la hora.</li>
+    <li><b>Respuesta:</b> la base devuelve el ciclo actualizado y el celular muestra «Fin jabero · 08:15 guardado».</li>
+    <li><b>Más tarde (reloj automático):</b> cuando se cumple la frecuencia configurada, Supabase llama a la función <code>sync-sheets</code> y el ciclo aparece en la pestaña <code>Ciclos_BD</code> de la Google Sheet.</li>
+  </ol>
+</section>
+
+<section class="sec">
+  <h2 style="--c:var(--naranja)"><span class="n">18</span>Actualizaciones: datos, Google Sheets y la app</h2>
+  <p>“Actualizar” puede significar tres cosas distintas. Es importante no confundirlas:</p>
+
+  <h3>18.1 Actualización de datos (día a día, sin programador)</h3>
+  <table>
+    <thead><tr><th style="width:46mm">Qué se actualiza</th><th style="width:40mm">Cómo</th><th>Cuándo se refleja</th></tr></thead>
+    <tbody>
+      <tr><td>Horas y datos de un ciclo</td><td>Captura en campo</td><td><b>Al instante</b> en la base. Otros celulares lo ven al abrir o tocar «Actualizar lista».</td></tr>
+      <tr><td>Lista de reubicación</td><td>Datos → Subir Excel</td><td>Al instante. Cada celular la descarga al abrir el módulo o con «Actualizar ahora».</td></tr>
+      <tr><td>Ciclos históricos del Excel</td><td>Config → Ajustes → Importar</td><td>Al instante en Resumen. Repetible sin duplicar.</td></tr>
+      <tr><td>Opciones de captura</td><td>Config → Listas</td><td>La próxima vez que se abre la captura.</td></tr>
+      <tr><td>Umbral de minutos</td><td>Config → Ajustes</td><td>La próxima vez que se abre el Resumen.</td></tr>
+      <tr><td>Puntajes 5S, observaciones y seguimientos</td><td>Auditoría 5S → Auditar / Observaciones</td><td><b>Al instante</b> en Resultados y en los demás celulares.</td></tr>
+      <tr><td>Cultivos, campaña, áreas, zonas, checklist y plazo</td><td>Auditoría 5S → Catálogo</td><td>La próxima vez que se abre el módulo (las zonas agregadas al iniciar, al instante).</td></tr>
+    </tbody>
+  </table>
+
+  <h3>18.2 Sincronización con Google Sheets (automática)</h3>
+  <div class="flujo">
+    <div class="f" style="--c:var(--verde)"><b>Reloj (pg_cron)</b>Revisa cada 5 minutos si ya toca sincronizar.</div><div class="fl">›</div>
+    <div class="f" style="--c:var(--verde)"><b>¿Ya pasó el tiempo?</b>Si pasaron los minutos elegidos (60 por defecto) y hay hoja y clave, continúa.</div><div class="fl">›</div>
+    <div class="f" style="--c:var(--azul)"><b>Función sync-sheets</b>Lee todas las tablas y se identifica ante Google con la clave del Vault.</div><div class="fl">›</div>
+    <div class="f" style="--c:var(--azul)"><b>Escribe la hoja</b>Borra y reescribe sus 8 pestañas; anota el resultado en la bitácora.</div>
+  </div>
+  <table>
+    <thead><tr><th style="width:46mm">Pestaña en la Google Sheet</th><th>Contenido</th></tr></thead>
+    <tbody>
+      <tr><td><code>Ciclos_BD</code></td><td>Todos los ciclos con todas sus horas (hora de Lima), tramos, total, estado y quién lo registró.</td></tr>
+      <tr><td><code>Resumen_Semanal</code></td><td>Promedios por semana y fundo, más el promedio general.</td></tr>
+      <tr><td><code>Personal_Reubicacion</code></td><td>La lista de reubicación completa (activos e inactivos).</td></tr>
+      <tr><td><code>Auditoria_Escaneos</code></td><td>Todos los escaneos, del más reciente al más antiguo.</td></tr>
+      <tr><td><code>5S_BD</code></td><td>Las mismas 19 columnas de la hoja BD del Excel (una fila por zona y S) más código, estado de la auditoría, estado de la zona y <b>cultivo</b>. Sirve para reutilizar las tablas dinámicas del Excel.</td></tr>
+      <tr><td><code>5S_Observaciones</code></td><td>Formato de la hoja Observaciones, con área, cultivo, notas « // », correcciones de puntaje y <b>miniaturas</b>: hasta 3 columnas «Antes» y 3 «Después».</td></tr>
+      <tr><td><code>5S_Resumen</code></td><td>Por auditoría y zona: % de cada S, total y madurez, con cultivo y campaña.</td></tr>
+      <tr><td><code>Sync_Info</code></td><td>Fecha de la última sincronización, origen (automática o manual) y cantidad de filas, incluidas las de 5S.</td></tr>
+    </tbody>
+  </table>
+  <div class="caja ojo">
+    <b class="t">Estas 8 pestañas se sobrescriben en cada sincronización</b>
+    <p>Cualquier cambio manual en ellas se pierde. Crea tus gráficos, filtros o tablas dinámicas en <b>otras pestañas</b> que lean de estas: la app nunca toca las demás.</p>
+  </div>
+
+  <div style="break-inside:avoid">
+  <h3>18.3 Actualización de la aplicación (mejoras y correcciones de código)</h3>
+  <p>Cuando se mejora la app (una pantalla nueva, una corrección), el cambio sigue este camino:</p>
+  <div class="flujo">
+    <div class="f" style="--c:var(--marron)"><b>1. Cambio</b>Se modifican los archivos del proyecto y se prueban.</div><div class="fl">›</div>
+    <div class="f" style="--c:var(--marron)"><b>2. GitHub</b>Se guarda una nueva versión (<i>commit</i>) con una descripción del cambio y se sube (<i>push</i>).</div><div class="fl">›</div>
+    <div class="f" style="--c:#2B2420"><b>3. Vercel</b>Detecta la nueva versión y la publica sola (<i>deploy</i>), normalmente en 1–2 minutos.</div><div class="fl">›</div>
+    <div class="f" style="--c:var(--naranja)"><b>4. Usuarios</b>Al recargar la página ya usan la versión nueva. No hay que instalar nada.</div>
+  </div>
+  </div>
+  <p>Si el cambio afecta a la <b>base de datos</b> (una tabla o regla nueva), además se aplica una <b>migración</b>: un archivo SQL numerado que funciona como un <b>plano de remodelación</b>. Se aplican en orden y una sola vez. Las <b>funciones de servidor</b> se publican directamente en Supabase.</p>
+  <div class="dos" style="gap:4mm">
+    <table style="margin-top:0">
+      <thead><tr><th style="width:16mm">Migración</th><th>Qué agregó</th></tr></thead>
+      <tbody>
+        <tr><td>0001</td><td>Usuarios, configuración, listas de opciones y bitácora.</td></tr>
+        <tr><td>0002</td><td>Tabla de ciclos y fórmulas del Excel.</td></tr>
+        <tr><td>0003</td><td>Reubicación: personal y escaneos.</td></tr>
+        <tr><td>0004</td><td>Reglas de acceso por rol en cada tabla.</td></tr>
+        <tr><td>0005</td><td>Resúmenes y funciones de guardado.</td></tr>
+      </tbody>
+    </table>
+    <table style="margin-top:0">
+      <thead><tr><th style="width:16mm">Migración</th><th>Qué agregó</th></tr></thead>
+      <tbody>
+        <tr><td>0006 · 0008</td><td>Refuerzos de seguridad en funciones y roles.</td></tr>
+        <tr><td>0007</td><td>Sync con Google Sheets y reloj automático.</td></tr>
+        <tr><td>0009</td><td>Importación del Excel histórico.</td></tr>
+        <tr><td>0010</td><td>Configuración autorreparable.</td></tr>
+        <tr><td>0011</td><td>Papelera y bloqueo de borrados masivos.</td></tr>
+        <tr><td>0012</td><td>Auditoría 5S: checklist, auditorías, observaciones, seguimiento y fotos.</td></tr>
+        <tr><td>0013</td><td>Auditoría 5S por cultivo: zonas de Uva y Cítrico, área Limpieza.</td></tr>
+        <tr><td>0014</td><td>Observaciones por área/zona, varias fotos y plazo desde el registro.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="caja tip">
+    <b class="t">Buena noticia</b>
+    <p>Actualizar la app <b>no borra ni altera los datos</b>: el código vive en Vercel y los datos en Supabase, por separado. Y si una versión nueva tuviera un problema, GitHub y Vercel permiten volver a la anterior.</p>
+  </div>
+</section>
+
+<!-- ===================================================== ANEXOS -->
+<div class="parte anexo">
+  <small>Anexos</small>
+  <h1>Glosario y ficha técnica</h1>
+  <p>Las palabras técnicas que puedes escuchar al hablar de AgriTracer, explicadas en una línea.</p>
+  <svg viewBox="0 0 650 300"><path d="M0,0 A150,150 0 0 1 0,300 Z" fill="#fff"/><circle cx="262" cy="188" r="112" fill="#fff"/><path d="M350,300 A150,150 0 0 1 650,300 Z" fill="#fff"/></svg>
+</div>
+
+<section class="sec" style="margin-top:0">
+  <h2 style="--c:var(--verde)"><span class="n">A</span>Glosario</h2>
+  <table class="compacta">
+    <thead><tr><th style="width:42mm">Término</th><th>Significado</th></tr></thead>
+    <tbody>
+      <tr><td><b>5S</b></td><td>Metodología japonesa de orden y limpieza: Seleccionar, Ordenar, Limpiar, Estandarizar y Disciplina.</td></tr>
+      <tr><td><b>API</b></td><td>Puerta por la que dos programas conversan (por ejemplo, Supabase con Google Sheets).</td></tr>
+      <tr><td><b>Base de datos</b></td><td>Lugar organizado donde se guarda la información, con tablas, reglas y cálculos.</td></tr>
+      <tr><td><b>Bitácora</b></td><td>Registro automático de quién hizo qué y cuándo.</td></tr>
+      <tr><td><b>Caché / copia local</b></td><td>Copia que el celular guarda para funcionar más rápido o sin señal.</td></tr>
+      <tr><td><b>Commit</b></td><td>Una “foto” del código guardada en GitHub con la descripción del cambio.</td></tr>
+      <tr><td><b>Cron (pg_cron)</b></td><td>Reloj que ejecuta una tarea cada cierto tiempo (aquí, revisar cada 5 min si toca sincronizar).</td></tr>
+      <tr><td><b>Cuenta de servicio</b></td><td>“Usuario robot” de Google que tiene permiso para escribir en la hoja. Su clave es el archivo .json.</td></tr>
+      <tr><td><b>Cultivo</b></td><td>En la Auditoría 5S, Arándano, Uva o Cítrico: cada uno con su campaña, planta y zonas. Sus puntajes nunca se mezclan.</td></tr>
+      <tr><td><b>Deploy (despliegue)</b></td><td>Publicar una versión nueva de la app en internet.</td></tr>
+      <tr><td><b>Disparador (trigger)</b></td><td>Regla de la base de datos que se ejecuta sola al guardar (por ejemplo, recalcular tiempos).</td></tr>
+      <tr><td><b>Edge Function</b></td><td>Pequeño programa que corre en los servidores de Supabase (admin-usuarios, sync-sheets).</td></tr>
+      <tr><td><b>Enlace firmado</b></td><td>Dirección temporal que permite ver una foto privada durante un tiempo corto.</td></tr>
+      <tr><td><b>Frontend / Backend</b></td><td>Frontend: lo que ves (pantallas). Backend: lo que no ves (base de datos, reglas, servidor).</td></tr>
+      <tr><td><b>GitHub</b></td><td>Servicio que guarda el código y todas sus versiones.</td></tr>
+      <tr><td><b>Hosting</b></td><td>Servicio que mantiene una página web disponible en internet (aquí, Vercel).</td></tr>
+      <tr><td><b>Librería</b></td><td>Componente de código hecho por terceros que se reutiliza (anime.js, SheetJS…).</td></tr>
+      <tr><td><b>Madurez</b></td><td>Calificación de un puntaje 5S: EXCELENTE (≥ 90 %), BIEN (≥ 75 %), REGULAR (≥ 65 %) o CRÍTICO.</td></tr>
+      <tr><td><b>Migración</b></td><td>Archivo con instrucciones para crear o cambiar la estructura de la base de datos.</td></tr>
+      <tr><td><b>Observación</b></td><td>Hallazgo de una zona con foto «Antes»; es el sustento de los puntajes 5S.</td></tr>
+      <tr><td><b>Plazo de corrección</b></td><td>Días (3) desde la fecha de la auditoría en que un auditor puede corregir puntajes; después, solo un administrador.</td></tr>
+      <tr><td><b>PostgreSQL</b></td><td>El motor de base de datos que usa Supabase.</td></tr>
+      <tr><td><b>Radar</b></td><td>Gráfico de cinco puntas (una por S): cuanto más grande el pentágono, mejor el resultado.</td></tr>
+      <tr><td><b>RLS</b></td><td><i>Row Level Security</i>: reglas que deciden, fila por fila, quién puede ver o cambiar un dato.</td></tr>
+      <tr><td><b>Rol</b></td><td>Tipo de permiso de un usuario: Administrador, Captura en campo o Solo consulta.</td></tr>
+      <tr><td><b>RPC</b></td><td>“Ventanilla”: función de la base de datos que la app llama para hacer una acción controlada.</td></tr>
+      <tr><td><b>Sesión</b></td><td>Pase temporal que el celular guarda después de iniciar sesión, para no pedir la contraseña cada vez.</td></tr>
+      <tr><td><b>Seguimiento</b></td><td>Registro posterior de una observación: nuevo estado, nota, foto «Después» y, si corresponde, corrección del puntaje.</td></tr>
+      <tr><td><b>Sincronización</b></td><td>Copiar los datos de Supabase a la Google Sheet para que ambos coincidan.</td></tr>
+      <tr><td><b>Storage</b></td><td>Almacén de archivos de Supabase; aquí guarda las fotos de la Auditoría 5S en un espacio privado.</td></tr>
+      <tr><td><b>Supabase</b></td><td>Plataforma en la nube con base de datos, usuarios, funciones y almacenamiento de claves.</td></tr>
+      <tr><td><b>Umbral</b></td><td>Límite de minutos por encima del cual un ciclo no entra en los promedios.</td></tr>
+      <tr><td><b>Vault</b></td><td>Caja fuerte cifrada de Supabase para claves y secretos.</td></tr>
+      <tr><td><b>Vercel</b></td><td>Servicio de hosting que publica la app cada vez que hay una versión nueva en GitHub.</td></tr>
+      <tr><td><b>Zona</b></td><td>Espacio numerado dentro de un área que se evalúa con el checklist («2. Pesado»). Equivale a SUB ÁREA / ZONA de la hoja BD.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="sec">
+  <h2 style="--c:var(--verde)"><span class="n">B</span>Ficha técnica e historial de versiones</h2>
+  <table class="ficha">
+    <thead><tr><th>Dato</th><th>Valor</th></tr></thead>
+    <tbody>
+      <tr><td>Nombre</td><td>AgriTracer · Don Ricardo — Tiempos de Ciclo, Reubicación de Personal y Auditoría 5S</td></tr>
+      <tr><td>Versión</td><td>3.1</td></tr>
+      <tr><td>Área responsable</td><td>Ingeniería de Procesos · Agrícola Don Ricardo</td></tr>
+      <tr><td>Dirección web</td><td><span style="display:inline-block;min-width:80mm;border-bottom:1px solid var(--tinta-3)">&nbsp;</span></td></tr>
+      <tr><td>Hosting (pantallas)</td><td>Vercel · sitio estático (HTML, CSS y JavaScript sin compilación)</td></tr>
+      <tr><td>Base de datos y usuarios</td><td>Supabase (PostgreSQL) · proyecto <i>agritracer-don-ricardo</i></td></tr>
+      <tr><td>Funciones de servidor</td><td><code>admin-usuarios</code> (TypeScript) · <code>sync-sheets</code> (TypeScript)</td></tr>
+      <tr><td>Fotos</td><td>Supabase Storage · almacén privado <code>auditoria-5s</code> (fotos comprimidas en el celular, enlaces firmados)</td></tr>
+      <tr><td>Informes</td><td>Excel de observaciones (ExcelJS) e informe PDF con radar (jsPDF), generados en el propio dispositivo</td></tr>
+      <tr><td>Tareas automáticas</td><td><code>pg_cron</code> cada 5 min → sincronización según frecuencia configurada</td></tr>
+      <tr><td>Copia de reportes</td><td>Google Sheet «ADR_ Proyecto AGRITRACER»</td></tr>
+      <tr><td>Código fuente</td><td>GitHub · repositorio <i>ADR_Agri_Tracer</i></td></tr>
+      <tr><td>Navegadores</td><td>Chrome (Android) y Safari (iPhone) actualizados; también en computadora</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Historial de versiones</h3>
+  <table>
+    <thead><tr><th style="width:28mm">Fecha</th><th>Cambio</th></tr></thead>
+    <tbody>
+      <tr><td>12/09/2026</td><td>Primera versión: Tiempos de ciclo y Reubicación de personal sobre Vercel + Supabase.</td></tr>
+      <tr><td>13/09/2026</td><td><b>v2.1:</b> captura secuencial por etapas con botón «Ahora», gestión de usuarios desde la app, sincronización con Google Sheets e importador del Excel histórico.</td></tr>
+      <tr><td>13/09/2026</td><td>Corrección: el enlace de Google Sheets no se guardaba. Paneles visibles aunque la pestaña esté en segundo plano.</td></tr>
+      <tr><td>13/09/2026</td><td>Papelera de ciclos restaurable y protección de tablas contra borrados.</td></tr>
+      <tr><td>14/09/2026</td><td>Sincronización con Google Sheets en funcionamiento e importación de los 234 ciclos históricos del Excel.</td></tr>
+      <tr><td>15/09/2026</td><td><b>v3.0: Auditoría 5S.</b> Checklist de 26 ítems por zona (1S a 5S), observaciones con foto, seguimiento con corrección de puntaje en plazo, Catálogo y pestañas 5S_BD, 5S_Observaciones y 5S_Resumen en Google Sheets.</td></tr>
+      <tr><td>15/09/2026</td><td>Auditoría 5S <b>por cultivo</b> (Arándano, Uva, Cítrico) con ícono, campaña, planta y zonas propias; agregar áreas y zonas antes de iniciar; vista Tabla con Excel en formato manual; informe PDF por fechas con radar.</td></tr>
+      <tr><td>16/09/2026</td><td><b>v3.1:</b> las observaciones 5S pasan a vivir en la <b>zona/área</b> y persisten entre auditorías (la auditoría queda como origen); se pueden registrar sin auditoría abierta; hasta <b>3 fotos «Antes» y 3 «Después»</b>; el plazo de corrección se cuenta desde la fecha de registro; el informe PDF termina con la <b>hoja de observaciones apaisada</b> y evidencia dividida en la celda.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="caja info">
+    <b class="t">Documentación técnica complementaria</b>
+    <p>El archivo <code>LEEME.md</code> del proyecto contiene el detalle técnico para quien mantenga el código. Este instructivo se genera desde <code>documentacion/instructivo.html</code>; si la app cambia, basta con editar ese archivo y volver a exportarlo a PDF.</p>
+  </div>
+
+  <div class="firma"><span>AgriTracer · Ingeniería de Procesos · Don Ricardo</span><span>Documento v3 · 16/09/2026</span></div>
+</section>
+
+</body>
+</html>

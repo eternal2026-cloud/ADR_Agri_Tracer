@@ -10,17 +10,6 @@ respaldado por **Supabase** (Postgres + Auth + Edge Functions + Vault + pg_cron)
   0013: Auditoría 5S por cultivo, 0014: observaciones 5S por área,
   0015: Revisión del plan de mantenimiento, 0016: Satisfacción del cliente
   interno y cultivo en los tiempos de ciclo).
-
-## Portada por grupos
-
-- **Ingeniería · Planta** (Ingeniería de Procesos): Auditoría 5S, Revisión plan de
-  mantenimiento, Satisfacción del cliente interno y Reubicación de personal.
-- **Ingeniería · Campo**: **Toma de tiempos campo** abre `#campo` con un acceso por
-  cultivo: **Arándano** (los tiempos de ciclo de siempre, `ciclos/`) y **Uva**
-  (`campo/uva/`, en definición). `ciclos_cosecha.cultivo` (0016) separa los cultivos;
-  todo lo registrado hasta hoy es Arándano (valor por defecto y trigger).
-- **Usuarios y configuración**: apartado propio, solo administradores.
-- El ícono de cultivo vive en `DR.iconoCultivo` (`js/nucleo.js`); 5S lo reutiliza.
 - **Edge Functions desplegadas** (código en `supabase/functions/`):
   - `admin-usuarios` — crear usuarios, restablecer contraseñas, cambiar rol, desactivar.
   - `sync-sheets` — espejo de auditoría hacia Google Sheets.
@@ -30,6 +19,23 @@ respaldado por **Supabase** (Postgres + Auth + Edge Functions + Vault + pg_cron)
   como Editor con la cuenta de servicio (verificado).
 - **Vercel no necesita variables de entorno**: las funciones de administración
   viven en Supabase.
+
+## Portada por grupos
+
+Mismo orden del organigrama de Ingeniería de Procesos (lista `GRUPOS` en `index.html`):
+
+- **Ingeniería · Campo**: **Toma de tiempos campo** abre `#campo` con un acceso por
+  cultivo: **Arándano** (los tiempos de ciclo de siempre, `ciclos/`) y **Uva**
+  (`campo/uva/`, en definición). `ciclos_cosecha.cultivo` (0016) separa los cultivos;
+  todo lo registrado hasta hoy es Arándano (valor por defecto y trigger).
+- **Ingeniería · Planta**: Reubicación de personal.
+- **Gestión de Procesos**: Auditoría 5S, Revisión plan de mantenimiento y
+  Satisfacción del cliente interno.
+- **Usuarios y configuración**: apartado propio, solo administradores.
+- Mover una tarjeta de grupo = cortar su línea `{ href: … }` y pegarla en la lista
+  `modulos` del grupo destino (no hay pantalla para esto). `#campo`, `#planta` y
+  `#gestion` en la dirección abren o desplazan a ese grupo.
+- El ícono de cultivo vive en `DR.iconoCultivo` (`js/nucleo.js`); 5S lo reutiliza.
 
 ### Pendiente (lo hace un admin desde la app, una sola vez)
 

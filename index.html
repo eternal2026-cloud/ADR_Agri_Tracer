@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0B0908">
-<meta name="description" content="AgriTracer · Don Ricardo — Ingeniería de Procesos: planta (5S, mantenimiento, cliente interno, reubicación) y campo (toma de tiempos).">
+<meta name="description" content="AgriTracer · Don Ricardo — Ingeniería de Procesos: campo (toma de tiempos), planta (reubicación) y gestión de procesos (5S, mantenimiento, cliente interno).">
 <title>AgriTracer · Don Ricardo</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="img/icono.svg" type="image/svg+xml">
@@ -33,7 +33,7 @@
 
     <div id="etiquetaApp">Ingeniería de Procesos</div>
     <div id="tituloApp">AgriTracer</div>
-    <div id="sedeApp">Ingeniería · Planta &nbsp;·&nbsp; Ingeniería · Campo</div>
+    <div id="sedeApp">Ingeniería · Campo &nbsp;·&nbsp; Ingeniería · Planta &nbsp;·&nbsp; Gestión de Procesos</div>
 
     <div id="loginPanel" class="login-panel">
       <div class="campo"><label for="loginUsuario">Usuario</label><input id="loginUsuario" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="ej. juan.perez"></div>
@@ -97,25 +97,31 @@ var ICO = {
 };
 
 /**
- * Portada por grupos. «Toma de tiempos campo» abre la sub-vista #campo con un
- * acceso por cultivo: Arándano (los tiempos de ciclo actuales) y Uva (en definición).
+ * Portada por grupos, en el orden del organigrama de Ingeniería de Procesos:
+ * Ingeniería · Campo, Ingeniería · Planta y Gestión de Procesos.
+ * «Toma de tiempos campo» abre la sub-vista #campo con un acceso por cultivo:
+ * Arándano (los tiempos de ciclo actuales) y Uva (en definición).
  * Usuarios y configuración es un apartado propio, solo para administradores.
+ * Para mover una tarjeta a otro grupo basta con cortar su línea { href: … } y
+ * pegarla en la lista «modulos» del grupo destino.
  */
 var TODOS = ['admin', 'captura', 'visor'];
 var GRUPOS = [
-  { id: 'planta', titulo: 'Ingeniería · Planta', sub: 'Ingeniería de Procesos', modulos: [
+  { id: 'campo', titulo: 'Ingeniería · Campo', sub: 'Tiempos en campo por cultivo', modulos: [
+    { href: '#campo', color: '#0097CE', nombre: 'Toma de tiempos campo', icono: ICO.cronometro,
+      sub: 'Arándano (tiempos de ciclo de cosecha) · Uva (en definición)', roles: TODOS }
+  ] },
+  { id: 'planta', titulo: 'Ingeniería · Planta', sub: 'Operación en planta', modulos: [
+    { href: 'reubicacion/', color: '#EF7C3B', nombre: 'Reubicación de personal', icono: ICO.personas,
+      sub: 'Escanear fotocheck, buscar personal y actualizar la lista', roles: TODOS }
+  ] },
+  { id: 'gestion', titulo: 'Gestión de Procesos', sub: '5S, mantenimiento y cliente interno', modulos: [
     { href: 'auditoria5s/', color: '#D9622B', nombre: 'Auditoría 5S', icono: ICO.auditoria,
       sub: 'Checklist por zona, observaciones con foto y seguimiento', roles: TODOS },
     { href: 'mantenimiento/', color: '#5B9BD5', nombre: 'Revisión plan de mantenimiento', icono: ICO.mantenimiento,
       sub: 'Carga el plan del mes, revisa OT por encargado y puntúa no conformidades', roles: TODOS },
     { href: 'satisfaccion/', color: '#76B729', nombre: 'Satisfacción del cliente interno', icono: ICO.cliente,
-      sub: 'Histórico de encuestas por área y planta, BD para Power BI y presentación', roles: TODOS },
-    { href: 'reubicacion/', color: '#EF7C3B', nombre: 'Reubicación de personal', icono: ICO.personas,
-      sub: 'Escanear fotocheck, buscar personal y actualizar la lista', roles: TODOS }
-  ] },
-  { id: 'campo', titulo: 'Ingeniería · Campo', sub: 'Tiempos en campo por cultivo', modulos: [
-    { href: '#campo', color: '#0097CE', nombre: 'Toma de tiempos campo', icono: ICO.cronometro,
-      sub: 'Arándano (tiempos de ciclo de cosecha) · Uva (en definición)', roles: TODOS }
+      sub: 'Histórico de encuestas por área y planta, BD para Power BI y presentación', roles: TODOS }
   ] },
   { id: 'config', titulo: 'Usuarios y configuración', sub: 'Solo administradores', modulos: [
     { href: 'ciclos/#usuarios', color: '#E8B04A', nombre: 'Usuarios y configuración', icono: ICO.usuarios,
@@ -215,7 +221,9 @@ function pintarModulos() {
     }).join('');
   }
   DR.entrarPaneles('#landing');
-  if (location.hash === '#planta' && DR.$('#grupo-planta')) DR.$('#grupo-planta').scrollIntoView();
+  // #planta o #gestion (enlace de regreso de un módulo) lleva a su grupo.
+  var grupo = /^#(planta|gestion)$/.test(location.hash) && DR.$('#grupo-' + location.hash.substring(1));
+  if (grupo) grupo.scrollIntoView();
 }
 
 function intentarLogin() {

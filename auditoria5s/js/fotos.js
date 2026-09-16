@@ -4,13 +4,86 @@
  * ≤ 1600 px en JPEG antes de subir (≈ 200–400 KB en lugar de varios MB).
  * El bucket es privado: para mostrarlas se piden URLs firmadas temporales.
  * ==========================================================================*/
-var FOTOS = { BUCKET: 'auditoria-5s', cache: {} };
+var FOTOS = { BUCKET: 'auditoria-5s', cache: {}, MAX: 3 };
 
 FOTOS.ICONO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.7l1.3-2h5l1.3 2h1.7A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.5" r="3.5"/></svg>';
 
 FOTOS.campoHtml = function (id, titulo, detalle) {
   return '<label class="foto-carga" id="' + id + 'Zona"><input type="file" accept="image/*" capture="environment" id="' + id + '">' +
     '<span class="foto-prev">' + FOTOS.ICONO + '</span><span class="foto-txt"><b>' + titulo + '</b><span>' + detalle + '</span></span></label>';
+};
+
+/** Campo de varias fotos (hasta max): galería con las elegidas + botón para agregar. */
+FOTOS.campoMultiHtml = function (id, titulo, detalle, max) {
+  return '<div class="foto-multi" id="' + id + 'Zona" data-max="' + (max || FOTOS.MAX) + '">' +
+    '<div class="foto-lista" id="' + id + 'Lista"></div>' +
+    '<label class="foto-carga chica" id="' + id + 'Btn"><input type="file" accept="image/*" capture="environment" multiple id="' + id + '">' +
+    '<span class="foto-prev">' + FOTOS.ICONO + '</span><span class="foto-txt"><b>' + titulo + '</b><span>' + detalle + '</span></span></label></div>';
+};
+
+/** Enlaza un campo multi-foto a una lista de estados [{blob|ruta, url}]; alCambiar() tras cada cambio. */
+FOTOS.enlazarLista = function (id, lista, max, alCambiar) {
+  max = max || FOTOS.MAX;
+  var inp = DR.$('#' + id), zona = DR.$('#' + id + 'Zona'), cont = DR.$('#' + id + 'Lista'), boton = DR.$('#' + id + 'Btn');
+  if (!inp || !cont) return;
+
+  var pintar = function () {
+    cont.innerHTML = lista.map(function (f, i) {
+      var img = f.url ? '<img alt="" src="' + f.url + '">' : '<img alt="" data-foto="' + DR.esc(f.ruta) + '">';
+      return '<span class="foto-item">' + img + '<button type="button" class="foto-quitar" data-quitar="' + i + '" aria-label="Quitar foto ' + (i + 1) + '">✕</button></span>';
+    }).join('');
+    if (boton) boton.classList.toggle('oculto', lista.length >= max);
+    DR.$('.foto-txt span', zona).textContent = lista.length
+      ? lista.length + ' de ' + max + ' foto(s) · toca + para agregar'
+      : 'Puedes elegir hasta ' + max;
+    FOTOS.pintar(cont);
+    DR.$$('[data-quitar]', cont).forEach(function (b) {
+      b.onclick = function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        var f = lista.splice(Number(this.getAttribute('data-quitar')), 1)[0];
+        if (f && f.url) URL.revokeObjectURL(f.url);
+        pintar();
+        if (alCambiar) alCambiar(lista);
+      };
+    });
+  };
+
+  inp.onchange = function () {
+    var archivos = Array.prototype.slice.call(this.files || []).slice(0, Math.max(0, max - lista.length));
+    this.value = '';
+    if (!archivos.length) return;
+    zona.classList.add('cargando');
+    Promise.all(archivos.map(function (a) { return FOTOS.comprimir(a); })).then(function (blobs) {
+      blobs.forEach(function (b) { lista.push({ blob: b, ruta: null, url: URL.createObjectURL(b) }); });
+      zona.classList.remove('cargando');
+      zona.classList.add('lista');
+      DR.vibrar(25);
+      pintar();
+      if (alCambiar) alCambiar(lista);
+    }).catch(function (e) {
+      zona.classList.remove('cargando');
+      DR.toast(e.message, 'error');
+    });
+  };
+  pintar();
+};
+
+/** Sube las fotos pendientes de una lista; devuelve las rutas en orden. */
+FOTOS.subirLista = function (lista, base) {
+  return Promise.all(lista.map(function (f, i) {
+    return f.ruta ? Promise.resolve(f.ruta) : FOTOS.subir(f, base + '-' + (i + 1) + '-' + Date.now() + '.jpg');
+  })).then(function (rutas) { return rutas.filter(Boolean); });
+};
+
+/** Miniaturas de varias rutas; al tocarlas se abre el visor con navegación. */
+FOTOS.galeriaHtml = function (rutas, clase) {
+  var lista = (rutas || []).filter(Boolean);
+  if (!lista.length) return '';
+  var todas = lista.join('|');
+  return '<span class="' + (clase || 'foto-galeria') + '">' + lista.map(function (r) {
+    return '<img alt="" data-foto="' + DR.esc(r) + '" data-ver="' + DR.esc(r) + '" data-galeria="' + DR.esc(todas) + '">';
+  }).join('') + '</span>';
 };
 
 /** Enlaza un campo de foto: al elegir, comprime y guarda el Blob en estado.blob (y olvida la ruta ya subida). */
@@ -100,22 +173,43 @@ FOTOS.pintar = function (raiz) {
     });
   }).catch(function () { /* sin miniaturas: el texto sigue visible */ });
   DR.$$('[data-ver]', cont).forEach(function (el) {
-    el.onclick = function (ev) { ev.stopPropagation(); FOTOS.ver(this.getAttribute('data-ver')); };
+    el.onclick = function (ev) {
+      ev.stopPropagation();
+      var g = this.getAttribute('data-galeria');
+      FOTOS.ver(this.getAttribute('data-ver'), g ? g.split('|') : null);
+    };
   });
 };
 
-FOTOS.ver = function (ruta) {
+/** Visor a pantalla completa; con `rutas` se puede pasar de una foto a otra. */
+FOTOS.ver = function (ruta, rutas) {
   var visor = DR.$('#visorFoto');
   if (!visor) {
     visor = document.createElement('div');
     visor.id = 'visorFoto';
-    visor.onclick = function () { visor.classList.add('oculto'); };
     document.body.appendChild(visor);
   }
+  var lista = (rutas && rutas.length ? rutas : [ruta]).filter(Boolean);
+  var i = Math.max(0, lista.indexOf(ruta));
+  visor.onclick = function (ev) { if (!ev.target.closest('[data-paso]')) visor.classList.add('oculto'); };
   visor.innerHTML = '<div class="vacio">Cargando foto…</div>';
   visor.classList.remove('oculto');
-  FOTOS.firmar([ruta]).then(function () {
-    var c = FOTOS.cache[ruta];
-    visor.innerHTML = c ? '<img alt="Evidencia" src="' + c.url + '"><span>Toca para cerrar</span>' : '<div class="vacio">No se pudo cargar la foto.</div>';
-  }).catch(function (e) { visor.innerHTML = '<div class="vacio">' + DR.esc(e.message) + '</div>'; });
+
+  var mostrar = function () {
+    var c = FOTOS.cache[lista[i]];
+    if (!c) { visor.innerHTML = '<div class="vacio">No se pudo cargar la foto.</div>'; return; }
+    visor.innerHTML = '<img alt="Evidencia" src="' + c.url + '">' +
+      (lista.length > 1 ? '<button type="button" class="visor-paso izq" data-paso="-1" aria-label="Anterior">‹</button>' +
+        '<button type="button" class="visor-paso der" data-paso="1" aria-label="Siguiente">›</button>' +
+        '<span>' + (i + 1) + ' de ' + lista.length + ' · toca para cerrar</span>'
+        : '<span>Toca para cerrar</span>');
+    DR.$$('[data-paso]', visor).forEach(function (b) {
+      b.onclick = function (ev) {
+        ev.stopPropagation();
+        i = (i + Number(this.getAttribute('data-paso')) + lista.length) % lista.length;
+        FOTOS.firmar([lista[i]]).then(mostrar).catch(function () { mostrar(); });
+      };
+    });
+  };
+  FOTOS.firmar(lista).then(mostrar).catch(function (e) { visor.innerHTML = '<div class="vacio">' + DR.esc(e.message) + '</div>'; });
 };

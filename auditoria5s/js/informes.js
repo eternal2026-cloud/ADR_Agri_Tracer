@@ -13,6 +13,7 @@ var INF = {
   PALETA: ['#0097CE', '#EF7C3B', '#76B729', '#5D4835', '#D9622B', '#E8B04A'],
   MADUREZ: { 'EXCELENTE': '#76B729', 'BIEN': '#0097CE', 'REGULAR': '#EF7C3B', 'CRÍTICO': '#E5484D' },
   MAX_FECHAS: 6,
+  MAX_FOTOS_PDF: 120,
   // Colores del Excel manual (tema Office: accent1 #5B9BD5, filas accent1 al 60 %).
   XL: {
     cabecera: 'FF5B9BD5', fila: 'FFBDD7EE',
@@ -206,12 +207,14 @@ INF.pdfResultados = function (opc) {
       fuente('normal', 6.5, GRIS); doc.text('– A ', x, 18.2); x += doc.getTextWidth('– A ');
       fuente('bold', 6.5, '#EF7C3B'); doc.text('FRUTURA', x, 18.2); x += doc.getTextWidth('FRUTURA');
       fuente('normal', 6.5, GRIS); doc.text(' COMPANY –', x, 18.2);
-      fuente('bold', 7.5, '#EF7C3B'); doc.text('INGENIERÍA DE PROCESOS', W - M, 12.2, { align: 'right' });
-      fuente('bold', 13, MARRON); doc.text('Informe de Auditoría 5S', W - M, 18.4, { align: 'right' });
-      ['#0097CE', '#EF7C3B', '#76B729'].forEach(function (c, i) { color('setFillColor', c); doc.rect(M + i * ANCHO / 3, 22.5, ANCHO / 3, 1.1, 'F'); });
+      // El ancho se lee por página: el anexo de observaciones va en hoja apaisada.
+      var wp = doc.internal.pageSize.getWidth(), ap = wp - 2 * M;
+      fuente('bold', 7.5, '#EF7C3B'); doc.text('INGENIERÍA DE PROCESOS', wp - M, 12.2, { align: 'right' });
+      fuente('bold', 13, MARRON); doc.text('Informe de Auditoría 5S', wp - M, 18.4, { align: 'right' });
+      ['#0097CE', '#EF7C3B', '#76B729'].forEach(function (c, i) { color('setFillColor', c); doc.rect(M + i * ap / 3, 22.5, ap / 3, 1.1, 'F'); });
       return 30;
     };
-    var espacio = function (h) { if (y + h > H - 16) { doc.addPage(); y = encabezado(); } };
+    var espacio = function (h) { if (y + h > doc.internal.pageSize.getHeight() - 16) { doc.addPage(); y = encabezado(); } };
     var titulo = function (t) {
       espacio(14);
       color('setFillColor', '#EF7C3B'); doc.rect(M, y - 3.6, 1.4, 4.6, 'F');
@@ -353,18 +356,137 @@ INF.pdfResultados = function (opc) {
       y += 9;
     });
 
-    /* ---- pie en todas las páginas */
-    var paginas = doc.internal.getNumberOfPages();
-    for (var p = 1; p <= paginas; p++) {
-      doc.setPage(p);
-      color('setDrawColor', LINEA); doc.setLineWidth(0.3); doc.line(M, H - 11, W - M, H - 11);
-      fuente('normal', 7.5, GRIS);
-      doc.text('AgriTracer · Ingeniería de Procesos · Don Ricardo', M, H - 6.5);
-      doc.text(cul.nombre + (opc.area ? ' · ' + opc.area.nombre : ''), W / 2, H - 6.5, { align: 'center' });
-      doc.text('Página ' + p + ' de ' + paginas, W - M, H - 6.5, { align: 'right' });
+    /* ---- anexo: hoja de observaciones (apaisada, con la evidencia dividida en la celda) */
+    var lista = (opc.obsDetalle || []).slice().sort(function (x, y) {
+      var ax = (S5.area(S5.areaDeObs(x)) || {}).orden || 0, ay = (S5.area(S5.areaDeObs(y)) || {}).orden || 0;
+      var zx = (S5.zona(x.zona_id) || {}).numero || 0, zy = (S5.zona(y.zona_id) || {}).numero || 0;
+      return ax - ay || zx - zy || String(x.fecha_registro).localeCompare(String(y.fecha_registro)) || x.numero - y.numero;
+    });
+    var rutas = [];
+    if (opc.conFotos !== false) {
+      lista.forEach(function (o) { rutas = rutas.concat(S5.fotosDe(o, 'antes'), S5.fotosDe(o, 'despues')); });
+      rutas = rutas.filter(function (r, i) { return r && rutas.indexOf(r) === i; }).slice(0, INF.MAX_FOTOS_PDF);
     }
-    return doc.output('blob');
+
+    var imgs = {};
+    return INF.enLotes(rutas, 4, function (r) {
+      return INF.fotoParaPdf(r).then(function (im) { if (im) imgs[r] = im; });
+    }).then(function () {
+      if (lista.length) {
+        INF.anexoObservaciones({ doc: doc, M: M, encabezado: encabezado, color: color, fuente: fuente, titulo: titulo,
+          MARRON: MARRON, TEXTO: TEXTO, GRIS: GRIS, LINEA: LINEA, FONDO: FONDO }, lista, imgs, opc);
+      }
+
+      /* ---- pie en todas las páginas (el tamaño se lee por página) */
+      var paginas = doc.internal.getNumberOfPages();
+      for (var p = 1; p <= paginas; p++) {
+        doc.setPage(p);
+        var wp = doc.internal.pageSize.getWidth(), hp = doc.internal.pageSize.getHeight();
+        color('setDrawColor', LINEA); doc.setLineWidth(0.3); doc.line(M, hp - 11, wp - M, hp - 11);
+        fuente('normal', 7.5, GRIS);
+        doc.text('AgriTracer · Ingeniería de Procesos · Don Ricardo', M, hp - 6.5);
+        doc.text(cul.nombre + (opc.area ? ' · ' + opc.area.nombre : ''), wp / 2, hp - 6.5, { align: 'center' });
+        doc.text('Página ' + p + ' de ' + paginas, wp - M, hp - 6.5, { align: 'right' });
+      }
+      return doc.output('blob');
+    });
   });
+};
+
+/** Última(s) hoja(s) del informe: tabla con el formato de la hoja Observaciones, en apaisado.
+ *  La celda de evidencia se divide en dos bandas: arriba las fotos «Antes», abajo las «Después». */
+INF.anexoObservaciones = function (ctx, lista, imgs, opc) {
+  var doc = ctx.doc, M = ctx.M, color = ctx.color, fuente = ctx.fuente;
+  doc.addPage('a4', 'landscape');
+  var W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), ANCHO = W - 2 * M;
+  var y = ctx.encabezado(), conArea = !opc.area;
+
+  var cols = [{ t: 'N°', w: 10, al: 'center' }, { t: 'Semana', w: 13, al: 'center' }, { t: 'Fecha de Registro', w: 20, al: 'center' }]
+    .concat(conArea ? [{ t: 'Área', w: 26 }] : [])
+    .concat([{ t: 'Zona', w: 30 }, { t: 'Observaciones', w: conArea ? 45 : 58 }, { t: 'Acción correctiva', w: conArea ? 45 : 58 },
+      { t: 'Estado', w: 22, al: 'center' }, { t: 'Fecha de cierre', w: 20, al: 'center' }, { t: 'Evidencia fotográfica', w: 38, al: 'center' }]);
+  var total = cols.reduce(function (a, c) { return a + c.w; }, 0);
+  var iEv = cols.length - 1, ALTO_FOTO = 26;
+
+  var cabecera = function () {
+    color('setFillColor', ctx.MARRON); doc.rect(M, y, total, 8, 'F');
+    fuente('bold', 7.6, '#FFFFFF');
+    var x = M;
+    cols.forEach(function (c) {
+      var l = doc.splitTextToSize(c.t, c.w - 2);
+      doc.text(l[0] + (l.length > 1 ? '…' : ''), c.al === 'center' ? x + c.w / 2 : x + 1.5, y + 5.2, c.al === 'center' ? { align: 'center' } : undefined);
+      x += c.w;
+    });
+    y += 8;
+  };
+
+  ctx.titulo('Observaciones · sustento de los puntajes');
+  fuente('normal', 7.8, ctx.GRIS);
+  doc.text('Abiertas del área y registradas en las fechas del informe. Las notas de seguimiento se añaden a la acción correctiva con « // ».', M, y, { maxWidth: ANCHO });
+  y += 6;
+  cabecera();
+
+  lista.forEach(function (o, k) {
+    var zona = S5.zona(o.zona_id) || {}, area = S5.area(S5.areaDeObs(o)) || {};
+    var accion = [o.accion_correctiva].concat((opc.notas || {})[o.id] || []).filter(Boolean).join(' // ');
+    var valores = [o.numero, o.semana, S5.fecha(o.fecha_registro)]
+      .concat(conArea ? [area.nombre || ''] : [])
+      .concat([S5.nombreZona(zona), o.descripcion || '', accion, o.estado, o.fecha_cierre ? S5.fecha(o.fecha_cierre) : '—', '']);
+
+    fuente('normal', 7.4, ctx.TEXTO);
+    var lineas = valores.map(function (v, j) { return j === iEv ? [] : doc.splitTextToSize(String(v === null || v === undefined ? '' : v), cols[j].w - 3).slice(0, 12); });
+    var altoTexto = Math.max.apply(null, lineas.map(function (l) { return l.length; })) * 3.3 + 3.4;
+    var antes = S5.fotosDe(o, 'antes').filter(function (r) { return imgs[r]; });
+    var despues = S5.fotosDe(o, 'despues').filter(function (r) { return imgs[r]; });
+    var h = Math.max(8, altoTexto, (antes.length || despues.length) ? ALTO_FOTO : 0);
+
+    if (y + h > H - 16) { doc.addPage('a4', 'landscape'); y = ctx.encabezado(); cabecera(); }
+    if (k % 2) { color('setFillColor', ctx.FONDO); doc.rect(M, y, total, h, 'F'); }
+
+    var x = M;
+    cols.forEach(function (c, j) {
+      if (j === iEv) { x += c.w; return; }
+      if (c.t === 'Estado') {
+        var col = S5.COLOR_ESTADO[o.estado] || '#A89A8C';
+        color('setFillColor', col); doc.roundedRect(x + 1.2, y + h / 2 - 2.4, c.w - 2.4, 4.8, 1.4, 1.4, 'F');
+        fuente('bold', 6.6, '#FFFFFF');
+        doc.text(String(o.estado), x + c.w / 2, y + h / 2 + 1.1, { align: 'center' });
+      } else {
+        fuente('normal', 7.4, ctx.TEXTO);
+        lineas[j].forEach(function (t, i2) {
+          var ty = y + 4 + i2 * 3.3;
+          if (c.al === 'center') doc.text(t, x + c.w / 2, ty, { align: 'center' });
+          else doc.text(t, x + 1.5, ty);
+        });
+      }
+      x += c.w;
+    });
+
+    // evidencia: banda superior «Antes», banda inferior «Después»
+    var xe = M + total - cols[iEv].w, we = cols[iEv].w;
+    [antes, despues].forEach(function (grupo, banda) {
+      var alto = (h - 3) / 2, y0 = y + 1.5 + banda * alto;
+      fuente('bold', 5.4, ctx.GRIS);
+      doc.text(banda ? 'D' : 'A', xe + 1.6, y0 + alto / 2 + 1);
+      if (!grupo.length) return;
+      var wCaja = (we - 6) / grupo.length - 1;
+      grupo.forEach(function (r, i2) {
+        var im = imgs[r], esc = Math.min(wCaja / im.w, (alto - 1) / im.h);
+        var w2 = im.w * esc, h2 = im.h * esc;
+        var x2 = xe + 4.5 + i2 * (wCaja + 1) + (wCaja - w2) / 2;
+        doc.addImage(im.base64, 'JPEG', x2, y0 + (alto - h2) / 2, w2, h2, r, 'FAST');
+      });
+    });
+
+    color('setDrawColor', ctx.LINEA); doc.setLineWidth(0.2); doc.line(M, y + h, M + total, y + h);
+    y += h;
+  });
+
+  y += 4;
+  if (opc.conFotos === false) {
+    fuente('normal', 7.2, ctx.GRIS);
+    doc.text('Informe generado sin fotos. La evidencia completa está en el Excel de Observaciones.', M, y);
+  }
 };
 
 /* ------------------------------------------------------------ Excel de observaciones (formato manual) */
@@ -384,19 +506,23 @@ INF.notasDe = function (ids) {
 };
 
 /** Descarga una foto del bucket privado y la reduce para incrustarla en el Excel. */
-INF.fotoParaExcel = function (ruta) {
+INF.fotoParaExcel = function (ruta) { return INF.fotoEscalada(ruta, 640, 0.72); };
+/** Versión pequeña para el PDF: la celda de evidencia mide ~12 mm. */
+INF.fotoParaPdf = function (ruta) { return INF.fotoEscalada(ruta, 240, 0.62); };
+
+INF.fotoEscalada = function (ruta, lado, calidad) {
   return sb.storage.from(FOTOS.BUCKET).download(ruta).then(function (r) {
     if (r.error || !r.data) return null;
     return new Promise(function (resolve) {
       var url = URL.createObjectURL(r.data), img = new Image();
       img.onload = function () {
-        var esc = Math.min(1, 640 / Math.max(img.naturalWidth, img.naturalHeight));
+        var esc = Math.min(1, lado / Math.max(img.naturalWidth, img.naturalHeight));
         var c = document.createElement('canvas');
         c.width = Math.max(1, Math.round(img.naturalWidth * esc));
         c.height = Math.max(1, Math.round(img.naturalHeight * esc));
         c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
         URL.revokeObjectURL(url);
-        resolve({ base64: c.toDataURL('image/jpeg', 0.72), w: c.width, h: c.height });
+        resolve({ base64: c.toDataURL('image/jpeg', calidad), w: c.width, h: c.height });
       };
       img.onerror = function () { URL.revokeObjectURL(url); resolve(null); };
       img.src = url;
@@ -429,10 +555,8 @@ INF.excelObservaciones = function (opc) {
     wb.creator = 'AgriTracer · Ingeniería de Procesos · Don Ricardo';
     wb.created = new Date();
     var usados = [], fotos = [], porArea = {};
-    opc.obs.forEach(function (o) {
-      var a = opc.auds[o.auditoria_id] || {};
-      (porArea[a.area_id] = porArea[a.area_id] || []).push(o);
-    });
+    // El área es de la observación (vive en la zona), no de su auditoría de origen.
+    opc.obs.forEach(function (o) { (porArea[S5.areaDeObs(o)] = porArea[S5.areaDeObs(o)] || []).push(o); });
     var areas = S5.areas.filter(function (a) { return porArea[a.id]; });
     var blanco = { argb: 'FFFFFFFF' }, fino = { style: 'thin', color: { argb: 'FF000000' } }, medio = { style: 'medium', color: { argb: 'FF000000' } };
     var relleno = function (argb) { return { type: 'pattern', pattern: 'solid', fgColor: { argb: argb } }; };
@@ -488,8 +612,10 @@ INF.excelObservaciones = function (opc) {
           c.border = b;
         });
         fila.height = 148.5;
-        if (o.foto_antes) fotos.push({ ws: ws, ruta: o.foto_antes, col: 8, fila: 3 + k });
-        if (o.foto_despues) fotos.push({ ws: ws, ruta: o.foto_despues, col: 9, fila: 3 + k });
+        // Hasta 3 fotos por celda: la celda se divide en bandas horizontales.
+        var antes = S5.fotosDe(o, 'antes'), despues = S5.fotosDe(o, 'despues');
+        antes.forEach(function (ruta, i) { fotos.push({ ws: ws, ruta: ruta, col: 8, fila: 3 + k, banda: i, bandas: antes.length }); });
+        despues.forEach(function (ruta, i) { fotos.push({ ws: ws, ruta: ruta, col: 9, fila: 3 + k, banda: i, bandas: despues.length }); });
       });
 
       var ultima = 2 + lista.length;
@@ -511,10 +637,15 @@ INF.excelObservaciones = function (opc) {
         hechas++;
         progreso('Fotos ' + hechas + ' de ' + fotos.length + '…');
         if (!img) return;
-        // Celda de foto ≈ 250 × 198 px (ancho 34.89, alto 148.5 pt): la imagen se centra con margen.
+        // Celda de foto ≈ 250 × 198 px (ancho 34.89, alto 148.5 pt). Con varias fotos se divide
+        // en bandas horizontales de igual alto; con una sola, la geometría es la de siempre.
         var id = wb.addImage({ base64: img.base64, extension: 'jpeg' });
-        var esc = Math.min(236 / img.w, 186 / img.h), w = Math.round(img.w * esc), h = Math.round(img.h * esc);
-        t.ws.addImage(id, { tl: { col: t.col + (250 - w) / 2 / 250, row: t.fila - 1 + (198 - h) / 2 / 198 }, ext: { width: w, height: h }, editAs: 'oneCell' });
+        var n = t.bandas || 1, margen = 6, banda = (198 - margen * (n + 1)) / n;
+        var esc = Math.min(236 / img.w, banda / img.h), w = Math.round(img.w * esc), h = Math.round(img.h * esc);
+        var arriba = margen + t.banda * (banda + margen) + (banda - h) / 2;
+        // La fracción de fila no se mapea con los 198 px reales: ExcelJS usa alto_pt × 1.05 (medido).
+        var FILA = 148.5 * 1.05;
+        t.ws.addImage(id, { tl: { col: t.col + (250 - w) / 2 / 250, row: t.fila - 1 + arriba / FILA }, ext: { width: w, height: h }, editAs: 'oneCell' });
       });
     }).then(function () {
       var audIds = {};

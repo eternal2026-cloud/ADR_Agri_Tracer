@@ -195,8 +195,24 @@ RESUL.generarPdf = function () {
   var original = btn.innerHTML;
   btn.disabled = true;
   btn.textContent = 'Generando PDF…';
-  sb.from('s5_observaciones').select('auditoria_id,estado').in('auditoria_id', ids).then(function (r) {
-    return INF.pdfResultados({ cultivo: cul, area: f.area ? S5.area(f.area) : null, grupos: grupos, obs: r.error ? [] : (r.data || []) });
+  // Para el anexo: las abiertas del área más las registradas en las fechas del informe.
+  var areas = [];
+  grupos.forEach(function (g) { g.lista.forEach(function (a) { if (areas.indexOf(a.area_id) < 0) areas.push(a.area_id); }); });
+  if (f.area && areas.indexOf(Number(f.area)) < 0) areas.push(Number(f.area));
+  var base = function () { return sb.from('s5_observaciones').select('*').eq('cultivo_id', cul.id).in('area_id', areas); };
+  Promise.all([
+    sb.from('s5_observaciones').select('auditoria_id,estado,fecha_registro').in('auditoria_id', ids),
+    base().in('estado', S5.ABIERTOS),
+    base().in('fecha_registro', grupos.map(function (g) { return g.fecha; }))
+  ]).then(function (r) {
+    var vistos = {}, detalle = [];
+    [r[1], r[2]].forEach(function (x) {
+      (x.error ? [] : (x.data || [])).forEach(function (o) { if (!vistos[o.id]) { vistos[o.id] = true; detalle.push(o); } });
+    });
+    return INF.notasDe(detalle.map(function (o) { return o.id; })).catch(function () { return {}; }).then(function (notas) {
+      return INF.pdfResultados({ cultivo: cul, area: f.area ? S5.area(f.area) : null, grupos: grupos,
+        obs: r[0].error ? [] : (r[0].data || []), obsDetalle: detalle, notas: notas });
+    });
   }).then(function (blob) {
     var area = f.area ? (S5.area(f.area) || {}).nombre : 'Todas las áreas';
     INF.descargar(blob, INF.nombreArchivo(['Informe 5S', cul.nombre, area, grupos.map(function (g) { return S5.fecha(g.fecha).replace(/\//g, '-'); }).join(' y ')], 'pdf'));

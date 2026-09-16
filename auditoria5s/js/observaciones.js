@@ -27,11 +27,17 @@ OBS.cargar = function () {
     if (r[1].error) throw new Error(r[1].error.message);
     OBS.auds = {};
     (r[0].data || []).forEach(function (a) { OBS.auds[a.id] = a; });
-    OBS.lista = (r[1].data || []).filter(function (o) { var a = OBS.auds[o.auditoria_id]; return a && a.estado !== 'anulada'; });
+    // La observación vive en la zona: sin auditoría de origen también cuenta; con una anulada, no.
+    OBS.lista = (r[1].data || []).filter(function (o) {
+      if (!o.auditoria_id) return true;
+      var a = OBS.auds[o.auditoria_id];
+      return a && a.estado !== 'anulada';
+    });
   });
 };
 
 OBS.buscar = function (id) { return OBS.lista.filter(function (o) { return o.id === id; })[0] || null; };
+/** Auditoría de origen (puede no existir: las registradas fuera de una auditoría). */
 OBS.audDe = function (o) { return o.s5_auditorias || OBS.auds[o.auditoria_id] || {}; };
 
 OBS.reemplazar = function (o) {
@@ -42,9 +48,9 @@ OBS.reemplazar = function (o) {
 };
 
 OBS.coincide = function (o, sinEstado) {
-  var f = OBS.filtros, a = OBS.audDe(o);
-  if (a.cultivo_id !== S5.cultivoId()) return false;
-  if (f.area && String(a.area_id) !== String(f.area)) return false;
+  var f = OBS.filtros;
+  if (S5.cultivoDeObs(o) !== S5.cultivoId()) return false;
+  if (f.area && String(S5.areaDeObs(o)) !== String(f.area)) return false;
   if (f.zona && String(o.zona_id) !== String(f.zona)) return false;
   if (f.auditoria && o.auditoria_id !== f.auditoria) return false;
   if (sinEstado || f.estado === 'todas') return true;
@@ -117,11 +123,12 @@ OBS.pintar = function (animar) {
     '<div class="obs-herramientas"><div class="vista-toggle" role="tablist">' +
       '<button type="button" data-vista-obs="tarjetas"' + (f.vista === 'tarjetas' ? ' class="activo"' : '') + '>Tarjetas</button>' +
       '<button type="button" data-vista-obs="tabla"' + (f.vista === 'tabla' ? ' class="activo"' : '') + '>Tabla</button></div>' +
+      (AT.puedeCapturar() ? '<button type="button" class="btn verde chico" id="btnNuevaObs">' + FOTOS.ICONO + '<span>Nueva observación</span></button>' : '') +
       '<button type="button" class="btn azul chico" id="btnExcelObs"' + (visibles.length ? '' : ' disabled') + '>' + DR.ICONOS.subir + '<span>Descargar Excel</span></button></div>' +
     '<div class="conteo">' + visibles.length + ' observación(es) de ' + DR.esc(cul ? cul.nombre : '') + (visibles.length > OBS.LIMITE ? ' · se muestran las ' + OBS.LIMITE + ' más recientes (el Excel incluye todas)' : '') + '</div>' +
     '<div id="listaObs">' + (visibles.length
       ? (f.vista === 'tabla' ? OBS.tablaHtml(muestra) : muestra.map(OBS.tarjetaHtml).join(''))
-      : '<div class="vacio">' + (base.length ? 'Ninguna observación coincide con los filtros.' : 'Aún no hay observaciones de este cultivo. Se registran desde Auditar, dentro de cada zona.') + '</div>') + '</div>';
+      : '<div class="vacio">' + (base.length ? 'Ninguna observación coincide con los filtros.' : 'Aún no hay observaciones de este cultivo. Se registran desde Auditar, dentro de cada zona, o con «Nueva observación».') + '</div>') + '</div>';
 
   if (animar) DR.entrarPaneles('#contenido');
   FOTOS.pintar('#listaObs');
@@ -134,6 +141,7 @@ OBS.pintar = function (animar) {
     b.onclick = function () { f.vista = this.getAttribute('data-vista-obs'); S5.escribirLocal('agritracer.5s.vistaObs', f.vista); OBS.pintar(false); };
   });
   DR.$('#btnExcelObs').onclick = OBS.descargarExcel;
+  if (DR.$('#btnNuevaObs')) DR.$('#btnNuevaObs').onclick = function () { OBS.abrirFormulario({ areaId: f.area, zonaId: f.zona }); };
   DR.$$('[data-obs]', cont).forEach(function (b) {
     b.onclick = function () { var o = OBS.buscar(this.getAttribute('data-obs')); if (o) OBS.abrirDetalle(o); };
   });
@@ -141,10 +149,11 @@ OBS.pintar = function (animar) {
 };
 
 OBS.tarjetaHtml = function (o) {
-  var a = OBS.audDe(o), z = S5.zona(o.zona_id), area = S5.area(a.area_id) || {};
-  var abierta = S5.ABIERTOS.indexOf(o.estado) > -1;
+  var a = OBS.audDe(o), z = S5.zona(o.zona_id), area = S5.area(S5.areaDeObs(o)) || {};
+  var abierta = S5.ABIERTOS.indexOf(o.estado) > -1, fotos = S5.fotosDe(o, 'antes');
   return '<button type="button" class="obs-card" data-obs="' + o.id + '" style="--c:' + (S5.COLOR_ESTADO[o.estado] || '#A89A8C') + '">' +
-    '<img class="foto-mini" alt="" data-foto="' + DR.esc(o.foto_antes) + '">' +
+    '<span class="foto-con-n">' + (fotos.length > 1 ? '<i>' + fotos.length + '</i>' : '') +
+    '<img class="foto-mini" alt="" data-foto="' + DR.esc(fotos[0] || '') + '"></span>' +
     '<span class="obs-cuerpo"><span class="obs-top"><b>N° ' + o.numero + ' · ' + DR.esc(S5.nombreZona(z)) + '</b>' + S5.pillEstado(o.estado) + '</span>' +
     '<span class="obs-texto">' + DR.esc(DR.recortar(o.descripcion, 140)) + '</span>' +
     '<span class="obs-det">' + [area.nombre, a.codigo, S5.fecha(o.fecha_registro)].filter(Boolean).map(DR.esc).join(' · ') +
@@ -155,18 +164,18 @@ OBS.tarjetaHtml = function (o) {
 OBS.tablaHtml = function (lista) {
   var conArea = !OBS.filtros.area;
   var titulos = ['N°', 'Semana', 'Fecha de Registro'].concat(conArea ? ['Área'] : []).concat(['Zona', 'Observaciones', 'Acción correctiva', 'Estado', 'Fecha de cierre', 'Antes', 'Después']);
-  var foto = function (ruta, t) { return ruta ? '<img alt="' + t + '" data-foto="' + DR.esc(ruta) + '" data-ver="' + DR.esc(ruta) + '">' : ''; };
+  var foto = function (o, tipo) { return FOTOS.galeriaHtml(S5.fotosDe(o, tipo), 'foto-celda'); };
   return '<div class="tabla-cont tabla-obs-cont"><table class="tabla-obs"><thead><tr>' + titulos.map(function (t) { return '<th>' + t + '</th>'; }).join('') + '</tr></thead><tbody>' +
     lista.map(function (o) {
-      var a = OBS.audDe(o), z = S5.zona(o.zona_id) || {}, col = OBS.COLOR_XL[o.estado] || ['#A89A8C', '#FFFFFF'];
+      var z = S5.zona(o.zona_id) || {}, col = OBS.COLOR_XL[o.estado] || ['#A89A8C', '#FFFFFF'];
       return '<tr data-obs="' + o.id + '"><td class="centro">' + o.numero + '</td><td class="centro">' + DR.esc(o.semana) + '</td><td class="centro">' + S5.fecha(o.fecha_registro) + '</td>' +
-        (conArea ? '<td class="centro">' + DR.esc((S5.area(a.area_id) || {}).nombre || '') + '</td>' : '') +
+        (conArea ? '<td class="centro">' + DR.esc((S5.area(S5.areaDeObs(o)) || {}).nombre || '') + '</td>' : '') +
         '<td class="centro">' + DR.esc(z.nombre || '') + '</td>' +
         '<td class="txt">' + DR.esc(o.descripcion) + '</td>' +
         '<td class="txt" data-accion="' + o.id + '">' + DR.esc(OBS.accionConNotas(o)) + '</td>' +
         '<td class="centro"><span class="estado-xl" style="background:' + col[0] + ';color:' + col[1] + '">' + DR.esc(o.estado) + '</span></td>' +
         '<td class="centro">' + (o.fecha_cierre ? S5.fecha(o.fecha_cierre) : '') + '</td>' +
-        '<td class="foto">' + foto(o.foto_antes, 'Antes') + '</td><td class="foto">' + foto(o.foto_despues, 'Después') + '</td></tr>';
+        '<td class="foto">' + foto(o, 'antes') + '</td><td class="foto">' + foto(o, 'despues') + '</td></tr>';
     }).join('') + '</tbody></table></div>';
 };
 
@@ -192,12 +201,13 @@ OBS.descargarExcel = function () {
   var btn = this, cul = S5.cultivoActual(), f = OBS.filtros, original = btn.innerHTML;
   var lista = OBS.lista.filter(function (o) { return OBS.coincide(o); });
   if (!cul || !lista.length) { DR.toast('No hay observaciones con estos filtros.', 'error'); return; }
-  // Auditorías del filtro (también las sin observaciones) para la hoja BD.
+  // Auditorías del área y cultivo filtrados (también las sin observaciones) para la hoja BD.
   var auds = {};
   Object.keys(OBS.auds).forEach(function (k) {
     var a = OBS.auds[k];
     if (a.estado !== 'anulada' && a.cultivo_id === cul.id && (!f.area || String(a.area_id) === String(f.area)) && (!f.auditoria || a.id === f.auditoria)) auds[k] = a;
   });
+  // El Excel agrupa por el área de la observación, no por la de su auditoría.
   btn.disabled = true;
   INF.excelObservaciones({ cultivo: cul, obs: lista, auds: auds, areaId: f.area || null, alProgreso: function (t) { btn.textContent = t; } }).then(function (blob) {
     var area = f.area ? (S5.area(f.area) || {}).nombre : 'Todas las áreas';
@@ -232,7 +242,7 @@ OBS.abrirDetalle = function (o, opc) {
   UI.abrirHoja('<div class="asa"></div><div class="vacio">Cargando observación…</div>');
   Promise.all([
     sb.from('s5_observaciones').select('*').eq('id', o.id).single(),
-    sb.from('s5_auditorias').select('*').eq('id', o.auditoria_id).single(),
+    o.auditoria_id ? sb.from('s5_auditorias').select('*').eq('id', o.auditoria_id).maybeSingle() : Promise.resolve({ data: null }),
     sb.from('s5_seguimientos').select('*').eq('observacion_id', o.id).order('fecha')
   ]).then(function (r) {
     r.forEach(function (x) { if (x.error) throw new Error(x.error.message); });
@@ -241,19 +251,22 @@ OBS.abrirDetalle = function (o, opc) {
 };
 
 OBS.pintarDetalle = function (o, a, segs, opc) {
-  var z = S5.zona(o.zona_id) || {}, area = S5.area(a.area_id) || {}, cul = S5.cultivo(a.cultivo_id);
+  a = a || {};
+  var z = S5.zona(o.zona_id) || {}, area = S5.area(S5.areaDeObs(o)) || {}, cul = S5.cultivo(S5.cultivoDeObs(o));
   var puede = AT.puedeCapturar() && a.estado !== 'anulada';
-  var editable = puede && (AT.esAdmin() || S5.hoy() <= S5.sumarDias(o.fecha_registro, S5.diasCorreccion()));
-  var figura = function (titulo, ruta) {
-    return ruta
-      ? '<figure><img alt="Foto ' + titulo + '" data-foto="' + DR.esc(ruta) + '" data-ver="' + DR.esc(ruta) + '"><figcaption>' + titulo + '</figcaption></figure>'
+  var editable = puede && (AT.esAdmin() || S5.enPlazoObs(o));
+  var figura = function (titulo, tipo) {
+    var fotos = S5.fotosDe(o, tipo);
+    return fotos.length
+      ? '<figure>' + FOTOS.galeriaHtml(fotos, 'foto-grupo') + '<figcaption>' + titulo + (fotos.length > 1 ? ' (' + fotos.length + ')' : '') + '</figcaption></figure>'
       : '<figure class="sin-foto"><span>' + FOTOS.ICONO + 'Sin foto</span><figcaption>' + titulo + '</figcaption></figure>';
   };
   var linea = segs.map(function (sg) {
     var cambios = (sg.cambios_puntaje || []).map(function (c) {
       return c.s + 'S-' + c.numero + ': ' + S5.numPuntaje(c.antes) + ' → ' + S5.numPuntaje(c.despues);
     }).join(' · ');
-    var foto = sg.foto && sg.foto !== o.foto_antes ? '<img class="foto-mini" alt="" data-foto="' + DR.esc(sg.foto) + '" data-ver="' + DR.esc(sg.foto) + '">' : '';
+    var suyas = (sg.fotos && sg.fotos.length ? sg.fotos : [sg.foto]).filter(function (r) { return r && S5.fotosDe(o, 'antes').indexOf(r) < 0; });
+    var foto = suyas.length ? FOTOS.galeriaHtml(suyas, 'foto-grupo chico') : '';
     return '<li style="--c:' + (S5.COLOR_ESTADO[sg.estado_nuevo] || '#A89A8C') + '">' +
       '<span class="lt-fecha">' + DR.fechaHora(sg.fecha) + (sg.usuario_nombre ? ' · ' + DR.esc(sg.usuario_nombre) : '') + '</span>' +
       '<b>' + (sg.estado_anterior && sg.estado_anterior !== sg.estado_nuevo ? DR.esc(sg.estado_anterior) + ' → ' : '') + DR.esc(sg.estado_nuevo) + '</b>' +
@@ -262,10 +275,11 @@ OBS.pintarDetalle = function (o, a, segs, opc) {
   }).join('');
 
   UI.abrirHoja('<div class="asa"></div>' +
-    '<div class="obs-cab">' + S5.pillEstado(o.estado) + '<span>' + DR.esc(a.codigo) + ' · Auditoría N° ' + a.numero_auditoria + '</span></div>' +
+    '<div class="obs-cab">' + S5.pillEstado(o.estado) +
+      '<span>' + (a.codigo ? DR.esc(a.codigo) + ' · Auditoría N° ' + a.numero_auditoria : 'Registrada fuera de una auditoría') + '</span></div>' +
     '<div class="res-nombre">Observación N° ' + o.numero + '</div>' +
     '<div class="res-dni" style="letter-spacing:.02em">' + DR.esc([cul ? cul.nombre : '', area.nombre, S5.nombreZona(z)].filter(Boolean).join(' · ')) + (o.s_referencia ? ' · ' + o.s_referencia + 'S ' + S5.NOMBRES[o.s_referencia] : '') + '</div>' +
-    '<div class="fotos-par">' + figura('Antes', o.foto_antes) + figura('Después', o.foto_despues) + '</div>' +
+    '<div class="fotos-par">' + figura('Antes', 'antes') + figura('Después', 'despues') + '</div>' +
     '<div class="res-obs"><b>Observación</b>' + DR.esc(o.descripcion) + '</div>' +
     (o.accion_correctiva ? '<div class="res-obs accion"><b>Acción correctiva</b>' + DR.esc(o.accion_correctiva) + '</div>' : '') +
     '<div class="dato-fila"><span>Fecha de registro</span><b>' + S5.fecha(o.fecha_registro) + ' · semana ' + DR.esc(o.semana) + '</b></div>' +
@@ -289,15 +303,34 @@ OBS.pintarDetalle = function (o, a, segs, opc) {
 
 /* ============================================================ REGISTRO / EDICIÓN */
 OBS.abrirFormulario = function (opc) {
-  var o = opc.observacion || null, a = opc.auditoria, z = opc.zona;
-  var st = OBS.form = { id: o ? o.id : S5.uuid(), foto: {}, estado: 'Pendiente', s: o ? o.s_referencia : (opc.s || null) };
+  var o = opc.observacion || null;
+  var a = opc.auditoria || (o && o.auditoria_id ? OBS.auds[o.auditoria_id] : null) || null;
+  var cul = S5.cultivoActual();
+  var z = opc.zona || (o ? S5.zona(o.zona_id) : null) || (opc.zonaId ? S5.zona(opc.zonaId) : null) || null;
+  // Sin auditoría y sin zona fija se elige área y zona: la observación vive en la zona.
+  var libre = !a && !opc.zona;
+  var st = OBS.form = {
+    id: o ? o.id : S5.uuid(), fotos: [], estado: 'Pendiente', s: o ? o.s_referencia : (opc.s || null),
+    areaId: (z ? z.area_id : null) || opc.areaId || '', zonaId: z ? z.id : ''
+  };
+  if (o) st.fotos = S5.fotosDe(o, 'antes').map(function (r) { return { ruta: r }; });
   var chipsS = [{ v: '', t: 'Ninguna' }].concat([1, 2, 3, 4, 5].map(function (s) { return { v: s, t: s + 'S' }; }));
+  var op = function (valor, texto, actual) {
+    return '<option value="' + DR.esc(valor) + '"' + (String(valor) === String(actual) ? ' selected' : '') + '>' + DR.esc(texto) + '</option>';
+  };
+  var zonasDe = function (areaId) { return areaId && cul ? S5.zonasDe(areaId, false, cul.id) : []; };
 
   UI.abrirHoja('<div class="asa"></div>' +
     '<div class="res-estado" style="color:#F8B68A">' + FOTOS.ICONO + '<span>' + (o ? 'Editar observación N° ' + o.numero : 'Nueva observación') + '</span></div>' +
-    '<div class="res-nombre">' + DR.esc(S5.nombreZona(z)) + '</div>' +
-    '<div class="res-dni" style="letter-spacing:.02em">' + DR.esc(AUD.etiqueta(a)) + '</div>' +
+    '<div class="res-nombre">' + DR.esc(z ? S5.nombreZona(z) : (cul ? cul.nombre : 'Observación')) + '</div>' +
+    '<div class="res-dni" style="letter-spacing:.02em">' + DR.esc(a ? AUD.etiqueta(a) : (cul ? cul.nombre + ' · sin auditoría (queda en la zona)' : '')) + '</div>' +
     '<div class="form" style="margin-top:14px">' +
+      (libre ? '<div class="campo ancho"><label for="obsArea">Área<em>obligatorio</em></label>' +
+        '<select id="obsArea">' + op('', 'Elige el área', st.areaId) +
+        (cul ? S5.areasDe(cul.id) : []).map(function (x) { return op(x.id, x.nombre, st.areaId); }).join('') + '</select></div>' +
+        '<div class="campo ancho"><label for="obsZona">Zona<em>obligatorio</em></label>' +
+        '<select id="obsZona"' + (st.areaId ? '' : ' disabled') + '>' + op('', st.areaId ? 'Elige la zona' : 'Primero elige el área', st.zonaId) +
+        zonasDe(st.areaId).map(function (x) { return op(x.id, S5.nombreZona(x), st.zonaId); }).join('') + '</select></div>' : '') +
       '<div class="campo ancho"><label for="obsDesc">Observación<em>obligatorio</em></label>' +
         '<textarea id="obsDesc" rows="3" placeholder="Ej. Jabas con precintos sin identificar ni delimitar.">' + DR.esc(o ? o.descripcion : '') + '</textarea></div>' +
       '<div class="campo ancho"><label for="obsAccion">Acción correctiva</label>' +
@@ -309,17 +342,24 @@ OBS.abrirFormulario = function (opc) {
       '<div class="campo ancho"><label>S relacionada (opcional)</label><div class="opciones" id="obsS">' + chipsS.map(function (c) {
         return '<button type="button" class="opcion' + (String(c.v) === String(st.s || '') ? ' activa' : '') + '" data-valor="' + c.v + '" style="--c:' + (c.v ? S5.COLORES[c.v] : '#A89A8C') + '">' + c.t + '</button>';
       }).join('') + '</div><div class="ayuda-campo">Solo sirve para ubicar el ítem si luego corriges el puntaje.</div></div>' +
-      '<div class="campo ancho"><label>Foto «Antes»' + (o ? '' : '<em>obligatoria</em>') + '</label>' +
-        FOTOS.campoHtml('obsFoto', o ? 'Reemplazar foto' : 'Tomar foto', o ? 'Opcional: deja la actual si está bien' : 'Evidencia del hallazgo') + '</div>' +
+      '<div class="campo ancho"><label>Fotos «Antes»' + (o ? '' : '<em>obligatorio</em>') + '</label>' +
+        FOTOS.campoMultiHtml('obsFoto', 'Agregar foto', 'Evidencia del hallazgo · hasta ' + FOTOS.MAX) + '</div>' +
     '</div>' +
     '<div class="acciones"><button type="button" class="btn sec" id="obsCancelar">Cancelar</button>' +
     '<button type="button" class="btn verde" id="obsGuardar" style="flex:1">' + (o ? 'Guardar cambios' : 'Registrar observación') + '</button></div>', { fija: true });
 
-  if (o && o.foto_antes) {
-    DR.$('#obsFotoZona .foto-prev').innerHTML = '<img alt="" data-foto="' + DR.esc(o.foto_antes) + '">';
-    FOTOS.pintar('#obsFotoZona');
+  FOTOS.enlazarLista('obsFoto', st.fotos, FOTOS.MAX);
+  if (libre) {
+    DR.$('#obsArea').onchange = function () {
+      st.areaId = this.value;
+      st.zonaId = '';
+      var sel = DR.$('#obsZona');
+      sel.disabled = !st.areaId;
+      sel.innerHTML = op('', st.areaId ? 'Elige la zona' : 'Primero elige el área', '') +
+        zonasDe(st.areaId).map(function (x) { return op(x.id, S5.nombreZona(x), ''); }).join('');
+    };
+    DR.$('#obsZona').onchange = function () { st.zonaId = this.value; };
   }
-  FOTOS.enlazar('obsFoto', st.foto);
   OBS.chips('#obsEstado', function (v) { st.estado = v; });
   OBS.chips('#obsS', function (v) { st.s = v ? Number(v) : null; });
   DR.$('#obsCancelar').onclick = function () {
@@ -327,8 +367,10 @@ OBS.abrirFormulario = function (opc) {
   };
   DR.$('#obsGuardar').onclick = function () {
     var btn = this, desc = DR.$('#obsDesc').value.trim();
+    var zonaId = z ? z.id : Number(st.zonaId);
+    if (!zonaId) { DR.toast('Elige el área y la zona de la observación.', 'error'); return; }
     if (!desc) { DR.toast('Describe la observación.', 'error'); DR.$('#obsDesc').focus(); return; }
-    if (!o && !st.foto.blob && !st.foto.ruta) {
+    if (!st.fotos.length) {
       DR.toast('Toma la foto «Antes»: es el sustento del hallazgo.', 'error');
       DR.$('#obsFotoZona').scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
@@ -336,13 +378,14 @@ OBS.abrirFormulario = function (opc) {
     DR.desbloquearAudio();
     btn.disabled = true;
     btn.classList.add('cargando');
-    btn.textContent = st.foto.blob && !st.foto.ruta ? 'Subiendo foto…' : 'Guardando…';
-    var ruta = a.codigo + '/' + z.numero + '/' + st.id + '-antes' + (o ? '-' + Date.now() : '') + '.jpg';
-    FOTOS.subir(st.foto, ruta).then(function (subida) {
+    btn.textContent = st.fotos.some(function (f) { return !f.ruta; }) ? 'Subiendo fotos…' : 'Guardando…';
+    // La ruta ya no depende de la auditoría: la observación vive en la zona.
+    var base = 'obs/' + (cul ? cul.id : 0) + '/' + zonaId + '/' + st.id + '-antes';
+    FOTOS.subirLista(st.fotos, base).then(function (rutas) {
       btn.textContent = 'Guardando…';
       return AT.rpc('rpc_s5_guardar_observacion', { p: {
-        id: st.id, auditoria_id: a.id, zona_id: z.id, descripcion: desc, accion_correctiva: DR.$('#obsAccion').value.trim(),
-        estado: st.estado, s_referencia: st.s || null, foto_antes: subida || (o ? o.foto_antes : '')
+        id: st.id, auditoria_id: a ? a.id : null, zona_id: zonaId, descripcion: desc, accion_correctiva: DR.$('#obsAccion').value.trim(),
+        estado: st.estado, s_referencia: st.s || null, fotos_antes: rutas
       } });
     }).then(function (nueva) {
       DR.vibrar(40);
@@ -363,10 +406,10 @@ OBS.abrirFormulario = function (opc) {
 /* ============================================================ SEGUIMIENTO + SOBRESCRITURA DE PUNTAJE */
 OBS.abrirSeguimiento = function (o, a, opc) {
   var z = S5.zona(o.zona_id) || {};
-  var st = OBS.seg = { o: o, a: a, z: z, opc: opc || {}, estado: o.estado, foto: {}, corregir: false, cargado: false, ev: null, puntajes: {}, detalle: {}, nuevos: {} };
-  var limite = S5.limiteCorreccion(a), enPlazo = S5.enPlazo(a), puedeCorregir = AT.esAdmin() || enPlazo;
+  var st = OBS.seg = { o: o, a: a || null, z: z, opc: opc || {}, estado: o.estado, fotos: [], corregir: false, cargado: false, ev: null, puntajes: {}, detalle: {}, nuevos: {} };
+  var limite = S5.limiteObs(o), enPlazo = S5.enPlazoObs(o), puedeCorregir = AT.esAdmin() || enPlazo;
   var ayudaPlazo = enPlazo
-    ? 'Disponible hasta el ' + S5.fecha(limite) + ' (' + S5.diasCorreccion() + ' días desde la auditoría).'
+    ? 'Disponible hasta el ' + S5.fecha(limite) + ' (' + S5.diasCorreccion() + ' días desde el registro).'
     : (AT.esAdmin() ? 'El plazo venció el ' + S5.fecha(limite) + '; como administrador puedes corregir igual.'
       : 'El plazo venció el ' + S5.fecha(limite) + '. Pide a un administrador que lo corrija.');
 
@@ -379,8 +422,8 @@ OBS.abrirSeguimiento = function (o, a, opc) {
     }).join('') + '</div><div class="ayuda-campo" id="segAyudaEstado"></div></div>' +
     '<div class="campo" style="margin-top:12px"><label for="segNota">Nota del seguimiento</label>' +
       '<textarea id="segNota" rows="3" placeholder="Ej. Se colocó el rótulo estandarizado en las jabas."></textarea></div>' +
-    '<div class="campo" style="margin-top:12px"><label>Foto «Después» (opcional)</label>' +
-      FOTOS.campoHtml('segFoto', 'Tomar foto después', 'Evidencia del levantamiento') + '</div>' +
+    '<div class="campo" style="margin-top:12px"><label>Fotos «Después» (opcional)</label>' +
+      FOTOS.campoMultiHtml('segFoto', 'Agregar foto después', 'Evidencia del levantamiento · hasta ' + FOTOS.MAX) + '</div>' +
     '<div class="corregir5s">' +
       '<label class="interruptor' + (puedeCorregir ? '' : ' bloqueado') + '"><input type="checkbox" id="segCorregir"' + (puedeCorregir ? '' : ' disabled') + '><i></i>' +
       '<span><b>Corregir puntaje del checklist</b><small>' + ayudaPlazo + '</small></span></label>' +
@@ -388,7 +431,7 @@ OBS.abrirSeguimiento = function (o, a, opc) {
     '<div class="acciones"><button type="button" class="btn sec" id="segCancelar">Cancelar</button>' +
     '<button type="button" class="btn verde" id="segGuardar" style="flex:1">Guardar seguimiento</button></div>', { fija: true });
 
-  FOTOS.enlazar('segFoto', st.foto);
+  FOTOS.enlazarLista('segFoto', st.fotos, FOTOS.MAX);
   OBS.chips('#segEstados', function (v) { st.estado = v; OBS.ayudaEstado(puedeCorregir); });
   DR.$('#segCorregir').onchange = function () {
     st.corregir = this.checked;
@@ -411,10 +454,15 @@ OBS.ayudaEstado = function (puedeCorregir) {
 OBS.cargarChecklist = function () {
   var st = OBS.seg, c = DR.$('#segChecklist');
   c.innerHTML = '<div class="vacio">Cargando checklist…</div>';
-  sb.from('s5_evaluaciones').select('id,estado').eq('auditoria_id', st.a.id).eq('zona_id', st.o.zona_id).maybeSingle().then(function (r) {
+  // Con auditoría de origen se corrige la suya; si nació suelta, la última auditoría de la zona.
+  sb.from('s5_evaluaciones').select('id,estado,auditoria_id,s5_auditorias(codigo,fecha,estado)').eq('zona_id', st.o.zona_id).then(function (r) {
     if (r.error) throw new Error(r.error.message);
-    st.ev = r.data;
-    return r.data ? sb.from('s5_puntajes').select('*').eq('evaluacion_id', r.data.id) : null;
+    var evs = (r.data || []).filter(function (e) { return !e.s5_auditorias || e.s5_auditorias.estado !== 'anulada'; });
+    if (st.a && st.a.id) evs = evs.filter(function (e) { return e.auditoria_id === st.a.id; });
+    evs.sort(function (x, y) { return String((y.s5_auditorias || {}).fecha || '').localeCompare(String((x.s5_auditorias || {}).fecha || '')); });
+    st.ev = evs[0] || null;
+    if (st.ev && st.ev.s5_auditorias) st.evAud = st.ev.s5_auditorias;
+    return st.ev ? sb.from('s5_puntajes').select('*').eq('evaluacion_id', st.ev.id) : null;
   }).then(function (r) {
     if (r && r.error) throw new Error(r.error.message);
     st.puntajes = {};
@@ -429,11 +477,14 @@ OBS.pintarChecklist = function () {
   var st = OBS.seg, c = DR.$('#segChecklist');
   if (!c) return;
   if (!st.ev || !Object.keys(st.puntajes).length) {
-    c.innerHTML = '<div class="aviso alerta" style="margin-top:10px">Esta zona todavía no tiene puntajes en la auditoría ' + DR.esc(st.a.codigo) + '. Complétala desde Auditar.</div>';
+    c.innerHTML = '<div class="aviso alerta" style="margin-top:10px">Esta zona todavía no tiene puntajes' +
+      (st.a && st.a.codigo ? ' en la auditoría ' + DR.esc(st.a.codigo) : ' en ninguna auditoría') + '. Complétala desde Auditar.</div>';
     return;
   }
   var abrir = st.o.s_referencia || 1;
-  c.innerHTML = '<div class="ayuda-campo" style="margin:12px 2px">Toca el nuevo puntaje del ítem que ya cumple. Se conserva el puntaje original y este seguimiento queda como sustento.</div>' +
+  c.innerHTML = '<div class="ayuda-campo" style="margin:12px 2px">Se corrige el checklist de ' +
+      DR.esc((st.evAud && st.evAud.codigo) || (st.a && st.a.codigo) || 'la última auditoría de la zona') +
+      '. Toca el nuevo puntaje del ítem que ya cumple: se conserva el original y este seguimiento queda como sustento.</div>' +
     '<div class="zona-total" id="segTotal"></div>' +
     [1, 2, 3, 4, 5].map(function (s) {
       var items = S5.itemsDe(s, true).filter(function (it) { return st.puntajes[it.id] !== undefined; });
@@ -477,7 +528,7 @@ OBS.recalcular = function () {
 OBS.guardarSeguimiento = function () {
   var st = OBS.seg, btn = DR.$('#segGuardar'), nota = DR.$('#segNota').value.trim();
   var cambios = st.corregir ? Object.keys(st.nuevos).map(function (k) { return { item_id: Number(k), puntaje: st.nuevos[k] }; }) : [];
-  if (st.estado === st.o.estado && !nota && !st.foto.blob && !cambios.length) {
+  if (st.estado === st.o.estado && !nota && !st.fotos.length && !cambios.length) {
     DR.toast('Elige un estado, escribe una nota, agrega la foto o corrige un puntaje.', 'error');
     return;
   }
@@ -489,11 +540,11 @@ OBS.guardarSeguimiento = function () {
   DR.desbloquearAudio();
   btn.disabled = true;
   btn.classList.add('cargando');
-  btn.textContent = st.foto.blob && !st.foto.ruta ? 'Subiendo foto…' : 'Guardando…';
-  var ruta = st.a.codigo + '/' + st.z.numero + '/' + st.o.id + '-despues-' + Date.now() + '.jpg';
-  FOTOS.subir(st.foto, ruta).then(function (subida) {
+  btn.textContent = st.fotos.some(function (f) { return !f.ruta; }) ? 'Subiendo fotos…' : 'Guardando…';
+  var base = 'obs/' + (S5.cultivoDeObs(st.o) || 0) + '/' + st.o.zona_id + '/' + st.o.id + '-despues';
+  FOTOS.subirLista(st.fotos, base).then(function (rutas) {
     btn.textContent = 'Guardando…';
-    return AT.rpc('rpc_s5_seguimiento', { p_observacion: st.o.id, p_estado: st.estado, p_nota: nota || null, p_foto: subida, p_cambios: cambios });
+    return AT.rpc('rpc_s5_seguimiento', { p_observacion: st.o.id, p_estado: st.estado, p_nota: nota || null, p_foto: null, p_cambios: cambios, p_fotos: rutas });
   }).then(function (res) {
     DR.vibrar(40);
     DR.sonar(true);

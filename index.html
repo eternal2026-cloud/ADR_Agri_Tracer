@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0B0908">
-<meta name="description" content="AgriTracer · Don Ricardo — Tiempos de ciclo, reubicación de personal y auditoría 5S.">
+<meta name="description" content="AgriTracer · Don Ricardo — Ingeniería de Procesos: planta (5S, mantenimiento, cliente interno, reubicación) y campo (toma de tiempos).">
 <title>AgriTracer · Don Ricardo</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="img/icono.svg" type="image/svg+xml">
@@ -33,7 +33,7 @@
 
     <div id="etiquetaApp">Ingeniería de Procesos</div>
     <div id="tituloApp">AgriTracer</div>
-    <div id="sedeApp">Tiempos de ciclo · Reubicación de personal · Auditoría 5S · Plan de mantenimiento</div>
+    <div id="sedeApp">Ingeniería · Planta &nbsp;·&nbsp; Ingeniería · Campo</div>
 
     <div id="loginPanel" class="login-panel">
       <div class="campo"><label for="loginUsuario">Usuario</label><input id="loginUsuario" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="ej. juan.perez"></div>
@@ -92,22 +92,46 @@ var ICO = {
   personas: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.8-3.2 3-5 5.5-5s4.7 1.8 5.5 5"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.2c2.3.1 4 1.6 4.8 4.3"/></svg>',
   usuarios: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.8-3.2 3-5 5.5-5s4.7 1.8 5.5 5"/><path d="M17 8v6M14 11h6"/></svg>',
   auditoria: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M8.5 11l2 2 4-4M8.5 17h7"/></svg>',
-  mantenimiento: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 6.5a4 4 0 0 0-5.2 5.2L4 17l3 3 5.3-5.3a4 4 0 0 0 5.2-5.2l-2.3 2.3-2.2-.8-.8-2.2z"/><path d="m16 17 1.5 1.5L21 15"/></svg>'
+  mantenimiento: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 6.5a4 4 0 0 0-5.2 5.2L4 17l3 3 5.3-5.3a4 4 0 0 0 5.2-5.2l-2.3 2.3-2.2-.8-.8-2.2z"/><path d="m16 17 1.5 1.5L21 15"/></svg>',
+  cliente: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 20 9.3l-3 9.2H7L4 9.3z"/><path d="M9 12.5c.8 1.2 1.8 1.8 3 1.8s2.2-.6 3-1.8"/><circle cx="9.6" cy="9.8" r=".6" fill="currentColor"/><circle cx="14.4" cy="9.8" r=".6" fill="currentColor"/></svg>'
 };
 
-var MODULOS = [
-  { href: 'ciclos/#captura', color: '#76B729', nombre: 'Captura de tiempos', icono: ICO.cronometro,
-    sub: 'Registra un ciclo etapa por etapa desde el celular', roles: ['admin', 'captura'] },
-  { href: 'ciclos/#resumen', color: '#0097CE', nombre: 'Resumen de tiempos de ciclo', icono: ICO.grafico,
-    sub: 'Promedios por semana y fundo, muestras y gráficos', roles: ['admin', 'captura', 'visor'] },
-  { href: 'reubicacion/', color: '#EF7C3B', nombre: 'Reubicación de personal', icono: ICO.personas,
-    sub: 'Escanear fotocheck, buscar personal y actualizar la lista', roles: ['admin', 'captura', 'visor'] },
-  { href: 'auditoria5s/', color: '#D9622B', nombre: 'Auditoría 5S', icono: ICO.auditoria,
-    sub: 'Checklist por zona, observaciones con foto y seguimiento', roles: ['admin', 'captura', 'visor'] },
-  { href: 'mantenimiento/', color: '#5B9BD5', nombre: 'Revisión plan de mantenimiento', icono: ICO.mantenimiento,
-    sub: 'Carga el plan del mes, revisa OT por encargado y puntúa no conformidades', roles: ['admin', 'captura', 'visor'] },
-  { href: 'ciclos/#usuarios', color: '#E8B04A', nombre: 'Usuarios y configuración', icono: ICO.usuarios,
-    sub: 'Dar acceso a tu equipo, listas de captura y Google Sheets', roles: ['admin'] }
+/**
+ * Portada por grupos. «Toma de tiempos campo» abre la sub-vista #campo con un
+ * acceso por cultivo: Arándano (los tiempos de ciclo actuales) y Uva (en definición).
+ * Usuarios y configuración es un apartado propio, solo para administradores.
+ */
+var TODOS = ['admin', 'captura', 'visor'];
+var GRUPOS = [
+  { id: 'planta', titulo: 'Ingeniería · Planta', sub: 'Ingeniería de Procesos', modulos: [
+    { href: 'auditoria5s/', color: '#D9622B', nombre: 'Auditoría 5S', icono: ICO.auditoria,
+      sub: 'Checklist por zona, observaciones con foto y seguimiento', roles: TODOS },
+    { href: 'mantenimiento/', color: '#5B9BD5', nombre: 'Revisión plan de mantenimiento', icono: ICO.mantenimiento,
+      sub: 'Carga el plan del mes, revisa OT por encargado y puntúa no conformidades', roles: TODOS },
+    { href: 'satisfaccion/', color: '#76B729', nombre: 'Satisfacción del cliente interno', icono: ICO.cliente,
+      sub: 'Histórico de encuestas por área y planta, BD para Power BI y presentación', roles: TODOS },
+    { href: 'reubicacion/', color: '#EF7C3B', nombre: 'Reubicación de personal', icono: ICO.personas,
+      sub: 'Escanear fotocheck, buscar personal y actualizar la lista', roles: TODOS }
+  ] },
+  { id: 'campo', titulo: 'Ingeniería · Campo', sub: 'Tiempos en campo por cultivo', modulos: [
+    { href: '#campo', color: '#0097CE', nombre: 'Toma de tiempos campo', icono: ICO.cronometro,
+      sub: 'Arándano (tiempos de ciclo de cosecha) · Uva (en definición)', roles: TODOS }
+  ] },
+  { id: 'config', titulo: 'Usuarios y configuración', sub: 'Solo administradores', modulos: [
+    { href: 'ciclos/#usuarios', color: '#E8B04A', nombre: 'Usuarios y configuración', icono: ICO.usuarios,
+      sub: 'Dar acceso a tu equipo, listas (fundos y códigos de planta) y Google Sheets', roles: ['admin'] }
+  ] }
+];
+
+/** Cultivos de Toma de tiempos campo (colores e íconos como en s5_cultivos). */
+var CAMPO = [
+  { id: 'arandano', nombre: 'Arándano', color: '#4B5FA8', sub: 'Tiempos de ciclo de cosecha: captura por etapas y resumen por semana y fundo.',
+    accesos: [
+      { href: 'ciclos/#captura', t: 'Captura de tiempos', clase: 'verde', roles: ['admin', 'captura'] },
+      { href: 'ciclos/#resumen', t: 'Resumen de tiempos', clase: 'azul', roles: TODOS }
+    ] },
+  { id: 'uva', nombre: 'Uva', color: '#7A3E8E', sub: 'Toma de tiempos para uva: en definición.',
+    accesos: [{ href: 'campo/uva/', t: 'Ver avance', clase: 'sec', roles: TODOS }] }
 ];
 
 function mostrarErrorLogin(msg) { var el = DR.$('#loginError'); el.textContent = msg; el.classList.remove('oculto'); }
@@ -153,15 +177,45 @@ function pintarLanding() {
   var h = new Date().getHours();
   DR.$('#saludo').textContent = (h < 12 ? 'Buenos días' : (h < 19 ? 'Buenas tardes' : 'Buenas noches')) + (nombre ? ', ' + nombre.split(' ')[0] : '');
 
-  var rol = AT.perfil ? AT.perfil.rol : 'visor';
-  DR.$('#modulos').innerHTML = MODULOS.filter(function (m) { return m.roles.indexOf(rol) > -1; }).map(function (m) {
-    return '<a class="modulo-card entra" href="' + m.href + '" style="--c:' + m.color + '"><div class="ico">' + m.icono + '</div>' +
-      '<div class="mc-txt"><b>' + DR.esc(m.nombre) + '</b><span>' + DR.esc(m.sub) + '</span></div>' + DR.ICONOS.chevron + '</a>';
-  }).join('');
+  pintarModulos();
 
   DR.$('#splash').style.display = 'none';
   DR.$('#landing').classList.remove('oculto');
   DR.entrarPaneles('#landing');
+}
+
+function tarjetaModulo(m) {
+  return '<a class="modulo-card entra" href="' + m.href + '" style="--c:' + m.color + '"><div class="ico">' + m.icono + '</div>' +
+    '<div class="mc-txt"><b>' + DR.esc(m.nombre) + '</b><span>' + DR.esc(m.sub) + '</span></div>' + DR.ICONOS.chevron + '</a>';
+}
+
+/** Grupos de la portada o, con #campo, los cultivos de Toma de tiempos campo. */
+function pintarModulos() {
+  var rol = AT.perfil ? AT.perfil.rol : 'visor';
+  var puede = function (x) { return x.roles.indexOf(rol) > -1; };
+  var cont = DR.$('#modulos');
+  if (location.hash === '#campo') {
+    DR.$('#saludoSub').textContent = 'Ingeniería · Campo › Toma de tiempos campo';
+    cont.innerHTML = '<div class="grupo-mod entra"><div class="grupo-mod-cab"><h2>Toma de tiempos campo</h2><span>Elige el cultivo</span></div>' +
+      '<div class="modulos">' + CAMPO.map(function (c) {
+        var accesos = c.accesos.filter(puede);
+        return '<section class="cultivo-tarjeta" style="--c:' + c.color + '"><div class="cultivo-tarjeta-cab">' + DR.iconoCultivo(c.id, c.color, 48) +
+          '<div><b>' + DR.esc(c.nombre) + '</b><span>' + DR.esc(c.sub) + '</span></div></div>' +
+          '<div class="acceso-par">' + accesos.map(function (a) { return '<a class="btn ' + a.clase + '" href="' + a.href + '">' + DR.esc(a.t) + '</a>'; }).join('') + '</div></section>';
+      }).join('') + '</div>' +
+      '<button type="button" class="campo-volver" id="btnVolverInicio">' + DR.ICONOS.atras + 'Volver al inicio</button></div>';
+    DR.$('#btnVolverInicio').onclick = function () { location.hash = ''; };
+  } else {
+    DR.$('#saludoSub').textContent = '¿A dónde vamos hoy?';
+    cont.innerHTML = GRUPOS.map(function (g) {
+      var mods = g.modulos.filter(puede);
+      if (!mods.length) return '';
+      return '<section class="grupo-mod" id="grupo-' + g.id + '"><div class="grupo-mod-cab"><h2>' + DR.esc(g.titulo) + '</h2><span>' + DR.esc(g.sub) + '</span></div>' +
+        '<div class="modulos">' + mods.map(tarjetaModulo).join('') + '</div></section>';
+    }).join('');
+  }
+  DR.entrarPaneles('#landing');
+  if (location.hash === '#planta' && DR.$('#grupo-planta')) DR.$('#grupo-planta').scrollIntoView();
 }
 
 function intentarLogin() {
@@ -211,6 +265,9 @@ document.addEventListener('DOMContentLoaded', function () {
   DR.$('#btnGuardarPassword').addEventListener('click', intentarCambiarPassword);
   DR.$('#btnCerrarSesion').addEventListener('click', cerrarSesion);
   DR.$('#chipDatos').addEventListener('click', cerrarSesion);
+  window.addEventListener('hashchange', function () {
+    if (AT.perfil && !DR.$('#landing').classList.contains('oculto')) pintarModulos();
+  });
 
   AT.sesionInicial().then(function (perfil) {
     if (!perfil) return;

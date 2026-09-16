@@ -4,7 +4,7 @@
  * Configuración → Google Sheets (JWT de su sesión). Sobrescribe solo sus
  * pestañas: Ciclos_BD, Resumen_Semanal, Personal_Reubicacion,
  * Auditoria_Escaneos, 5S_BD, 5S_Observaciones, 5S_Resumen, PM_Revisiones,
- * PM_Hallazgos, PM_Resultados y Sync_Info;
+ * PM_Hallazgos, PM_Resultados, SCI_BD, SCI_Resultados y Sync_Info;
  * cualquier otra pestaña de la hoja se respeta.
  * La clave de la cuenta de servicio vive en Vault, nunca en el código.
  * ==========================================================================*/
@@ -403,6 +403,44 @@ function pestanasMP(d: MPDatos | null): Pestana[] {
   ];
 }
 
+/* ------------------------------------------------------------ Satisfacción del cliente interno */
+type SCIDatos = { bd: Fila[]; resultados: Fila[] };
+
+async function leerSCI(sb: SupabaseClient): Promise<SCIDatos> {
+  const [bd, resultados] = await Promise.all([leerRpc(sb, 'fn_sci_bd'), leerRpc(sb, 'fn_sci_resultados')]);
+  return { bd, resultados };
+}
+
+function pestanasSCI(d: SCIDatos | null): Pestana[] {
+  if (!d) return [];
+  const sug = new Map<string, Fila>(d.resultados.map((f) => [f.codigo, f]));
+  const origen = (f: Fila) => f.origen === 'app' ? 'App' : 'Excel';
+  // Mismo formato largo que la BD de Power BI (una fila por ítem) + sugerencias de la encuesta.
+  const colsBD: Col[] = [
+    NU('semana', 'Semana', 0), TX('campana', 'Campaña'), TX('cultivo', 'Cultivo'), TX('planta', 'Planta'), TX('fecha', 'Fecha'),
+    TX('area_evaluada', 'Área evaluada'), TX('area_evaluadora', 'Área evaluadora'), TX('sub_area', 'Sub área'),
+    TX('grupo_evaluador', 'Grupo evaluador'), TX('cargo', 'Cargo'), NU('item', 'Items', 0), TX('pregunta', 'Pregunta'),
+    TX('criterio', 'Criterio'), TX('respuesta', 'Respuesta'), NU('puntaje_item', 'Puntaje ítem', 3),
+    NU('resultado_encuesta', 'Resultado encuesta', 4), TX('codigo', 'Código'), ['Origen', origen],
+    ['Aspectos valorados', (f) => txt((sug.get(f.codigo) || {}).aspectos_valorados)],
+    ['Aspectos por mejorar', (f) => txt((sug.get(f.codigo) || {}).aspectos_mejorar)],
+    ['Recomendaciones', (f) => txt((sug.get(f.codigo) || {}).recomendaciones)],
+  ];
+  const colsRes: Col[] = [
+    TX('codigo', 'Código'), TX('fecha', 'Fecha'), NU('semana', 'Semana', 0), TX('cultivo', 'Cultivo'), TX('campana', 'Campaña'),
+    TX('area_evaluada', 'Área evaluada'), TX('area_evaluadora', 'Área evaluadora'), TX('sub_area', 'Sub área'), TX('planta', 'Planta'),
+    TX('grupo', 'Grupo evaluador'), TX('cargo', 'Cargo'), TX('evaluador', 'Evaluador'),
+    NU('p_atencion', 'Atención y trato %', 2), NU('p_tiempo', 'Tiempo de respuesta %', 2), NU('p_comunicacion', 'Comunicación %', 2),
+    NU('p_calidad', 'Calidad de servicio %', 2), NU('resultado', 'Resultado %', 2),
+    TX('aspectos_valorados', 'Aspectos valorados'), TX('aspectos_mejorar', 'Aspectos por mejorar'), TX('recomendaciones', 'Recomendaciones'),
+    ['Origen', origen], TX('archivo', 'Archivo'), TS('creado_en', 'Registrado'),
+  ];
+  return [
+    { titulo: 'SCI_BD', valores: tabla(colsBD, d.bd) },
+    { titulo: 'SCI_Resultados', valores: tabla(colsRes, d.resultados) },
+  ];
+}
+
 /* ------------------------------------------------------------ handler */
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
@@ -475,6 +513,10 @@ Deno.serve(async (req) => {
     let mp: MPDatos | null = null;
     let mpError = '';
     try { mp = await leerMP(sb); } catch (e) { mpError = (e as Error).message || String(e); }
+    // Satisfacción del cliente interno: mismo aislamiento.
+    let sci: SCIDatos | null = null;
+    let sciError = '';
+    try { sci = await leerSCI(sb); } catch (e) { sciError = (e as Error).message || String(e); }
 
     const colsCiclos: Col[] = [
       TX('fecha', 'Fecha'), NU('semana', 'Semana', 0), TX('codigo', 'Código'), TX('fundo', 'Fundo'), TX('lote', 'Lote'),
@@ -494,6 +536,7 @@ Deno.serve(async (req) => {
       ['Horas', (f) => (f.t_ciclo_total === null || f.t_ciclo_total === undefined) ? '' : num(Number(f.t_ciclo_total) / 60)],
       ['Estado', (f) => f.cerrado ? 'Cerrado' : 'En curso'],
       ['Registrado por', (f) => quien(f.creado_por)], TS('creado_en', 'Creado'), TS('actualizado_en', 'Actualizado'),
+      TX('cultivo', 'Cultivo'),
     ];
     const colsResumen: Col[] = [
       ['Semana', (f) => f._semana], TX('fundo', 'Fundo'), NU('n_muestras', 'N° muestras', 0),
@@ -512,6 +555,7 @@ Deno.serve(async (req) => {
     const ahora = new Date().toISOString();
     const estadoS5 = s5 ? (s5.fotosError ? 'OK · fotos sin miniatura: ' + s5.fotosError : 'OK') : 'No sincronizada: ' + s5Error;
     const estadoMP = mp ? (mp.fotosError ? 'OK · fotos sin miniatura: ' + mp.fotosError : 'OK') : 'No sincronizada: ' + mpError;
+    const estadoSCI = sci ? 'OK' : 'No sincronizada: ' + sciError;
     const pestanas: Pestana[] = [
       { titulo: 'Ciclos_BD', valores: tabla(colsCiclos, ciclos) },
       { titulo: 'Resumen_Semanal', valores: tabla(colsResumen, resumen) },
@@ -519,6 +563,7 @@ Deno.serve(async (req) => {
       { titulo: 'Auditoria_Escaneos', valores: tabla(colsEscaneos, escaneos) },
       ...pestanasS5(s5),
       ...pestanasMP(mp),
+      ...pestanasSCI(sci),
       { titulo: 'Sync_Info', valores: [
         ['Dato', 'Valor'],
         ['Última sincronización (hora Lima)', fechaHora(ahora)],
@@ -532,6 +577,9 @@ Deno.serve(async (req) => {
         ['Plan de mantenimiento · revisiones', mp ? mp.revs.length : ''],
         ['Plan de mantenimiento · hallazgos', mp ? mp.hallazgos.length : ''],
         ['Plan de mantenimiento · estado', estadoMP],
+        ['Cliente interno · encuestas', sci ? sci.resultados.length : ''],
+        ['Cliente interno · filas BD', sci ? sci.bd.length : ''],
+        ['Cliente interno · estado', estadoSCI],
         ['Nota', 'Estas pestañas se sobrescriben en cada sincronización. Crea tus gráficos o tablas dinámicas en otras pestañas. Las miniaturas de 5S_Observaciones y PM_Hallazgos se renuevan en cada sincronización.'],
       ] },
     ];
@@ -543,12 +591,14 @@ Deno.serve(async (req) => {
       ciclos: ciclos.length, resumen: resumen.length, personal: personal.length, escaneos: escaneos.length,
       s5_bd: s5 ? s5.bd.length : 0, s5_observaciones: s5 ? s5.obs.length : 0,
       mp_revisiones: mp ? mp.revs.length : 0, mp_hallazgos: mp ? mp.hallazgos.length : 0,
+      sci_encuestas: sci ? sci.resultados.length : 0, sci_bd: sci ? sci.bd.length : 0,
     };
     await fijarParametro(sb, 'ULTIMA_SYNC_SHEETS', ahora);
-    const parciales = [s5 ? '' : `Auditoría 5S: ${s5Error}`, mp ? '' : `Plan de mantenimiento: ${mpError}`].filter(Boolean);
+    const parciales = [s5 ? '' : `Auditoría 5S: ${s5Error}`, mp ? '' : `Plan de mantenimiento: ${mpError}`,
+      sci ? '' : `Cliente interno: ${sciError}`].filter(Boolean);
     await fijarParametro(sb, 'ULTIMO_ERROR_SYNC_SHEETS', parciales.length ? `${fechaHora(ahora)} · ${parciales.join(' · ')}` : '');
     await sb.from('bitacora').insert({ usuario_id: usuarioId, modulo: 'SHEETS', accion: 'Sincronización OK', detalle: `${origen} · ${JSON.stringify(filas)}` });
-    return responder({ ok: true, hoja: tituloHoja, filas, origen, s5: estadoS5, mp: estadoMP, duracion_ms: Date.now() - inicio });
+    return responder({ ok: true, hoja: tituloHoja, filas, origen, s5: estadoS5, mp: estadoMP, sci: estadoSCI, duracion_ms: Date.now() - inicio });
   } catch (e) {
     const msg = (e && (e as Error).message) || String(e);
     await fijarParametro(sb, 'ULTIMO_ERROR_SYNC_SHEETS', `${fechaHora(new Date().toISOString())} · ${msg}`);

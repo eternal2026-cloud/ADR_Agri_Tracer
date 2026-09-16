@@ -85,36 +85,7 @@ S5.fijarCultivo = function (id) {
   S5.escribirLocal(S5.CLAVE_CULTIVO, Number(id));
 };
 
-/** Íconos SVG de cultivo (autónomos: sirven en pantalla y para el PDF). */
-S5.iconoSvg = function (icono, color, tam) {
-  var c = color || '#76B729', t = tam || 28, hoja = '#76B729', cuerpo;
-  if (icono === 'arandano') {
-    cuerpo = '<path d="M36 13c5-7 14-8 19-4-5 5-12 7-19 4z" fill="' + hoja + '"/>' +
-      '<circle cx="42" cy="41" r="14" fill="' + c + '" opacity=".8"/>' +
-      '<circle cx="24" cy="37" r="16" fill="' + c + '"/>' +
-      '<circle cx="18" cy="31" r="4.5" fill="#fff" opacity=".28"/>' +
-      '<path d="M18.5 25l3 1.6 2.5-3.6 2.5 3.6 3-1.6-1 4.2h-9z" fill="#1B2347" opacity=".78"/>' +
-      '<path d="M41 31.6l2.4 1.3 2-2.9 2 2.9 2.4-1.3-.8 3.3h-7.2z" fill="#1B2347" opacity=".62"/>';
-  } else if (icono === 'uva') {
-    cuerpo = '<path d="M33 4v10" stroke="#5D4835" stroke-width="3" stroke-linecap="round"/>' +
-      '<path d="M34 10c5-6 14-7 19-3-5 5-13 7-19 3z" fill="' + hoja + '"/>' +
-      [[19, 22], [33, 22], [47, 22], [26, 34], [40, 34], [33, 46], [19, 34], [47, 34], [26, 46], [40, 46], [33, 57]]
-        .filter(function (p, i) { return i < 6 || i === 10; })
-        .map(function (p) {
-          return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="7" fill="' + c + '"/><circle cx="' + (p[0] - 2.4) + '" cy="' + (p[1] - 2.4) + '" r="1.8" fill="#fff" opacity=".35"/>';
-        }).join('');
-  } else if (icono === 'citrico') {
-    cuerpo = '<path d="M34 13c3-7 11-9 16-7-2 6-9 9-16 7z" fill="' + hoja + '"/>' +
-      '<circle cx="32" cy="36" r="23" fill="' + c + '"/>' +
-      '<circle cx="32" cy="36" r="18" fill="#FFE2BF"/>' +
-      '<path d="M32 18v36M14 36h36M19.3 23.3l25.4 25.4M44.7 23.3L19.3 48.7" stroke="' + c + '" stroke-width="2.6" opacity=".85"/>' +
-      '<circle cx="32" cy="36" r="3.5" fill="#FFF4E6"/>';
-  } else {
-    cuerpo = '<path d="M11 53C11 28 27 12 53 11c0 26-15 42-42 42z" fill="' + c + '"/>' +
-      '<path d="M13 51L43 21" stroke="#fff" stroke-opacity=".55" stroke-width="2.6" stroke-linecap="round"/>';
-  }
-  return '<svg class="cultivo-ico" width="' + t + '" height="' + t + '" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' + cuerpo + '</svg>';
-};
+S5.iconoSvg = DR.iconoCultivo;
 S5.iconoCultivo = function (c, tam) { return c ? S5.iconoSvg(c.icono, c.color, tam) : ''; };
 
 S5.selectorCultivoHtml = function () {

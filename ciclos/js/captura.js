@@ -120,7 +120,7 @@ window.addEventListener('beforeunload', function (e) {
 /* ============================================================ LISTA DE CICLOS */
 VISTAS.captura = function (cont) {
   if (!AT.puedeCapturar()) {
-    cont.innerHTML = UI.encabezado('Tiempos de ciclo', 'Captura de datos', '') +
+    cont.innerHTML = UI.encabezado('Toma de tiempos · Arándano', 'Captura de datos', '') +
       UI.panel('Sin permiso', '', '<div class="aviso alerta">Tu cuenta no tiene permiso de captura en campo. Pide a un administrador que te lo habilite.</div>');
     DR.entrarPaneles('#contenido');
     return;

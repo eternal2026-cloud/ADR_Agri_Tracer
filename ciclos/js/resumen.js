@@ -28,7 +28,7 @@ RES.renderGeneral = function (cont) {
   Promise.all([AT.rpc('fn_resumen_general'), AT.rpc('fn_semanas_disponibles')]).then(function (r) {
     var filas = r[0] || [], semanas = r[1] || [];
     if (!filas.length) {
-      cont.innerHTML = UI.encabezado('Tiempos de ciclo', 'Resumen general', 'Todavía no hay ciclos cerrados registrados.') +
+      cont.innerHTML = UI.encabezado('Toma de tiempos · Arándano', 'Resumen general', 'Todavía no hay ciclos cerrados registrados.') +
         UI.panel('Sin datos', '', '<div class="aviso">Registra el primer ciclo desde la pestaña <b>Captura</b>, o importa la hoja BD del Excel a la tabla <code>ciclos_cosecha</code>.</div>');
       DR.entrarPaneles('#contenido'); return;
     }
@@ -38,7 +38,7 @@ RES.renderGeneral = function (cont) {
     var sel = '<select id="selSemanaIr"><option value="">Ver una semana…</option>' + semanas.map(function (s) { return '<option value="' + s + '">Semana ' + s + '</option>'; }).join('') + '</select>';
 
     var h = UI.migas([{ texto: 'Todas las semanas' }]) +
-      UI.encabezado('Tiempos de ciclo', 'Promedio general', 'Todas las semanas registradas, agrupado por fundo. Toca un fundo para ver sus muestras individuales.', sel);
+      UI.encabezado('Toma de tiempos · Arándano', 'Promedio general', 'Todas las semanas registradas, agrupado por fundo. Toca un fundo para ver sus muestras individuales.', sel);
 
     h += '<div class="kpis">' +
       UI.kpi('Tiempo de ciclo promedio', DR.num(total.t_ciclo_total, 1) + ' min', DR.num(total.tiempo_horas, 2) + ' h en promedio', '#0097CE') +
@@ -79,7 +79,7 @@ RES.renderSemana = function (cont) {
       var sel = '<select id="selSemana">' + semanas.map(function (s) { return '<option value="' + s + '"' + (s === semana ? ' selected' : '') + '>Semana ' + s + '</option>'; }).join('') + '</select>';
 
       var h = UI.migas([{ texto: 'Todas las semanas', accion: true }, { texto: 'Semana ' + semana }]) +
-        UI.encabezado('Tiempos de ciclo', 'Semana ' + semana, 'Promedio de cada tramo agrupado por fundo. Los registros que superan el umbral se excluyen del cálculo.', sel);
+        UI.encabezado('Toma de tiempos · Arándano', 'Semana ' + semana, 'Promedio de cada tramo agrupado por fundo. Los registros que superan el umbral se excluyen del cálculo.', sel);
 
       h += '<div class="kpis">' +
         UI.kpi('Tiempo de ciclo promedio', DR.num(total.t_ciclo_total, 1) + ' min', DR.num(total.tiempo_horas, 2) + ' h', '#0097CE') +
@@ -122,7 +122,7 @@ RES.renderMuestras = function (cont) {
     var excluidas = filas.filter(function (f) { return f.t_ciclo_total !== null && f.t_ciclo_total > RES.umbral; });
     var promedio = validas.length ? validas.reduce(function (s, f) { return s + Number(f.t_ciclo_total); }, 0) / validas.length : 0;
 
-    var h = UI.migas(migas) + UI.encabezado('Tiempos de ciclo', RES.fundo, (RES.semana ? 'Semana ' + RES.semana + ' · ' : 'Todas las semanas · ') + filas.length + ' registro(s)');
+    var h = UI.migas(migas) + UI.encabezado('Toma de tiempos · Arándano', RES.fundo, (RES.semana ? 'Semana ' + RES.semana + ' · ' : 'Todas las semanas · ') + filas.length + ' registro(s)');
 
     h += '<div class="kpis">' +
       UI.kpi('Promedio válido', DR.num(promedio, 1) + ' min', validas.length + ' muestra(s)', '#0097CE') +

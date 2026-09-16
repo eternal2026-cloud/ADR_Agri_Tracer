@@ -46,8 +46,9 @@ function vistaInicial() {
 }
 
 function pintarBarraSup() {
-  DR.$('#slotLogo').innerHTML = '<a href="../" class="logo" style="display:flex;align-items:center;gap:10px;text-decoration:none">' +
-    DR.marcaSvg(42) + '<span class="texto">TIEMPOS DE CICLO</span></a>';
+  // Tiempos de ciclo es la Toma de tiempos campo de arándano (portada › Ingeniería · Campo).
+  DR.$('#slotLogo').innerHTML = '<a href="../#campo" class="logo" style="display:flex;align-items:center;gap:10px;text-decoration:none">' +
+    DR.marcaSvg(42) + '<span class="texto">TIEMPOS · ARÁNDANO</span></a>';
   DR.$('#chipDatos').classList.add('ok');
   DR.$('#chipTexto').textContent = (AT.perfil && AT.perfil.nombre) || '—';
 }

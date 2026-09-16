@@ -6,9 +6,21 @@ respaldado por **Supabase** (Postgres + Auth + Edge Functions + Vault + pg_cron)
 ## Estado actual
 
 - **Proyecto Supabase** `agritracer-don-ricardo` (ref `ptsvriudoilsyofgccsb`) con
-  migraciones `supabase/migrations/0001..0015` aplicadas (0012: Auditoría 5S,
+  migraciones `supabase/migrations/0001..0016` aplicadas (0012: Auditoría 5S,
   0013: Auditoría 5S por cultivo, 0014: observaciones 5S por área,
-  0015: Revisión del plan de mantenimiento).
+  0015: Revisión del plan de mantenimiento, 0016: Satisfacción del cliente
+  interno y cultivo en los tiempos de ciclo).
+
+## Portada por grupos
+
+- **Ingeniería · Planta** (Ingeniería de Procesos): Auditoría 5S, Revisión plan de
+  mantenimiento, Satisfacción del cliente interno y Reubicación de personal.
+- **Ingeniería · Campo**: **Toma de tiempos campo** abre `#campo` con un acceso por
+  cultivo: **Arándano** (los tiempos de ciclo de siempre, `ciclos/`) y **Uva**
+  (`campo/uva/`, en definición). `ciclos_cosecha.cultivo` (0016) separa los cultivos;
+  todo lo registrado hasta hoy es Arándano (valor por defecto y trigger).
+- **Usuarios y configuración**: apartado propio, solo administradores.
+- El ícono de cultivo vive en `DR.iconoCultivo` (`js/nucleo.js`); 5S lo reutiliza.
 - **Edge Functions desplegadas** (código en `supabase/functions/`):
   - `admin-usuarios` — crear usuarios, restablecer contraseñas, cambiar rol, desactivar.
   - `sync-sheets` — espejo de auditoría hacia Google Sheets.
@@ -171,6 +183,44 @@ tabla dinámica Hoja1) y del correo de resultados.
   `rpc_mp_reabrir_revision`, `rpc_mp_anular_revision`; lecturas `fn_mp_tabla` y
   `fn_mp_resultados`. Bitácora con módulo `REVISION_PLAN_MTTO`.
 
+## Satisfacción del cliente interno (módulo `satisfaccion/`, migración 0016)
+
+Réplica de los Excel «Encuesta NPS - <Área evaluada> - <Evaluador>.xlsx» (hoja
+ENCUESTA) y de la presentación «Evaluación Cliente Interno - <Área>».
+
+- **Fórmulas** (validadas contra la presentación de Manejo de Información):
+  cada ítem vale Totalmente en desacuerdo 4 % · En desacuerdo 6,5 % · De acuerdo 8,5 % ·
+  Totalmente de acuerdo 10 %; resultado = suma de los 10 ítems; % de un criterio =
+  suma de sus ítems / (n° de ítems × 10). Criterios: Atención y trato (1-2),
+  Tiempo de respuesta (3-4), Comunicación (5-6), Calidad de servicio (7-10).
+  **Ponderado** del área evaluada = promedio por encuesta.
+- **Cargar histórico** (admin y captura): varios Excel o una carpeta completa. El
+  lector ubica los ítems por el N° de la columna D (sirve para las dos variantes de
+  la plantilla, con o sin fila Cargo) y valida contra el resultado del Excel
+  (28/28 archivos idénticos). La planta (PDC, PLM…) y la sub-área (Limpieza,
+  Packing…) se sugieren desde el nombre del archivo; todo se corrige en la vista
+  previa. Avisa duplicados (mismo contenido en dos carpetas) y campos faltantes.
+  También acepta la BD en formato largo que descarga la app.
+- **Repetible sin duplicar**: clave cultivo | área evaluada | área evaluadora |
+  sub-área | planta | fecha. Reimportar actualiza; nunca pisa lo registrado en la
+  app ni revive una encuesta anulada.
+- **Encuesta** (admin y captura): asistente de 4 pasos para registros futuros; el
+  borrador queda en el celular hasta guardarlo.
+- **Resultados**: filtros por cultivo (o todos), campaña, fechas y área evaluada;
+  ponderado, matriz de evaluaciones por planta y grupo («PDC - Prod. Limpieza»),
+  radar, sugerencias, encuestas (anular: solo admin) e histórico por campaña.
+- **Descargas**: BD para Power BI (`.xlsx`, hoja «Data Power BI» con la tabla
+  `TablaSCI`, una fila por ítem, + hoja «Resultados») y **presentación `.pptx`**
+  (PptxGenJS local `vendor/pptxgen.bundle.js`, radar nativo editable, imágenes en
+  `satisfaccion/plantilla/`): portada, objetivo, estructura, RESULTADOS, matriz,
+  consolidado y una diapositiva por planta con 2 grupos.
+- **Áreas**: catálogo `s5_areas` (compartido con 5S; 0016 activa Ingeniería y crea
+  PCP). **Planta**: `listas_maestras.codigo` del fundo (DON CARLOS → PDC,
+  LA MAQUINA → PLM, YANCAY → PYA), editable en `Config → Listas → Códigos de planta`.
+- Tablas `sci_criterios`, `sci_items`, `sci_encuestas`, `sci_respuestas`; RPC
+  `rpc_sci_importar`, `rpc_sci_guardar_encuesta`, `rpc_sci_anular_encuesta`;
+  lecturas `fn_sci_resultados` y `fn_sci_bd`. Bitácora con módulo `SATISFACCION_CI`.
+
 ## Conectar Google Sheets (referencia)
 
 Pestañas que la app sobrescribe: `Ciclos_BD`, `Resumen_Semanal`,
@@ -178,7 +228,9 @@ Pestañas que la app sobrescribe: `Ciclos_BD`, `Resumen_Semanal`,
 hoja BD), `5S_Observaciones` (formato de la hoja Observaciones, con miniaturas
 Antes/Después que se renuevan en cada sincronización), `5S_Resumen`,
 `PM_Revisiones`, `PM_Hallazgos` (una fila por observación / no conformidad, con
-miniaturas), `PM_Resultados` (resultado por encargado y revisión) y
+miniaturas), `PM_Resultados` (resultado por encargado y revisión), `SCI_BD`
+(satisfacción del cliente interno en formato largo, fuente para Power BI),
+`SCI_Resultados` (una fila por encuesta) y
 `Sync_Info` (horas de Lima).
 Tus otras pestañas no se tocan. Estado, frecuencia y "Sincronizar ahora" en
 `Config → Sheets`.
@@ -220,6 +272,17 @@ mantenimiento/           Revisión plan de mantenimiento (Resultados · Revisar 
   js/cargar.js           Vista previa y creación de la revisión
   js/revisar.js          Tabla dinámica, OT por encargado con checks y hallazgos con fotos
   js/resultados.js       Resultado por encargado, hallazgos, histórico y resumen para correo
+
+satisfaccion/            Satisfacción del cliente interno (Resultados · Encuesta · Cargar histórico)
+  js/importar.js         Lector de los Excel de encuesta y de la BD larga (sin DOM, probado en Node)
+  js/comun.js            Catálogos, fórmulas, consolidado y radar de 4 criterios (SCI.*)
+  js/cargar.js           Vista previa editable, duplicados e importación por lotes
+  js/encuesta.js         Asistente de registro en 4 pasos
+  js/resultados.js       Matriz, consolidado, detalle por planta, histórico y BD para Power BI
+  js/pptx.js             Presentación .pptx (PptxGenJS)
+  plantilla/             Imágenes de la presentación
+
+campo/uva/               Toma de tiempos campo · Uva (en definición)
 
 supabase/migrations/     Esquema SQL completo (ya aplicado)
 supabase/functions/      Edge Functions admin-usuarios y sync-sheets (ya desplegadas)

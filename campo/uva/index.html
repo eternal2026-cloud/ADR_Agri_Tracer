@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B0908">
+<meta name="description" content="Toma de tiempos campo · Uva: sub-módulo en definición.">
+<title>Toma de tiempos · Uva · Don Ricardo</title>
+<link rel="icon" href="../../img/icono.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../css/estilos.css">
+</head>
+<body>
+
+<div id="app">
+  <header id="barraSup">
+    <div id="slotLogo"></div>
+    <button id="chipDatos" class="chip" type="button" title="Volver al inicio"><i></i><span id="chipTexto">Cargando…</span></button>
+  </header>
+  <main id="contenido"><div class="vacio">Cargando…</div></main>
+</div>
+
+<div id="toast" role="status"></div>
+
+<script src="../../vendor/anime.min.js"></script>
+<script src="../../vendor/supabase.min.js"></script>
+<script src="../../js/nucleo.js"></script>
+<script src="../../js/supabase-cliente.js"></script>
+<script src="../../ciclos/js/ui.js"></script>
+<script>
+/* Toma de tiempos campo · Uva — en definición.
+ * La tabla ciclos_cosecha ya distingue el cultivo (columna cultivo, migración 0016):
+ * cuando se definan las etapas de uva se reutiliza la captura por etapas de arándano. */
+document.addEventListener('DOMContentLoaded', function () {
+  AT.requiereSesion('../../').then(function (perfil) {
+    if (perfil.debe_cambiar_password) { location.href = '../../'; return; }
+    DR.$('#slotLogo').innerHTML = '<a href="../../#campo" class="logo" style="display:flex;align-items:center;gap:10px;text-decoration:none">' +
+      DR.marcaSvg(42) + '<span class="texto">TIEMPOS · UVA</span></a>';
+    DR.$('#chipDatos').classList.add('ok');
+    DR.$('#chipTexto').textContent = perfil.nombre || '—';
+    DR.$('#chipDatos').onclick = function () { location.href = '../../#campo'; };
+    DR.$('#contenido').innerHTML = '<div class="vista angosta">' +
+      UI.encabezado('Ingeniería · Campo › Toma de tiempos campo', 'Uva', 'Sub-módulo en definición.') +
+      '<section class="cultivo-tarjeta entra" style="--c:#7A3E8E"><div class="cultivo-tarjeta-cab">' + DR.iconoCultivo('uva', '#7A3E8E', 56) +
+        '<div><b>Toma de tiempos para uva</b><span>Por definir con el equipo: etapas del ciclo, puntos de control y campos de captura.</span></div></div></section>' +
+      UI.panel('Qué ya está listo', '', '<ul class="aviso" style="list-style:disc;padding-left:30px">' +
+        '<li>La base de tiempos distingue el cultivo (Arándano / Uva), así la uva no se mezcla con el arándano.</li>' +
+        '<li>La captura por etapas, el resumen por semana y fundo y la sincronización a Google Sheets se reutilizarán.</li>' +
+        '<li>Falta definir las etapas y sus tramos para uva.</li></ul>') +
+      '<div class="acciones"><a class="btn sec" href="../../#campo">' + DR.ICONOS.atras + 'Volver a Toma de tiempos campo</a>' +
+      '<a class="btn azul" href="../../ciclos/#resumen">Ver tiempos de arándano</a></div></div>';
+    DR.entrarPaneles('#contenido');
+    DR.$('#app').style.opacity = 1;
+  }).catch(function () { /* AT.requiereSesion ya redirige */ });
+});
+</script>
+</body>
+</html>

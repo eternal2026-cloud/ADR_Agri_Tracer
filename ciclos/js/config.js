@@ -237,7 +237,8 @@ CONFIG.tabListas = function (c) {
       }).join('') : '<span class="nota-vacia">Todavía no hay opciones.</span>') + '</div>' +
       '<div class="lista-add"><input placeholder="Nueva ' + CONFIG.SINGULAR[tipo] + '…" data-nuevo-lista="' + tipo + '" autocomplete="off">' +
       '<button type="button" class="btn chico" data-agregar-lista="' + tipo + '">Agregar</button></div>');
-  }).join('');
+  }).join('') + CONFIG.panelCodigosPlanta();
+  CONFIG.enlazarCodigosPlanta(c);
 
   DR.$$('[data-lista-id]', c).forEach(function (chip) {
     chip.onclick = function () {
@@ -262,6 +263,32 @@ CONFIG.tabListas = function (c) {
   DR.$$('[data-agregar-lista]', c).forEach(function (b) { b.onclick = function () { agregar(this.getAttribute('data-agregar-lista')); }; });
   DR.$$('[data-nuevo-lista]', c).forEach(function (inp) {
     inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') agregar(this.getAttribute('data-nuevo-lista')); });
+  });
+};
+
+/**
+ * Código de planta de cada fundo (DON CARLOS → PDC). Lo usa Satisfacción del cliente
+ * interno para separar los resultados por planta y sugerirla desde el nombre del Excel.
+ */
+CONFIG.panelCodigosPlanta = function () {
+  var fundos = CONFIG.listas.filter(function (l) { return l.tipo === 'fundo'; });
+  return UI.panel('Códigos de planta', 'Abreviatura de cada fundo (p. ej. PDC, PLM). Se usa en Satisfacción del cliente interno.',
+    fundos.length ? '<div class="form">' + fundos.map(function (f) {
+      return '<div class="campo"><label for="cod_' + f.id + '">' + DR.esc(f.valor) + '</label>' +
+        '<input id="cod_' + f.id + '" data-codigo-fundo="' + f.id + '" value="' + DR.esc(f.codigo || '') + '" maxlength="8" autocapitalize="characters" placeholder="Sin código"></div>';
+    }).join('') + '</div>' : '<span class="nota-vacia">Todavía no hay fundos.</span>');
+};
+CONFIG.enlazarCodigosPlanta = function (c) {
+  DR.$$('[data-codigo-fundo]', c).forEach(function (inp) {
+    inp.onchange = function () {
+      var codigo = this.value.trim().toUpperCase() || null;
+      this.value = codigo || '';
+      sb.from('listas_maestras').update({ codigo: codigo }).eq('id', this.getAttribute('data-codigo-fundo')).then(function (r) {
+        if (r.error) throw new Error(r.error.message);
+        DR.toast(codigo ? 'Código ' + codigo + ' guardado.' : 'Código quitado.');
+        return CONFIG.refrescar();
+      }).catch(function (e) { DR.toast(e.message, 'error'); });
+    };
   });
 };
 

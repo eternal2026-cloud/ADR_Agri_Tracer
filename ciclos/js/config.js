@@ -312,7 +312,7 @@ CONFIG.tabSheets = function (c) {
     : zona('Subir clave JSON', 'Google Cloud → Cuentas de servicio → Claves → archivo .json') +
       '<div class="ayuda" style="text-align:left">Se guarda cifrada en Supabase Vault: nunca queda en el código, en GitHub ni en este celular.</div>';
 
-  c.innerHTML = UI.panel('Estado del espejo', 'La app escribe las pestañas Ciclos_BD, Resumen_Semanal, Personal_Reubicacion, Auditoria_Escaneos, 5S_BD, 5S_Observaciones, 5S_Resumen y Sync_Info. Tus otras pestañas no se tocan.', estado) +
+  c.innerHTML = UI.panel('Estado del espejo', 'La app escribe las pestañas Ciclos_BD, Resumen_Semanal, Personal_Reubicacion, Auditoria_Escaneos, 5S_BD, 5S_Observaciones, 5S_Resumen, PM_Revisiones, PM_Hallazgos, PM_Resultados y Sync_Info. Tus otras pestañas no se tocan.', estado) +
     (s.tiene_credencial && tieneHoja && s.ultima_sync ? '' : UI.panel('Cómo conectarla (una sola vez)', '', pasos)) +
     UI.panel('Hoja destino y frecuencia', '', form) +
     UI.panel('Credencial de Google', '', cred);

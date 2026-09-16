@@ -3,7 +3,8 @@
  * La invoca pg_cron (header x-sync-token, ver migración 0007) o un admin desde
  * Configuración → Google Sheets (JWT de su sesión). Sobrescribe solo sus
  * pestañas: Ciclos_BD, Resumen_Semanal, Personal_Reubicacion,
- * Auditoria_Escaneos, 5S_BD, 5S_Observaciones, 5S_Resumen y Sync_Info;
+ * Auditoria_Escaneos, 5S_BD, 5S_Observaciones, 5S_Resumen, PM_Revisiones,
+ * PM_Hallazgos, PM_Resultados y Sync_Info;
  * cualquier otra pestaña de la hoja se respeta.
  * La clave de la cuenta de servicio vive en Vault, nunca en el código.
  * ==========================================================================*/
@@ -221,11 +222,11 @@ type S5Datos = {
 };
 
 /** URLs firmadas por 7 días del bucket privado; se renuevan en cada sincronización. */
-async function firmarFotos(sb: SupabaseClient, rutas: string[]): Promise<Map<string, string>> {
+async function firmarFotos(sb: SupabaseClient, rutas: string[], bucket = 'auditoria-5s'): Promise<Map<string, string>> {
   const mapa = new Map<string, string>();
   const unicas = [...new Set(rutas.filter(Boolean))];
   for (let i = 0; i < unicas.length; i += 100) {
-    const { data, error } = await sb.storage.from('auditoria-5s').createSignedUrls(unicas.slice(i, i + 100), 7 * 24 * 3600);
+    const { data, error } = await sb.storage.from(bucket).createSignedUrls(unicas.slice(i, i + 100), 7 * 24 * 3600);
     if (error) throw new Error(error.message);
     (data || []).forEach((d: Fila) => { if (d.signedUrl && d.path) mapa.set(d.path, d.signedUrl); });
   }
@@ -322,6 +323,86 @@ function pestanasS5(d: S5Datos | null): Pestana[] {
   ];
 }
 
+/* ------------------------------------------------------------ Revisión del plan de mantenimiento */
+type MPDatos = { revs: Fila[]; hallazgos: Fila[]; resultados: Fila[]; fotos: Map<string, string>; fotosError: string };
+const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Setiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+async function leerMP(sb: SupabaseClient): Promise<MPDatos> {
+  const [revs, resultados] = await Promise.all([
+    leerTodo(sb, 'mp_revisiones', [['anio', true], ['mes', true], ['creado_en', true]]),
+    leerRpc(sb, 'fn_mp_resultados'),
+  ]);
+  const validas = new Set(revs.filter((r) => r.estado !== 'anulada').map((r) => r.id));
+  // Solo las OT con hallazgo: el plan completo ya está en el Excel original.
+  const hallazgos: Fila[] = [];
+  for (let desde = 0; desde < 50000; desde += 1000) {
+    const { data, error } = await sb.from('mp_ot').select('*')
+      .or('observacion.not.is.null,no_conformidad.not.is.null')
+      .order('revision_id').order('fila').range(desde, desde + 999);
+    if (error) throw new Error('mp_ot: ' + error.message);
+    hallazgos.push(...(data || []).filter((o: Fila) => validas.has(o.revision_id)));
+    if (!data || data.length < 1000) break;
+  }
+  let fotos = new Map<string, string>();
+  let fotosError = '';
+  try {
+    fotos = await firmarFotos(sb, hallazgos.flatMap((o) => (o.fotos || []) as string[]), 'plan-mantenimiento');
+  } catch (e) { fotosError = (e as Error).message || String(e); }
+  return { revs: revs.filter((r) => validas.has(r.id)), hallazgos, resultados, fotos, fotosError };
+}
+
+function pestanasMP(d: MPDatos | null): Pestana[] {
+  if (!d) return [];
+  const revs = new Map<string, Fila>(d.revs.map((r) => [r.id, r]));
+  const rev = (f: Fila): Fila => revs.get(f.revision_id) || {};
+  const mes = (r: Fila) => MESES[(Number(r.mes) || 1) - 1];
+  const puntaje = (nc: number) => Math.max(0, 100 - 0.5 * nc);  // igual que fn_mp_puntaje
+
+  const totales = new Map<string, { n: number; obs: number; nc: number }>();
+  d.resultados.forEach((f) => {
+    const t = totales.get(f.revision_id) || { n: 0, obs: 0, nc: 0 };
+    t.n += Number(f.total_ot); t.obs += Number(f.n_obs); t.nc += Number(f.n_nc);
+    totales.set(f.revision_id, t);
+  });
+  const tot = (f: Fila) => totales.get(f.id) || { n: 0, obs: 0, nc: 0 };
+
+  const colsRev: Col[] = [
+    TX('codigo', 'Código'), ['Mes', (f) => mes(f)], NU('anio', 'Año', 0), TX('hoja', 'Hoja'), TX('archivo', 'Archivo'),
+    TX('fecha_revision', 'Fecha revisión'), TX('revisor', 'Revisor'),
+    ['Estado', (f) => f.estado === 'cerrada' ? 'Cerrada' : 'En curso'],
+    ['# OT', (f) => tot(f).n], ['Observaciones', (f) => tot(f).obs], ['No conformidades', (f) => tot(f).nc],
+    ['Resultado %', (f) => puntaje(tot(f).nc)], TS('cerrada_en', 'Cerrada'), TS('actualizado_en', 'Actualizado'),
+  ];
+
+  // Formato del correo: una fila por no conformidad y otra por observación.
+  const filasHall: Fila[] = [];
+  for (const [k, tipo] of [['no_conformidad', 'No conformidad'], ['observacion', 'Observación']]) {
+    d.hallazgos.forEach((o) => { if (o[k]) filasHall.push({ ...o, _tipo: tipo, _detalle: o[k] }); });
+  }
+  const colsHall: Col[] = [
+    ['Código revisión', (f) => txt(rev(f).codigo)], ['Mes', (f) => mes(rev(f))], ['Año', (f) => rev(f).anio ?? ''],
+    ['Fecha', (f) => txt(f.fecha_hallazgo)], ['Hallazgo', (f) => f._tipo], ['Detalle', (f) => seguro(f._detalle)],
+    ['OT', (f) => seguro(f.num_ot)], ['Planta', (f) => seguro(f.planta)], ['Supervisor', (f) => seguro(f.responsable)],
+    ['Sub equipo', (f) => seguro(f.sub_equipo)], ['Descripción OT', (f) => seguro(f.descripcion)],
+    ...[0, 1, 2].map((i) => [i ? `Foto ${i + 1}` : 'Foto', (f: Fila) => imagen(d.fotos.get(((f.fotos || []) as string[])[i]))] as Col),
+    ['Registrado por', (f) => seguro(f.revisado_nombre)], TS('revisado_en', 'Actualizado'),
+  ];
+
+  const colsRes: Col[] = [
+    TX('codigo', 'Código'), ['Mes', (f) => mes(f)], NU('anio', 'Año', 0),
+    ['Estado', (f) => f.estado === 'cerrada' ? 'Cerrada' : 'En curso'],
+    TX('responsable', 'Encargado'), TX('plantas', 'Plantas'), NU('total_ot', '# OT', 0), NU('n_obs', 'Observaciones', 0),
+    NU('n_nc', 'No conformidades', 0), NU('resultado', 'Resultado %', 1),
+  ];
+
+  return [
+    { titulo: 'PM_Revisiones', valores: tabla(colsRev, d.revs) },
+    { titulo: 'PM_Hallazgos', valores: tabla(colsHall, filasHall), formulas: true, altoFila: 90,
+      anchos: [[5, 360], [10, 260], [11, 120], [12, 120], [13, 120]] },
+    { titulo: 'PM_Resultados', valores: tabla(colsRes, d.resultados) },
+  ];
+}
+
 /* ------------------------------------------------------------ handler */
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
@@ -390,6 +471,10 @@ Deno.serve(async (req) => {
     let s5: S5Datos | null = null;
     let s5Error = '';
     try { s5 = await leerS5(sb); } catch (e) { s5Error = (e as Error).message || String(e); }
+    // Plan de mantenimiento: mismo aislamiento.
+    let mp: MPDatos | null = null;
+    let mpError = '';
+    try { mp = await leerMP(sb); } catch (e) { mpError = (e as Error).message || String(e); }
 
     const colsCiclos: Col[] = [
       TX('fecha', 'Fecha'), NU('semana', 'Semana', 0), TX('codigo', 'Código'), TX('fundo', 'Fundo'), TX('lote', 'Lote'),
@@ -426,12 +511,14 @@ Deno.serve(async (req) => {
 
     const ahora = new Date().toISOString();
     const estadoS5 = s5 ? (s5.fotosError ? 'OK · fotos sin miniatura: ' + s5.fotosError : 'OK') : 'No sincronizada: ' + s5Error;
+    const estadoMP = mp ? (mp.fotosError ? 'OK · fotos sin miniatura: ' + mp.fotosError : 'OK') : 'No sincronizada: ' + mpError;
     const pestanas: Pestana[] = [
       { titulo: 'Ciclos_BD', valores: tabla(colsCiclos, ciclos) },
       { titulo: 'Resumen_Semanal', valores: tabla(colsResumen, resumen) },
       { titulo: 'Personal_Reubicacion', valores: tabla(colsPersonal, personal) },
       { titulo: 'Auditoria_Escaneos', valores: tabla(colsEscaneos, escaneos) },
       ...pestanasS5(s5),
+      ...pestanasMP(mp),
       { titulo: 'Sync_Info', valores: [
         ['Dato', 'Valor'],
         ['Última sincronización (hora Lima)', fechaHora(ahora)],
@@ -442,7 +529,10 @@ Deno.serve(async (req) => {
         ['Auditoría 5S · filas BD', s5 ? s5.bd.length : ''],
         ['Auditoría 5S · observaciones', s5 ? s5.obs.length : ''],
         ['Auditoría 5S · estado', estadoS5],
-        ['Nota', 'Estas pestañas se sobrescriben en cada sincronización. Crea tus gráficos o tablas dinámicas en otras pestañas. Las miniaturas de 5S_Observaciones se renuevan en cada sincronización.'],
+        ['Plan de mantenimiento · revisiones', mp ? mp.revs.length : ''],
+        ['Plan de mantenimiento · hallazgos', mp ? mp.hallazgos.length : ''],
+        ['Plan de mantenimiento · estado', estadoMP],
+        ['Nota', 'Estas pestañas se sobrescriben en cada sincronización. Crea tus gráficos o tablas dinámicas en otras pestañas. Las miniaturas de 5S_Observaciones y PM_Hallazgos se renuevan en cada sincronización.'],
       ] },
     ];
 
@@ -452,11 +542,13 @@ Deno.serve(async (req) => {
     const filas = {
       ciclos: ciclos.length, resumen: resumen.length, personal: personal.length, escaneos: escaneos.length,
       s5_bd: s5 ? s5.bd.length : 0, s5_observaciones: s5 ? s5.obs.length : 0,
+      mp_revisiones: mp ? mp.revs.length : 0, mp_hallazgos: mp ? mp.hallazgos.length : 0,
     };
     await fijarParametro(sb, 'ULTIMA_SYNC_SHEETS', ahora);
-    await fijarParametro(sb, 'ULTIMO_ERROR_SYNC_SHEETS', s5 ? '' : `${fechaHora(ahora)} · Auditoría 5S: ${s5Error}`);
+    const parciales = [s5 ? '' : `Auditoría 5S: ${s5Error}`, mp ? '' : `Plan de mantenimiento: ${mpError}`].filter(Boolean);
+    await fijarParametro(sb, 'ULTIMO_ERROR_SYNC_SHEETS', parciales.length ? `${fechaHora(ahora)} · ${parciales.join(' · ')}` : '');
     await sb.from('bitacora').insert({ usuario_id: usuarioId, modulo: 'SHEETS', accion: 'Sincronización OK', detalle: `${origen} · ${JSON.stringify(filas)}` });
-    return responder({ ok: true, hoja: tituloHoja, filas, origen, s5: estadoS5, duracion_ms: Date.now() - inicio });
+    return responder({ ok: true, hoja: tituloHoja, filas, origen, s5: estadoS5, mp: estadoMP, duracion_ms: Date.now() - inicio });
   } catch (e) {
     const msg = (e && (e as Error).message) || String(e);
     await fijarParametro(sb, 'ULTIMO_ERROR_SYNC_SHEETS', `${fechaHora(new Date().toISOString())} · ${msg}`);

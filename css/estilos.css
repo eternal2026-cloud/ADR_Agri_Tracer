@@ -667,3 +667,53 @@ tr.fila-cerca td{background:#23170E}
 @media (prefers-reduced-motion: reduce){
   #splashFondo::before,.cc-pasos i.actual{animation:none}
 }
+
+/* ==================== REVISIÓN DEL PLAN DE MANTENIMIENTO ==================== */
+.mp-tabla{min-width:420px}
+.mp-fila-planta td{font-weight:600;background:#1D1713}
+td.mp-sangria{padding-left:26px}
+.mp-enlace{display:inline-flex;align-items:center;gap:4px;color:#4FC3F0}
+.mp-enlace svg{width:16px;height:16px}
+.mp-resumen-cifras{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:14px;color:var(--texto-2)}
+.mp-resumen-cifras b{color:var(--texto);font-size:18px;font-weight:600;margin-right:3px}
+.mp-progreso{height:8px;border-radius:4px;background:#2A221C;margin-top:12px;overflow:hidden}
+.mp-progreso i{display:block;height:100%;background:linear-gradient(90deg,var(--dr-verde),#9BD85A);border-radius:4px;transition:width .3s}
+.mp-ot{background:linear-gradient(160deg,var(--panel),var(--panel-2));border:1px solid var(--borde);border-left:4px solid #4A3E34;border-radius:16px;padding:12px;margin-bottom:10px;box-shadow:var(--sombra)}
+.mp-ot.completa{border-left-color:var(--dr-verde);background:linear-gradient(160deg,#1A2410,#151D0E)}
+.mp-ot.con-obs{border-left-color:#E8B04A}
+.mp-ot.con-nc{border-left-color:#E5484D}
+.mp-ot-cab{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:10px}
+.mp-ot-cab b{display:block;font-size:17px;font-weight:600;letter-spacing:.03em}
+.mp-ot-cab span{display:block;font-size:13px;color:var(--texto-3);margin-top:1px}
+.mp-ot-etq{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.mp-checks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.mp-chk{position:relative;display:flex;flex-direction:column;gap:1px;text-align:left;padding:7px 10px 7px 36px;border-radius:11px;border:1px solid #3F342B;background:#1A1411;color:var(--texto);font-family:var(--fuente);cursor:pointer;min-width:0;transition:background .15s,border-color .15s}
+.mp-chk.fijo{padding-left:10px;cursor:default}
+.mp-chk.ancho{grid-column:1/-1}
+.mp-chk i{position:absolute;left:9px;top:50%;transform:translateY(-50%);width:20px;height:20px;border-radius:6px;border:1.5px solid #5E5044;display:flex;align-items:center;justify-content:center;color:transparent}
+.mp-chk i svg{width:14px;height:14px}
+.mp-chk.on{background:#172510;border-color:#4C7A20}
+.mp-chk.on i{background:var(--dr-verde);border-color:var(--dr-verde);color:#14100C}
+.mp-chk .etq{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--texto-3);font-weight:500}
+.mp-chk .val{font-size:14px;line-height:1.35;word-break:break-word}
+.mp-alerta{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12.5px;color:#F8B68A}
+.mp-alerta svg{width:16px;height:16px;flex:0 0 16px}
+.mp-nota{margin-top:6px;font-size:12.5px;color:var(--texto-3)}
+.mp-hallazgo{margin-top:8px;padding:8px 10px;border-radius:8px;font-size:14px;line-height:1.45;border-left:3px solid;word-break:break-word}
+.mp-hallazgo b{display:block;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:2px}
+.mp-hallazgo.nc{background:#2D1212;border-color:#E5484D}
+.mp-hallazgo.nc b{color:#FFA3A3}
+.mp-hallazgo.obs{background:#2A2110;border-color:#E8B04A}
+.mp-hallazgo.obs b{color:#F3D18B}
+.mp-ot .foto-grupo{margin-top:8px}
+.mp-ot-acc{display:flex;align-items:center;gap:10px;margin-top:10px}
+.mp-ot-acc .btn.chico{margin-left:auto}
+.mp-ot-cont{font-size:12.5px;color:var(--texto-3);font-variant-numeric:tabular-nums}
+.mp-texto-hoja{margin-top:10px;color:var(--texto-2);font-size:15px;line-height:1.5}
+.mp-detalle{white-space:normal;min-width:240px;max-width:420px;line-height:1.4}
+.mp-rojo{color:#FF6B6B;font-weight:500}
+.mp-ambar{color:#F3B45B;font-weight:500}
+@media (min-width:720px){
+  .mp-checks{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .mp-chk.ancho{grid-column:span 2}
+}

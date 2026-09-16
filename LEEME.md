@@ -6,8 +6,9 @@ respaldado por **Supabase** (Postgres + Auth + Edge Functions + Vault + pg_cron)
 ## Estado actual
 
 - **Proyecto Supabase** `agritracer-don-ricardo` (ref `ptsvriudoilsyofgccsb`) con
-  migraciones `supabase/migrations/0001..0013` aplicadas (0012: Auditoría 5S,
-  0013: Auditoría 5S por cultivo).
+  migraciones `supabase/migrations/0001..0015` aplicadas (0012: Auditoría 5S,
+  0013: Auditoría 5S por cultivo, 0014: observaciones 5S por área,
+  0015: Revisión del plan de mantenimiento).
 - **Edge Functions desplegadas** (código en `supabase/functions/`):
   - `admin-usuarios` — crear usuarios, restablecer contraseñas, cambiar rol, desactivar.
   - `sync-sheets` — espejo de auditoría hacia Google Sheets.
@@ -137,12 +138,47 @@ BD, Observaciones y Resultados), con el mismo estilo secuencial de Captura.
   reabrir/anular auditorías. Nada se borra: se desactiva o se anula.
 - Fotos en Storage privado `auditoria-5s` (la app usa URLs firmadas temporales).
 
+## Revisión del plan de mantenimiento (módulo `mantenimiento/`, migración 0015)
+
+Réplica de la revisión mensual del Excel «Plan de <mes>.xlsx» (hoja del mes +
+tabla dinámica Hoja1) y del correo de resultados.
+
+- **Cargar plan** (admin y captura): se elige el Excel y se lee en el dispositivo.
+  Se toma la **primera hoja cuyo nombre es un mes** (MARZO, «Abril 2026»…); las demás
+  (Hoja1, OT (2)…) se ignoran. La fila de encabezados se busca en las 10 primeras
+  filas (`# OT` y `RESPONSABLE` obligatorias; PLANTA, UBICACIÓN, SUB-EQUIPOS,
+  DESCRIPCIÓN, PERSONAS y las 4 fechas plan/real). El año sale de las fechas reales.
+  Se muestra la tabla dinámica para compararla con Hoja1 y al confirmar se crea la
+  revisión `RPM-00001…`. **Cada carga es una revisión nueva**: los hallazgos de
+  revisiones anteriores no pasan a la nueva; el histórico se acumula.
+  (Validado con `Plan de marzo`: 64 OT, mismos conteos que Hoja1.)
+- **Revisar**: lista de revisiones → tabla dinámica Planta > Responsable (# OT,
+  revisadas, observaciones, NC) → tocar un encargado → una tarjeta por OT con
+  **checks** en # OT, Descripción, Sub equipo, Personas y las 4 fechas. Los checks
+  son **solo ayuda visual** (localStorage del dispositivo): no van a la BD y se borran
+  al cerrar la revisión. Aviso si las fechas reales salen del rango del plan.
+  «Siguiente encargado» recorre la tabla en orden.
+- **Hallazgo por OT**: observación y/o no conformidad (ambas opcionales) y hasta
+  3 fotos (Storage privado `plan-mantenimiento`, ruta `rpm/<revisión>/<ot>-…`).
+- **Resultado** = 100 % − **0,5 %** por no conformidad (`fn_mp_puntaje`; 3 NC → 98,5 %).
+  Por encargado se **consolida entre plantas** (RENZO suma PDC-A, PDC-U y PYA); también
+  global de la revisión. Pestaña Resultados: KPIs, barras y tabla por encargado,
+  detalle de hallazgos con el formato del correo, histórico de las últimas 12
+  revisiones y **Copiar resumen para correo** (tablas en HTML para Outlook).
+- **Cerrar** (admin/captura) bloquea los hallazgos; **reabrir** y **anular** solo admin.
+- Tablas `mp_revisiones` y `mp_ot` (el hallazgo vive en la fila de la OT); RPC
+  `rpc_mp_crear_revision`, `rpc_mp_guardar_hallazgo`, `rpc_mp_cerrar_revision`,
+  `rpc_mp_reabrir_revision`, `rpc_mp_anular_revision`; lecturas `fn_mp_tabla` y
+  `fn_mp_resultados`. Bitácora con módulo `REVISION_PLAN_MTTO`.
+
 ## Conectar Google Sheets (referencia)
 
 Pestañas que la app sobrescribe: `Ciclos_BD`, `Resumen_Semanal`,
 `Personal_Reubicacion`, `Auditoria_Escaneos`, `5S_BD` (mismas 19 columnas de la
 hoja BD), `5S_Observaciones` (formato de la hoja Observaciones, con miniaturas
-Antes/Después que se renuevan en cada sincronización), `5S_Resumen` y
+Antes/Después que se renuevan en cada sincronización), `5S_Resumen`,
+`PM_Revisiones`, `PM_Hallazgos` (una fila por observación / no conformidad, con
+miniaturas), `PM_Resultados` (resultado por encargado y revisión) y
 `Sync_Info` (horas de Lima).
 Tus otras pestañas no se tocan. Estado, frecuencia y "Sincronizar ahora" en
 `Config → Sheets`.
@@ -177,6 +213,13 @@ auditoria5s/             Auditoría 5S (Resultados · Auditar · Observaciones �
   js/informes.js         Excel de observaciones (formato manual) e informe PDF con radar
   js/resultados.js       Resultados por cultivo, radar e informe PDF por fechas
   js/config.js           Catálogo: cultivos, áreas, zonas por cultivo, checklist, auditorías
+
+mantenimiento/           Revisión plan de mantenimiento (Resultados · Revisar · Cargar plan)
+  js/comun.js            Puntaje, tabla dinámica, checks locales y lectura de datos (MP.*)
+  js/importar.js         Lector del Excel del plan (hoja del mes)
+  js/cargar.js           Vista previa y creación de la revisión
+  js/revisar.js          Tabla dinámica, OT por encargado con checks y hallazgos con fotos
+  js/resultados.js       Resultado por encargado, hallazgos, histórico y resumen para correo
 
 supabase/migrations/     Esquema SQL completo (ya aplicado)
 supabase/functions/      Edge Functions admin-usuarios y sync-sheets (ya desplegadas)

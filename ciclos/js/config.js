@@ -1,10 +1,10 @@
 /* ============================================================================
  * config.js — PANEL DE ADMINISTRACIÓN: USUARIOS · LISTAS · GOOGLE SHEETS · AJUSTES
- * Usuarios y sincronización pasan por Edge Functions de Supabase
+ * Usuarios (correo corporativo + PIN del Bot Don Ricardo) y sincronización pasan por Edge Functions de Supabase
  * (admin-usuarios, sync-sheets): no dependen de variables en Vercel.
  * ==========================================================================*/
 
-var CONFIG = { tab: 'usuarios', parametros: {}, listas: [], usuarios: [], sync: null, rolNuevo: 'captura', usuarioEditado: false };
+var CONFIG = { tab: 'usuarios', parametros: {}, listas: [], usuarios: [], sync: null, rolNuevo: 'captura' };
 
 CONFIG.TABS = [
   { id: 'usuarios', t: 'Usuarios', ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.8-3.2 3-5 5.5-5s4.7 1.8 5.5 5"/><path d="M17 8v6M14 11h6"/></svg>' },
@@ -37,7 +37,8 @@ CONFIG.cargar = function () {
     sb.from('parametros').select('*'),
     sb.from('listas_maestras').select('*').order('tipo').order('orden').order('valor'),
     sb.from('perfiles').select('*').order('creado_en'),
-    AT.rpc('rpc_estado_sync_sheets').catch(function (e) { return { _error: e.message }; })
+    AT.rpc('rpc_estado_sync_sheets').catch(function (e) { return { _error: e.message }; }),
+    AT.cargarDominios()
   ]).then(function (r) {
     [0, 1, 2].forEach(function (i) { if (r[i].error) throw new Error(r[i].error.message); });
     CONFIG.parametros = {};
@@ -84,20 +85,16 @@ CONFIG.iniciales = function (texto) {
   return DR.esc(((p[0] || '')[0] || '?') + ((p[1] || '')[0] || '')).toUpperCase();
 };
 
-/** "Juan Carlos Pérez Quispe" → juan.perez · "Ana Torres" → ana.torres */
-CONFIG.sugerirUsuario = function (nombre) {
-  var p = String(nombre || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
-    .replace(/[^a-z0-9\s]/g, '').trim().split(/\s+/).filter(Boolean);
-  if (!p.length) return '';
-  var apellido = p.length >= 4 ? p[p.length - 2] : p[1];
-  return (apellido ? p[0] + '.' + apellido : p[0]).substring(0, 40);
-};
-
+/**
+ * Los usuarios ingresan con su correo corporativo y un PIN que envía el Bot Don Ricardo
+ * (sin contraseña). Solo la cuenta «admin» mantiene usuario y contraseña.
+ */
 CONFIG.tabUsuarios = function (c) {
+  var dominios = AT.DOMINIOS.map(function (d) { return '@' + d; }).join(', ');
   var guia = '<ol class="guia">' +
-    '<li><b>1</b><div><strong>Crea el usuario aquí abajo</strong><span>Escribe el nombre de la persona y elige qué podrá hacer. No necesita correo: el usuario se arma solo (ej. <i>juan.perez</i>).</span></div></li>' +
-    '<li><b>2</b><div><strong>Compártele su acceso</strong><span>Al crearlo verás su usuario y una contraseña temporal, con botones para copiarlos o enviarlos por WhatsApp.</span></div></li>' +
-    '<li><b>3</b><div><strong>Primer ingreso</strong><span>La persona abre esta misma página, entra con esos datos y el sistema le pide crear su propia contraseña.</span></div></li></ol>';
+    '<li><b>1</b><div><strong>Crea el usuario aquí abajo</strong><span>Escribe su nombre, su correo corporativo (' + DR.esc(dominios) + ') y elige qué podrá hacer.</span></div></li>' +
+    '<li><b>2</b><div><strong>El Bot Don Ricardo le avisa</strong><span>Le llega un correo de bienvenida con los pasos para ingresar. No hay contraseñas que compartir.</span></div></li>' +
+    '<li><b>3</b><div><strong>Ingreso con PIN</strong><span>Abre esta página, escribe su correo y recibe un PIN de 6 dígitos que vence en unos minutos.</span></div></li></ol>';
 
   var roles = '<div class="roles">' + CONFIG.ROLES.map(function (r) {
     return '<button type="button" class="rol-op' + (r.id === CONFIG.rolNuevo ? ' activo' : '') + '" data-rol="' + r.id + '" style="--c:' + r.c + '"><i></i><div><b>' + r.t + '</b><span>' + r.d + '</span></div></button>';
@@ -105,37 +102,36 @@ CONFIG.tabUsuarios = function (c) {
 
   var form = '<div class="form">' +
     '<div class="campo ancho"><label for="nuNombre">Nombre completo</label><input id="nuNombre" placeholder="Ej. Juan Pérez Quispe" autocomplete="off"></div>' +
-    '<div class="campo"><label for="nuUsuario">Usuario para ingresar</label><input id="nuUsuario" placeholder="juan.perez" autocapitalize="none" autocomplete="off" spellcheck="false"><div class="ayuda-campo">Se sugiere solo; puedes cambiarlo.</div></div>' +
+    '<div class="campo"><label for="nuCorreo">Correo corporativo</label><input id="nuCorreo" type="email" inputmode="email" placeholder="nombre@' + DR.esc(AT.DOMINIOS[0]) + '" autocapitalize="none" autocomplete="off" spellcheck="false"></div>' +
     '<div class="campo"><label for="nuArea">Área (opcional)</label><input id="nuArea" placeholder="Ej. Calidad campo" autocomplete="off"></div>' +
     '<div class="campo ancho"><label>¿Qué podrá hacer?</label>' + roles + '</div>' +
-    '<div class="campo ancho"><label for="nuClave">Contraseña (opcional)</label><input id="nuClave" placeholder="Déjalo vacío y se genera una temporal" autocomplete="off"></div>' +
-    '</div><div class="acciones"><button type="button" class="btn verde grande" id="btnCrearUsuario">' + DR.ICONOS.mas + '<span>Crear usuario</span></button></div>';
+    '</div><div class="acciones"><button type="button" class="btn verde grande" id="btnCrearUsuario">' + DR.ICONOS.mas + '<span>Dar acceso y enviar bienvenida</span></button></div>';
 
   var yo = AT.perfil ? AT.perfil.id : '';
   var lista = CONFIG.usuarios.map(function (u) {
     var pills = UI.pill(CONFIG.NOMBRE_ROL[u.rol] || u.rol, { 'Administrador': 'naranja', 'Captura en campo': 'verde', 'Solo consulta': 'azul' }) +
+      (u.correo ? ' <span class="pill azul">Correo + PIN</span>' : ' <span class="pill gris">Usuario y contraseña</span>') +
       (u.activo ? '' : ' <span class="pill rojo">Desactivado</span>') +
-      (u.activo && u.debe_cambiar_password ? ' <span class="pill gris">Aún no crea su contraseña</span>' : '') +
       (u.id === yo ? ' <span class="pill gris">Tú</span>' : '');
     var selector = '<select data-rol-de="' + u.id + '"' + (u.id === yo ? ' disabled' : '') + ' aria-label="Rol de ' + DR.esc(u.nombre) + '">' +
       CONFIG.ROLES.map(function (r) { return '<option value="' + r.id + '"' + (r.id === u.rol ? ' selected' : '') + '>' + r.t + '</option>'; }).join('') + '</select>';
+    var ultimo = u.ultimo_acceso ? 'Último ingreso ' + DR.hace(u.ultimo_acceso) : 'Aún no ingresa';
     return '<div class="usuario-card' + (u.activo ? '' : ' inactivo') + '"><div class="ini">' + CONFIG.iniciales(u.nombre || u.usuario) + '</div>' +
       '<div class="u-cuerpo"><div class="u-nombre">' + DR.esc(u.nombre) + '</div>' +
-      '<div class="u-det">' + DR.esc(u.usuario) + (u.area ? ' · ' + DR.esc(u.area) : '') + '</div><div class="u-pills">' + pills + '</div></div>' +
+      '<div class="u-det">' + DR.esc(u.correo || u.usuario) + (u.area ? ' · ' + DR.esc(u.area) : '') + ' · ' + DR.esc(ultimo) + '</div><div class="u-pills">' + pills + '</div></div>' +
       '<div class="u-acciones">' + selector +
-        '<button type="button" class="btn sec chico" data-reset="' + u.id + '">Nueva contraseña</button>' +
+        (u.correo
+          ? '<button type="button" class="btn sec chico" data-reenviar="' + u.id + '"' + (u.activo ? '' : ' disabled') + '>Reenviar acceso</button>'
+          : '<button type="button" class="btn sec chico" data-reset="' + u.id + '">Nueva contraseña</button>') +
         (u.id === yo ? '' : '<button type="button" class="btn sec chico" data-activo-de="' + u.id + '" data-activo="' + u.activo + '">' + (u.activo ? 'Desactivar' : 'Reactivar') + '</button>') +
       '</div></div>';
   }).join('');
 
   c.innerHTML = UI.panel('Cómo dar acceso a una persona', '', guia) +
     UI.panel('Nuevo usuario', '', form) +
-    UI.panel('Usuarios con acceso', CONFIG.usuarios.length + ' usuario(s)', lista || '<div class="vacio">Sin usuarios.</div>');
+    UI.panel('Usuarios con acceso', CONFIG.usuarios.length + ' usuario(s)', lista || '<div class="vacio">Sin usuarios.</div>') +
+    CONFIG.panelBot();
 
-  var inpNombre = DR.$('#nuNombre'), inpUsuario = DR.$('#nuUsuario');
-  CONFIG.usuarioEditado = false;
-  inpNombre.oninput = function () { if (!CONFIG.usuarioEditado) inpUsuario.value = CONFIG.sugerirUsuario(this.value); };
-  inpUsuario.oninput = function () { CONFIG.usuarioEditado = !!this.value; };
   DR.$$('.rol-op', c).forEach(function (b) {
     b.onclick = function () {
       var yo2 = this;
@@ -145,14 +141,26 @@ CONFIG.tabUsuarios = function (c) {
     };
   });
   DR.$('#btnCrearUsuario').onclick = CONFIG.crearUsuario;
+  CONFIG.enlazarBot(c);
 
+  DR.$$('[data-reenviar]', c).forEach(function (b) {
+    b.onclick = function () {
+      var u = CONFIG.buscarUsuario(this.getAttribute('data-reenviar')), btn = this;
+      if (!u) return;
+      btn.disabled = true;
+      AT.llamarFuncion('admin-usuarios', { accion: 'bienvenida', id: u.id }).then(function (r) {
+        DR.toast('Correo de acceso enviado a ' + r.correo + '.');
+        btn.disabled = false;
+      }).catch(function (e) { DR.toast(e.message, 'error'); btn.disabled = false; });
+    };
+  });
   DR.$$('[data-reset]', c).forEach(function (b) {
     b.onclick = function () {
       var u = CONFIG.buscarUsuario(this.getAttribute('data-reset'));
       if (!u || !window.confirm('¿Generar una nueva contraseña para ' + u.nombre + '? La actual dejará de funcionar.')) return;
       var btn = this; btn.disabled = true;
       AT.llamarFuncion('admin-usuarios', { accion: 'reset', id: u.id }).then(function (r) {
-        CONFIG.mostrarCredenciales(r, 'reset');
+        CONFIG.mostrarClave(r);
         return CONFIG.refrescar();
       }).catch(function (e) { DR.toast(e.message, 'error'); btn.disabled = false; });
     };
@@ -183,16 +191,20 @@ CONFIG.tabUsuarios = function (c) {
 CONFIG.buscarUsuario = function (id) { return CONFIG.usuarios.filter(function (u) { return u.id === id; })[0]; };
 
 CONFIG.crearUsuario = function () {
-  var nombre = DR.$('#nuNombre').value.trim(), usuario = DR.$('#nuUsuario').value.trim() || CONFIG.sugerirUsuario(nombre);
+  var nombre = DR.$('#nuNombre').value.trim(), correo = DR.$('#nuCorreo').value.trim().toLowerCase();
   if (!nombre) { DR.toast('Escribe el nombre de la persona.', 'error'); DR.$('#nuNombre').focus(); return; }
+  if (!AT.correoValido(correo)) {
+    DR.toast('Escribe su correo corporativo (' + AT.DOMINIOS.map(function (d) { return '@' + d; }).join(', ') + ').', 'error');
+    DR.$('#nuCorreo').focus();
+    return;
+  }
   var btn = this;
   btn.disabled = true;
   btn.classList.add('cargando');
   AT.llamarFuncion('admin-usuarios', {
-    accion: 'crear', nombre: nombre, usuario: usuario, area: DR.$('#nuArea').value.trim(),
-    rol: CONFIG.rolNuevo, password: DR.$('#nuClave').value
+    accion: 'crear', nombre: nombre, correo: correo, area: DR.$('#nuArea').value.trim(), rol: CONFIG.rolNuevo
   }).then(function (r) {
-    CONFIG.mostrarCredenciales(r, 'creado');
+    CONFIG.mostrarAlta(r);
     return CONFIG.refrescar();
   }).catch(function (e) {
     DR.toast(e.message, 'error');
@@ -201,29 +213,89 @@ CONFIG.crearUsuario = function () {
   });
 };
 
-CONFIG.mostrarCredenciales = function (r, tipo) {
-  var url = location.origin + '/';
-  var mensaje = 'Hola ' + r.nombre + ', ya tienes acceso a AgriTracer · Don Ricardo.\n\n' +
-    'Ingresa en: ' + url + '\nUsuario: ' + r.usuario + '\nContraseña temporal: ' + r.password + '\n\n' +
-    'Al entrar, el sistema te pedirá crear tu propia contraseña.';
+/** Resultado del alta: si el correo de bienvenida no salió, se explica y se puede reenviar después. */
+CONFIG.mostrarAlta = function (r) {
   UI.abrirHoja('<div class="asa"></div>' +
-    '<div class="res-estado">' + DR.ICONOS.check + '<span>' + (tipo === 'creado' ? 'Usuario creado' : 'Contraseña restablecida') + '</span></div>' +
+    '<div class="res-estado">' + (r.correo_enviado ? DR.ICONOS.check : DR.ICONOS.alerta) + '<span>Usuario creado</span></div>' +
     '<div class="res-nombre">' + DR.esc(r.nombre) + '</div>' +
     '<div class="res-dni">' + DR.esc(CONFIG.NOMBRE_ROL[r.rol] || '') + '</div>' +
     '<div class="cred">' +
-      '<div class="cred-fila"><span>Página</span><b>' + DR.esc(url.replace(/^https?:\/\//, '')) + '</b></div>' +
-      '<div class="cred-fila"><span>Usuario</span><b>' + DR.esc(r.usuario) + '</b></div>' +
-      '<div class="cred-fila"><span>Contraseña</span><b class="clave">' + DR.esc(r.password) + '</b></div></div>' +
-    '<div class="aviso alerta">Compártela ahora: por seguridad <b>no se vuelve a mostrar</b>. Si se pierde, usa «Nueva contraseña».</div>' +
-    '<div class="acciones"><button type="button" class="btn azul" id="btnCopiarCred" style="flex:1">Copiar datos</button>' +
-    '<a class="btn verde" id="btnWhatsapp" style="flex:1" target="_blank" rel="noopener" href="https://wa.me/?text=' + encodeURIComponent(mensaje) + '">Enviar por WhatsApp</a></div>' +
-    '<button type="button" class="res-cerrar-sec" id="btnCerrarHoja">Listo, ya lo compartí</button>', { fija: true });
-  DR.$('#btnCopiarCred').onclick = function () {
-    UI.copiar(mensaje).then(function () { DR.toast('Datos copiados. Pégalos en un mensaje.'); })
-      .catch(function () { DR.toast('No se pudo copiar; anótalos a mano.', 'error'); });
-  };
+      '<div class="cred-fila"><span>Correo</span><b>' + DR.esc(r.correo) + '</b></div>' +
+      '<div class="cred-fila"><span>Ingreso</span><b>Correo + PIN</b></div></div>' +
+    (r.correo_enviado
+      ? '<div class="aviso ok">El Bot Don Ricardo le envió la bienvenida con los pasos para ingresar.</div>'
+      : '<div class="aviso alerta"><b>El usuario quedó creado, pero no salió el correo de bienvenida.</b><br>' + DR.esc(r.error_correo) +
+        '<br>Revisa el panel «Correo del Bot Don Ricardo» y luego usa «Reenviar acceso». Igual puede ingresar escribiendo su correo en la página de inicio.</div>') +
+    '<button type="button" class="res-cerrar-sec" id="btnCerrarHoja">Listo</button>', { fija: true });
   DR.$('#btnCerrarHoja').onclick = UI.cerrarHoja;
   DR.vibrar(40);
+};
+
+/** Solo para la cuenta con contraseña (admin). */
+CONFIG.mostrarClave = function (r) {
+  UI.abrirHoja('<div class="asa"></div>' +
+    '<div class="res-estado">' + DR.ICONOS.check + '<span>Contraseña restablecida</span></div>' +
+    '<div class="res-nombre">' + DR.esc(r.nombre) + '</div>' +
+    '<div class="cred">' +
+      '<div class="cred-fila"><span>Usuario</span><b>' + DR.esc(r.usuario) + '</b></div>' +
+      '<div class="cred-fila"><span>Contraseña temporal</span><b class="clave">' + DR.esc(r.password) + '</b></div></div>' +
+    '<div class="aviso alerta">Anótala ahora: <b>no se vuelve a mostrar</b>. Al ingresar se pedirá crear una propia.</div>' +
+    '<div class="acciones"><button type="button" class="btn azul" id="btnCopiarCred" style="flex:1">Copiar</button></div>' +
+    '<button type="button" class="res-cerrar-sec" id="btnCerrarHoja">Listo</button>', { fija: true });
+  DR.$('#btnCopiarCred').onclick = function () {
+    UI.copiar(r.password).then(function () { DR.toast('Contraseña copiada.'); }).catch(function () { DR.toast('No se pudo copiar; anótala a mano.', 'error'); });
+  };
+  DR.$('#btnCerrarHoja').onclick = UI.cerrarHoja;
+};
+
+/* ------------------------------------------------------------ correo del bot */
+CONFIG.panelBot = function () {
+  var p = CONFIG.parametros;
+  var campo = function (id, etiqueta, valor, extra, ayuda) {
+    return '<div class="campo"><label for="' + id + '">' + etiqueta + '</label><input id="' + id + '" value="' + DR.esc(valor || '') + '"' + (extra || '') + '>' +
+      (ayuda ? '<div class="ayuda-campo">' + ayuda + '</div>' : '') + '</div>';
+  };
+  return UI.panel('Correo del Bot Don Ricardo', 'Buzón de Microsoft 365 desde el que salen los PIN y las bienvenidas (envío por Microsoft Graph).',
+    '<div class="form">' +
+      campo('botRemitente', 'Buzón remitente', p.CORREO_REMITENTE, ' type="email" autocapitalize="none" spellcheck="false"', 'La app de Entra ID debe tener permiso Mail.Send sobre este buzón.') +
+      campo('botNombre', 'Nombre del bot', p.CORREO_NOMBRE_BOT, '', '') +
+      campo('botDominios', 'Dominios permitidos', p.CORREO_DOMINIOS, ' autocapitalize="none" spellcheck="false"', 'Separados por coma (ej. adr.com.pe).') +
+      campo('botUrl', 'Dirección de AgriTracer', p.APP_URL || location.origin, ' type="url" autocapitalize="none" spellcheck="false"', 'Para el botón «Abrir AgriTracer» de los correos.') +
+    '</div><div class="acciones"><button type="button" class="btn" id="btnGuardarBot">Guardar</button></div>' +
+    '<div class="sep-titulo">Probar el envío</div>' +
+    '<div class="lista-add"><input id="botPrueba" type="email" placeholder="correo@' + DR.esc(AT.DOMINIOS[0]) + '" value="' + DR.esc(p.CORREO_REMITENTE || '') + '" autocapitalize="none" spellcheck="false">' +
+    '<button type="button" class="btn chico azul" id="btnProbarBot">Enviar correo de prueba</button></div>' +
+    '<div id="botEstado"></div>');
+};
+
+CONFIG.enlazarBot = function (c) {
+  DR.$('#btnGuardarBot', c).onclick = function () {
+    var btn = this;
+    var dominios = DR.$('#botDominios').value.toLowerCase().split(/[,;\s]+/).map(function (d) { return d.replace(/^@/, ''); }).filter(Boolean);
+    var remitente = DR.$('#botRemitente').value.trim().toLowerCase();
+    if (!dominios.length) { DR.toast('Escribe al menos un dominio.', 'error'); return; }
+    if (!/^[^@\s]+@[^@\s]+$/.test(remitente)) { DR.toast('Escribe el buzón remitente.', 'error'); return; }
+    btn.disabled = true;
+    Promise.all([
+      CONFIG.guardarParametro('CORREO_REMITENTE', remitente),
+      CONFIG.guardarParametro('CORREO_NOMBRE_BOT', DR.$('#botNombre').value.trim() || 'Bot Don Ricardo · Gestión de Procesos'),
+      CONFIG.guardarParametro('CORREO_DOMINIOS', dominios.join(', ')),
+      CONFIG.guardarParametro('APP_URL', DR.$('#botUrl').value.trim().replace(/\/+$/, ''))
+    ]).then(function () {
+      DR.toast('Datos del bot guardados.');
+      return AT.cargarDominios();
+    }).then(CONFIG.refrescar).catch(function (e) { DR.toast(e.message, 'error'); btn.disabled = false; });
+  };
+  DR.$('#btnProbarBot', c).onclick = function () {
+    var btn = this, correo = DR.$('#botPrueba').value.trim().toLowerCase(), estado = DR.$('#botEstado');
+    btn.disabled = true;
+    btn.classList.add('cargando');
+    AT.llamarFuncion('admin-usuarios', { accion: 'prueba_correo', correo: correo }).then(function (r) {
+      estado.innerHTML = '<div class="aviso ok" style="margin-top:10px">Correo de prueba enviado a <b>' + DR.esc(r.correo) + '</b> desde <b>' + DR.esc(r.remitente) + '</b>. Revisa la bandeja (y el correo no deseado).</div>';
+    }).catch(function (e) {
+      estado.innerHTML = '<div class="aviso alerta" style="margin-top:10px"><b>No salió el correo.</b><br>' + DR.esc(e.message) + '</div>';
+    }).then(function () { btn.disabled = false; btn.classList.remove('cargando'); });
+  };
 };
 
 /* ============================================================ LISTAS */

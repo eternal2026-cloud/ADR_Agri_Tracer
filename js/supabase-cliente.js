@@ -19,11 +19,47 @@ AT.usuarioAEmail = function (usuario) {
     .trim().toLowerCase().replace(/\s+/g, '.') + SB_DOMINIO_INTERNO;
 };
 
-/** Login: mismo mensaje genérico exista o no el usuario (Supabase ya lo garantiza). */
+/** Login con usuario y contraseña: solo la cuenta de administrador (admin). Mismo mensaje exista o no el usuario. */
 AT.login = function (usuario, password) {
   return sb.auth.signInWithPassword({ email: AT.usuarioAEmail(usuario), password: password })
     .then(function (r) {
       if (r.error) throw new Error(/banned/i.test(r.error.message) ? 'Este usuario está desactivado. Contacta al administrador.' : 'Usuario o contraseña incorrectos.');
+      return AT.cargarPerfil();
+    });
+};
+
+/* ---------------- ingreso con correo corporativo + PIN (Bot Don Ricardo) ---------------- */
+AT.DOMINIOS = ['adr.com.pe'];
+
+/** Dominios permitidos (parámetro CORREO_DOMINIOS); si falla la consulta se usan los de fábrica. */
+AT.cargarDominios = function () {
+  return sb.rpc('fn_correo_dominios').then(function (r) {
+    if (!r.error && r.data && r.data.length) AT.DOMINIOS = r.data;
+    return AT.DOMINIOS;
+  }, function () { return AT.DOMINIOS; });
+};
+
+AT.correoValido = function (correo) {
+  var m = String(correo || '').trim().toLowerCase().match(/^[^@\s]+@([^@\s]+)$/);
+  return !!m && AT.DOMINIOS.indexOf(m[1]) > -1;
+};
+
+/** Pide el PIN. No crea cuentas: solo reciben PIN los correos que el administrador dio de alta. */
+AT.enviarPin = function (correo) {
+  return sb.auth.signInWithOtp({ email: String(correo).trim().toLowerCase(), options: { shouldCreateUser: false } })
+    .then(function (r) {
+      if (!r.error) return true;
+      var m = r.error.message || '';
+      if (/signups? not allowed|not found|no tiene acceso/i.test(m)) throw new Error('Ese correo no tiene acceso a AgriTracer. Pídelo al administrador.');
+      if (/rate|seconds|security purposes/i.test(m)) throw new Error('Ya se envió un PIN hace poco. Espera un minuto antes de pedir otro.');
+      throw new Error(m || 'No se pudo enviar el PIN.');
+    });
+};
+
+AT.verificarPin = function (correo, pin) {
+  return sb.auth.verifyOtp({ email: String(correo).trim().toLowerCase(), token: String(pin).trim(), type: 'email' })
+    .then(function (r) {
+      if (r.error) throw new Error(/expired|invalid/i.test(r.error.message) ? 'PIN incorrecto o vencido. Revisa el último correo o pide uno nuevo.' : r.error.message);
       return AT.cargarPerfil();
     });
 };

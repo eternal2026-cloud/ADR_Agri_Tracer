@@ -35,12 +35,34 @@
     <div id="tituloApp">AgriTracer</div>
     <div id="sedeApp">Ingeniería · Campo &nbsp;·&nbsp; Ingeniería · Planta &nbsp;·&nbsp; Gestión de Procesos</div>
 
-    <div id="loginPanel" class="login-panel">
-      <div class="campo"><label for="loginUsuario">Usuario</label><input id="loginUsuario" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="ej. juan.perez"></div>
+    <!-- Ingreso con correo corporativo: el Bot Don Ricardo envía un PIN de un solo uso. -->
+    <div id="correoPanel" class="login-panel">
+      <div class="campo"><label for="loginCorreo">Correo corporativo</label><input id="loginCorreo" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="nombre@adr.com.pe"></div>
+      <div id="correoError" class="aviso alerta oculto"></div>
+      <button id="btnEnviarPin" class="btn" type="button">Enviarme un PIN</button>
+      <div class="login-nota">Te llegará un correo del <b>Bot Don Ricardo</b> con un PIN de 6 dígitos. No necesitas contraseña.</div>
+      <div class="aviso" style="margin-top:12px">¿Solo vienes a escanear un fotocheck? <a href="reubicacion/">Entra sin iniciar sesión</a>.</div>
+      <button id="btnModoAdmin" class="login-enlace" type="button">Ingresar como administrador</button>
+    </div>
+
+    <div id="pinPanel" class="login-panel oculto">
+      <div class="aviso ok">Enviamos un PIN a <b id="pinCorreo">—</b>. Revisa tu bandeja de entrada (y la carpeta de correo no deseado).</div>
+      <div class="campo" style="margin-top:12px"><label for="loginPin">PIN de 6 dígitos</label><input id="loginPin" class="pin-input" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="••••••"></div>
+      <div id="pinError" class="aviso alerta oculto"></div>
+      <button id="btnIngresarPin" class="btn verde" type="button">Ingresar</button>
+      <div class="login-fila">
+        <button id="btnReenviarPin" class="login-enlace" type="button">Reenviar PIN</button>
+        <button id="btnOtroCorreo" class="login-enlace" type="button">Usar otro correo</button>
+      </div>
+    </div>
+
+    <!-- Solo la cuenta de administrador entra con usuario y contraseña. -->
+    <div id="loginPanel" class="login-panel oculto">
+      <div class="campo"><label for="loginUsuario">Usuario administrador</label><input id="loginUsuario" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="admin"></div>
       <div class="campo"><label for="loginPassword">Contraseña</label><input id="loginPassword" type="password" autocomplete="current-password"></div>
       <div id="loginError" class="aviso alerta oculto"></div>
       <button id="btnIngresar" class="btn" type="button">Ingresar</button>
-      <div class="aviso" style="margin-top:12px">¿Solo vienes a escanear un fotocheck? <a href="reubicacion/">Entra sin iniciar sesión</a>.</div>
+      <button id="btnModoCorreo" class="login-enlace" type="button">Volver a ingresar con correo</button>
     </div>
 
     <div id="cambiarPanel" class="login-panel oculto">
@@ -140,14 +162,81 @@ var CAMPO = [
     accesos: [{ href: 'campo/uva/', t: 'Ver avance', clase: 'sec', roles: TODOS }] }
 ];
 
-function mostrarErrorLogin(msg) { var el = DR.$('#loginError'); el.textContent = msg; el.classList.remove('oculto'); }
+function mostrarErrorLogin(msg) { mostrarError('#loginError', msg); }
+function mostrarError(sel, msg) { var el = DR.$(sel); el.textContent = msg; el.classList.remove('oculto'); }
+function ocultarError(sel) { DR.$(sel).classList.add('oculto'); }
+
+/* ---------------- ingreso con correo corporativo + PIN ---------------- */
+var PIN = { correo: '', espera: 0, reloj: null, SEGUNDOS: 60 };
+
+function pedirPin(reenvio) {
+  var correo = reenvio ? PIN.correo : DR.$('#loginCorreo').value.trim().toLowerCase();
+  var errSel = reenvio ? '#pinError' : '#correoError';
+  ocultarError(errSel);
+  if (!AT.correoValido(correo)) {
+    mostrarError(errSel, 'Escribe tu correo corporativo (' + AT.DOMINIOS.map(function (d) { return '@' + d; }).join(', ') + ').');
+    return;
+  }
+  var btn = reenvio ? DR.$('#btnReenviarPin') : DR.$('#btnEnviarPin');
+  var texto = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Enviando…';
+  AT.enviarPin(correo).then(function () {
+    btn.textContent = texto;
+    PIN.correo = correo;
+    try { localStorage.setItem('agritracer.correo', correo); } catch (e) { /* sin almacenamiento */ }
+    DR.$('#pinCorreo').textContent = correo;
+    DR.$('#loginPin').value = '';
+    if (!reenvio) mostrarPanel('#pinPanel');
+    else DR.toast('Te enviamos un PIN nuevo.');
+    iniciarEspera();
+    DR.$('#loginPin').focus();
+  }).catch(function (e) {
+    btn.disabled = false;
+    btn.textContent = texto;
+    mostrarError(errSel, e.message);
+  });
+}
+
+/** «Reenviar PIN» queda bloqueado un minuto (el mismo límite de Supabase). */
+function iniciarEspera() {
+  var btn = DR.$('#btnReenviarPin');
+  PIN.espera = PIN.SEGUNDOS;
+  clearInterval(PIN.reloj);
+  var pintar = function () {
+    btn.disabled = PIN.espera > 0;
+    btn.textContent = PIN.espera > 0 ? 'Reenviar PIN (' + PIN.espera + ' s)' : 'Reenviar PIN';
+    if (PIN.espera-- <= 0) clearInterval(PIN.reloj);
+  };
+  pintar();
+  PIN.reloj = setInterval(pintar, 1000);
+}
+
+function ingresarConPin() {
+  var pin = DR.$('#loginPin').value.replace(/\D/g, '');
+  ocultarError('#pinError');
+  if (pin.length < 6) { mostrarError('#pinError', 'Escribe los 6 dígitos del PIN.'); return; }
+  var btn = DR.$('#btnIngresarPin');
+  btn.disabled = true;
+  btn.textContent = 'Verificando…';
+  AT.verificarPin(PIN.correo, pin).then(function () {
+    clearInterval(PIN.reloj);
+    btn.disabled = false;
+    btn.textContent = 'Ingresar';
+    pintarLanding();
+  }).catch(function (e) {
+    btn.disabled = false;
+    btn.textContent = 'Ingresar';
+    mostrarError('#pinError', e.message);
+  });
+}
 
 function animarInicio() {
-  var visibles = ['#splashFondo', '#etiquetaApp', '#tituloApp', '#sedeApp', '#loginPanel'];
+  var visibles = ['#splashFondo', '#etiquetaApp', '#tituloApp', '#sedeApp', '#correoPanel'];
   if (!DR.anima) { visibles.forEach(function (s) { DR.$(s).style.opacity = 1; }); return; }
   var texto = DR.$('#textoDR');
   texto.innerHTML = texto.textContent.split('').map(function (ch) { return "<span class='ltr'>" + (ch === ' ' ? '&nbsp;' : ch) + '</span>'; }).join('');
-  anime.set(['.lg-azul', '.lg-naranja', '.lg-verde', '.ltr', '#bajadaDR', '#loginPanel'], { opacity: 0 });
+  anime.set(['.lg-azul', '.lg-naranja', '.lg-verde', '.ltr', '#bajadaDR', '#correoPanel'], { opacity: 0 });
   anime.timeline({ easing: 'easeOutExpo' })
     .add({ targets: '#splashFondo', opacity: [0, 1], scale: [1.12, 1], duration: 1800 })
     .add({ targets: '.lg-azul', opacity: [0, 1], translateX: [-90, 0], duration: 800 }, 200)
@@ -158,11 +247,11 @@ function animarInicio() {
     .add({ targets: '#etiquetaApp', opacity: [0, 1], translateY: [10, 0], duration: 600 }, 1480)
     .add({ targets: '#tituloApp', opacity: [0, 1], translateY: [10, 0], duration: 600 }, 1580)
     .add({ targets: '#sedeApp', opacity: [0, 1], duration: 600 }, 1680)
-    .add({ targets: '#loginPanel', opacity: [0, 1], translateY: [12, 0], duration: 600 }, 1780);
+    .add({ targets: '#correoPanel', opacity: [0, 1], translateY: [12, 0], duration: 600 }, 1780);
   anime({ targets: '#barraCarga', width: ['0%', '92%'], duration: 2000, easing: 'easeInOutQuad' });
   // Red de seguridad: si una pestaña en segundo plano congeló la animación, todo queda visible.
   setTimeout(function () {
-    DR.$$('#splashFondo, .lg-forma, .ltr, #bajadaDR, #etiquetaApp, #tituloApp, #sedeApp, #loginPanel').forEach(function (el) {
+    DR.$$('#splashFondo, .lg-forma, .ltr, #bajadaDR, #etiquetaApp, #tituloApp, #sedeApp, #correoPanel').forEach(function (el) {
       if (Number(getComputedStyle(el).opacity) < 0.05) { el.style.opacity = 1; el.style.transform = 'none'; }
     });
   }, 3500);
@@ -267,6 +356,20 @@ function cerrarSesion() {
 
 document.addEventListener('DOMContentLoaded', function () {
   animarInicio();
+  AT.cargarDominios().then(function (d) { DR.$('#loginCorreo').placeholder = 'nombre@' + d[0]; });
+  try { DR.$('#loginCorreo').value = localStorage.getItem('agritracer.correo') || ''; } catch (e) { /* sin almacenamiento */ }
+  DR.$('#btnEnviarPin').addEventListener('click', function () { pedirPin(false); });
+  DR.$('#loginCorreo').addEventListener('keydown', function (e) { if (e.key === 'Enter') pedirPin(false); });
+  DR.$('#btnIngresarPin').addEventListener('click', ingresarConPin);
+  DR.$('#loginPin').addEventListener('input', function () {
+    this.value = this.value.replace(/\D/g, '');
+    if (this.value.length === 6) ingresarConPin();
+  });
+  DR.$('#loginPin').addEventListener('keydown', function (e) { if (e.key === 'Enter') ingresarConPin(); });
+  DR.$('#btnReenviarPin').addEventListener('click', function () { pedirPin(true); });
+  DR.$('#btnOtroCorreo').addEventListener('click', function () { clearInterval(PIN.reloj); mostrarPanel('#correoPanel'); DR.$('#loginCorreo').focus(); });
+  DR.$('#btnModoAdmin').addEventListener('click', function () { mostrarPanel('#loginPanel'); DR.$('#loginUsuario').focus(); });
+  DR.$('#btnModoCorreo').addEventListener('click', function () { mostrarPanel('#correoPanel'); });
   DR.$('#btnIngresar').addEventListener('click', intentarLogin);
   DR.$('#loginPassword').addEventListener('keydown', function (e) { if (e.key === 'Enter') intentarLogin(); });
   DR.$('#nuevaPassword2').addEventListener('keydown', function (e) { if (e.key === 'Enter') intentarCambiarPassword(); });

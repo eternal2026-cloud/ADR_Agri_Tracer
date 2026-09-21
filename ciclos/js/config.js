@@ -23,6 +23,14 @@ CONFIG.ROLES = [
 ];
 CONFIG.NOMBRE_ROL = { admin: 'Administrador', captura: 'Captura en campo', visor: 'Solo consulta' };
 
+// Al salir o recargar la página con nombres de áreas sin guardar, el navegador pregunta.
+window.addEventListener('beforeunload', function (ev) {
+  if (CONFIG.tab === 'areas' && DR.$('#cfgCuerpo') && CONFIG.areasPendientes()) {
+    ev.preventDefault();
+    ev.returnValue = '';
+  }
+});
+
 VISTAS.config = function (cont) {
   if (!AT.esAdmin()) {
     cont.innerHTML = UI.encabezado('Configuración', 'Configuración', '') +
@@ -63,6 +71,8 @@ CONFIG.render = function (cont) {
   DR.$$('.segmento', cont).forEach(function (b) {
     b.onclick = function () {
       var yo = this;
+      if (CONFIG.tab === 'areas' && yo.getAttribute('data-tab') !== 'areas' && CONFIG.areasPendientes() &&
+          !window.confirm('Tienes nombres de áreas sin guardar. Si cambias de pestaña, se descartan.')) return;
       CONFIG.tab = yo.getAttribute('data-tab');
       DR.$$('.segmento', cont).forEach(function (s) { s.classList.toggle('activo', s === yo); });
       try { history.replaceState(null, '', '#' + CONFIG.tab); } catch (e) { /* sin history */ }
@@ -296,54 +306,128 @@ CONFIG.mostrarCredenciales = function (r, tipo) {
  * cambia (usa s5_areas). Aquí se separa lo que en 5S es una sola área, p. ej.
  * Producción → Producción Cítricos, Producción Arándano, Producción Uva Limpieza.
  * Renombrar actualiza también las encuestas ya registradas; el nombre anterior queda como
- * alias para que el importador de Excel lo siga reconociendo.
+ * alias para que el importador de Excel lo siga reconociendo, salvo que otra área lo tome.
+ *
+ * Los nombres se editan todos y se guardan juntos con «Guardar cambios»
+ * (rpc_sci_guardar_areas, una sola transacción): así editar una fila no borra lo escrito en
+ * las demás, y un intercambio de nombres entre dos áreas es válido.
  */
+CONFIG.areasPendientes = function () {
+  return DR.$$('[data-area-nombre]').filter(function (inp) {
+    var a = CONFIG.areas.filter(function (x) { return x.id === Number(inp.getAttribute('data-area-nombre')); })[0];
+    return a && inp.value.trim() && inp.value.trim() !== a.nombre;
+  }).length;
+};
+
 CONFIG.tabAreas = function (c) {
   var filas = CONFIG.areas.map(function (a) {
     var antes = (a.alias || []).filter(Boolean);
-    return '<div class="area-fila' + (a.activo ? '' : ' inactiva') + '">' +
+    return '<div class="area-fila' + (a.activo ? '' : ' inactiva') + '" data-area-fila="' + a.id + '">' +
       '<div class="area-campo"><input value="' + DR.esc(a.nombre) + '" data-area-nombre="' + a.id + '" aria-label="Nombre legal de ' + DR.esc(a.nombre) + '" autocomplete="off">' +
       (antes.length ? '<small>Antes: ' + antes.map(DR.esc).join(' · ') + '</small>' : '') + '</div>' +
-      '<div class="area-acciones"><button type="button" class="btn chico oculto" data-area-guardar="' + a.id + '">Guardar</button>' +
-      '<button type="button" class="btn sec chico" data-area-activa="' + a.id + '">' + (a.activo ? 'Desactivar' : 'Activar') + '</button></div></div>';
+      '<div class="area-acciones"><button type="button" class="btn sec chico" data-area-activa="' + a.id + '">' + (a.activo ? 'Desactivar' : 'Activar') + '</button></div></div>';
   }).join('');
   c.innerHTML = UI.panel('Áreas de Satisfacción del cliente interno', CONFIG.areas.filter(function (a) { return a.activo; }).length + ' activa(s) · Auditoría 5S no cambia',
-    '<div class="aviso">Escribe el <b>nombre legal</b> de cada área. Puedes <b>separar</b> lo que en 5S es una sola área (ej. <i>Producción Cítricos</i>, <i>Producción Arándano</i>, <i>Producción Uva Limpieza</i>). Renombrar actualiza también las encuestas ya registradas. Luego asigna a cada usuario su área en <b>Cliente interno → Evaluadores</b>.</div>' +
+    '<div class="aviso">Escribe el <b>nombre legal</b> de cada área. Puedes <b>separar</b> lo que en 5S es una sola área (ej. <i>Producción Cítricos</i>, <i>Producción Arándano</i>, <i>Producción Uva Limpieza</i>). Edita todos los nombres que necesites y guárdalos juntos. Renombrar actualiza también las encuestas ya registradas. Luego asigna a cada usuario su área en <b>Cliente interno → Evaluadores</b>.</div>' +
     '<div class="lista-add"><input id="inpNuevaArea" placeholder="Nueva área (nombre legal)…" autocomplete="off"><button type="button" class="btn chico verde" id="btnNuevaArea">Agregar</button></div>' +
-    '<div class="areas-lista">' + (filas || '<div class="vacio">Todavía no hay áreas.</div>') + '</div>');
+    '<div class="areas-lista">' + (filas || '<div class="vacio">Todavía no hay áreas.</div>') + '</div>' +
+    '<div class="areas-guardar oculto" id="areasGuardar"><span id="areasCuenta"></span>' +
+      '<button type="button" class="btn sec chico" id="btnAreasDescartar">Descartar</button>' +
+      '<button type="button" class="btn chico verde" id="btnAreasGuardar">Guardar cambios</button></div>');
 
   var buscar = function (id) { return CONFIG.areas.filter(function (a) { return a.id === Number(id); })[0]; };
-  var guardar = function (btn, datos, ok) {
+  var entradas = DR.$$('[data-area-nombre]', c);
+  var barra = DR.$('#areasGuardar', c), btnGuardar = DR.$('#btnAreasGuardar', c);
+
+  var cambios = function () {
+    return entradas.map(function (inp) {
+      var a = buscar(inp.getAttribute('data-area-nombre'));
+      return { a: a, nuevo: inp.value.trim() };
+    }).filter(function (x) { return x.nuevo && x.nuevo !== x.a.nombre; });
+  };
+  var actualizarBarra = function () {
+    var n = cambios().length;
+    entradas.forEach(function (inp) {
+      var a = buscar(inp.getAttribute('data-area-nombre')), v = inp.value.trim();
+      inp.closest('.area-fila').classList.toggle('cambiada', !!v && v !== a.nombre);
+    });
+    barra.classList.toggle('oculto', !n);
+    DR.$('#areasCuenta', c).textContent = n === 1 ? '1 nombre sin guardar' : n + ' nombres sin guardar';
+    btnGuardar.textContent = 'Guardar cambios (' + n + ')';
+  };
+  var marcarError = function (mensaje) {
+    // Los mensajes del servidor empiezan con el nombre actual del área entre «».
+    DR.$$('.area-fila', c).forEach(function (f) { f.classList.remove('con-error'); });
+    CONFIG.areas.forEach(function (a) {
+      if (mensaje.indexOf('«' + a.nombre + '»') !== -1) {
+        var fila = DR.$('[data-area-fila="' + a.id + '"]', c);
+        if (fila && fila.classList.contains('cambiada')) fila.classList.add('con-error');
+      }
+    });
+  };
+  // Activar, desactivar y agregar vuelven a pintar la lista: antes se pregunta por lo escrito.
+  var puedeRepintar = function () {
+    var n = cambios().length;
+    return !n || window.confirm('Tienes ' + n + ' nombre(s) sin guardar. Si sigues, se descartan.');
+  };
+  var guardarUno = function (btn, datos, ok) {
     btn.disabled = true;
     return AT.rpc('rpc_sci_guardar_area', { p: datos }).then(function () {
       DR.toast(ok);
       return CONFIG.refrescar();
     }).catch(function (e) { btn.disabled = false; DR.toast(e.message, 'error'); });
   };
-  DR.$$('[data-area-nombre]', c).forEach(function (inp) {
-    var a = buscar(inp.getAttribute('data-area-nombre')), btn = DR.$('[data-area-guardar="' + a.id + '"]', c);
-    inp.oninput = function () { btn.classList.toggle('oculto', !this.value.trim() || this.value.trim() === a.nombre); };
-    inp.onkeydown = function (ev) { if (ev.key === 'Enter' && !btn.classList.contains('oculto')) btn.click(); };
-  });
-  DR.$$('[data-area-guardar]', c).forEach(function (b) {
-    b.onclick = function () {
-      var a = buscar(this.getAttribute('data-area-guardar')), nuevo = DR.$('[data-area-nombre="' + a.id + '"]', c).value.trim();
-      if (!nuevo || nuevo === a.nombre) return;
-      if (!window.confirm('¿Cambiar «' + a.nombre + '» por «' + nuevo + '»?' + String.fromCharCode(10, 10) + 'Se actualiza también en las encuestas ya registradas. Auditoría 5S no cambia.')) return;
-      guardar(this, { id: a.id, nombre: nuevo }, 'Área renombrada: «' + nuevo + '».');
+
+  entradas.forEach(function (inp, i) {
+    inp.oninput = actualizarBarra;
+    inp.onkeydown = function (ev) {
+      if (ev.key !== 'Enter') return;
+      ev.preventDefault();
+      var siguiente = entradas[i + 1];
+      if (siguiente) siguiente.focus(); else if (cambios().length) btnGuardar.focus();
     };
   });
+
+  btnGuardar.onclick = function () {
+    var lista = cambios();
+    if (!lista.length) return;
+    var salto = String.fromCharCode(10);
+    if (!window.confirm('¿Guardar estos cambios?' + salto + salto +
+        lista.map(function (x) { return '«' + x.a.nombre + '» → «' + x.nuevo + '»'; }).join(salto) +
+        salto + salto + 'Se actualizan también las encuestas ya registradas. Auditoría 5S no cambia.')) return;
+    var btn = this;
+    btn.disabled = true;
+    AT.rpc('rpc_sci_guardar_areas', { p: lista.map(function (x) { return { id: x.a.id, nombre: x.nuevo }; }) })
+      .then(function () {
+        DR.toast(lista.length === 1 ? 'Área renombrada: «' + lista[0].nuevo + '».' : lista.length + ' áreas renombradas.');
+        return CONFIG.refrescar();
+      })
+      .catch(function (e) {
+        // No se vuelve a pintar: lo escrito sigue en pantalla para corregirlo.
+        btn.disabled = false;
+        marcarError(e.message);
+        DR.toast(e.message, 'error');
+      });
+  };
+  DR.$('#btnAreasDescartar', c).onclick = function () {
+    entradas.forEach(function (inp) { inp.value = buscar(inp.getAttribute('data-area-nombre')).nombre; });
+    DR.$$('.area-fila', c).forEach(function (f) { f.classList.remove('con-error'); });
+    actualizarBarra();
+  };
+
   DR.$$('[data-area-activa]', c).forEach(function (b) {
     b.onclick = function () {
       var a = buscar(this.getAttribute('data-area-activa'));
+      if (!puedeRepintar()) return;
       if (a.activo && !window.confirm('¿Desactivar «' + a.nombre + '»? Deja de ofrecerse en la encuesta; lo ya registrado se conserva.')) return;
-      guardar(this, { id: a.id, activo: !a.activo }, a.activo ? 'Área desactivada.' : 'Área activada.');
+      guardarUno(this, { id: a.id, activo: !a.activo }, a.activo ? 'Área desactivada.' : 'Área activada.');
     };
   });
   var agregar = function () {
     var inp = DR.$('#inpNuevaArea'), nombre = inp.value.trim();
     if (!nombre) { inp.focus(); return; }
-    guardar(DR.$('#btnNuevaArea'), { nombre: nombre }, '«' + nombre + '» agregada.');
+    if (!puedeRepintar()) return;
+    guardarUno(DR.$('#btnNuevaArea'), { nombre: nombre }, '«' + nombre + '» agregada.');
   };
   DR.$('#btnNuevaArea').onclick = agregar;
   DR.$('#inpNuevaArea').onkeydown = function (ev) { if (ev.key === 'Enter') agregar(); };

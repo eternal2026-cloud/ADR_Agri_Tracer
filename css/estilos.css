@@ -870,6 +870,10 @@ td.mp-sangria{padding-left:26px}
 .area-campo small{display:block;margin-top:4px;font-size:12.5px;color:var(--texto-3)}
 .area-acciones{display:flex;gap:8px}
 .area-fila.inactiva input{opacity:.55;text-decoration:line-through}
+.area-fila.cambiada input{border-color:var(--dr-naranja);box-shadow:inset 3px 0 0 var(--dr-naranja)}
+.area-fila.con-error input{border-color:var(--dr-fuego);box-shadow:inset 3px 0 0 var(--dr-fuego),0 0 0 2px rgba(185,69,22,.25)}
+.areas-guardar{position:sticky;bottom:calc(var(--alto-nav) + var(--seguro-inf) + 8px);z-index:5;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin-top:14px;padding:10px 12px;border-radius:14px;background:var(--panel-2);border:1px solid var(--dr-naranja);box-shadow:var(--sombra)}
+.areas-guardar span{flex:1 1 140px;color:var(--texto-2);font-size:13.5px}
 .segmento span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 
 /* ==================== CLIENTE INTERNO · título largo y mejoras por ítem ==================== */

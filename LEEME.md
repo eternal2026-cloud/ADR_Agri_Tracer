@@ -43,8 +43,13 @@ respaldado por **Supabase** (Postgres + Auth + Edge Functions + Vault + pg_cron)
   (Producción → Producción Cítricos, Producción Arándano, Producción Uva Limpieza).
   Se creó con los mismos id y nombres que ya tenía el módulo, así que las encuestas y
   permisos anteriores siguen igual.
-- Agregar, renombrar (también cambia lo ya registrado) y desactivar: `rpc_sci_guardar_area`.
-  El nombre anterior queda en `sci_areas.alias` para el importador de Excel.
+- Agregar y desactivar: `rpc_sci_guardar_area`. Renombrar (también cambia lo ya registrado):
+  se editan todos los nombres y se guardan juntos con «Guardar cambios»
+  (`rpc_sci_guardar_areas`, migración 0023): una sola transacción, o se guardan todos o
+  ninguno, y admite intercambiar nombres entre dos áreas. Si falla, lo escrito sigue en
+  pantalla y se marca la fila con el problema.
+- El nombre anterior queda en `sci_areas.alias` para el importador de Excel. Otra área puede
+  tomar ese nombre anterior: el nombre pasa a ella y se quita del historial de la primera.
 - **Su área** por usuario (`perfiles.sci_area`, en Cliente interno → Evaluadores): queda
   fija como área evaluadora de sus encuestas (lo exige `trg_sci_permisos`).
 - **Encuesta**: campaña por defecto «<Cultivo> <año actual>» (ej. Arándano 2026), evaluador

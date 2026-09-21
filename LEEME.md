@@ -6,13 +6,12 @@ respaldado por **Supabase** (Postgres + Auth + Edge Functions + Vault + pg_cron)
 ## Estado actual
 
 - **Proyecto Supabase** `agritracer-don-ricardo` (ref `ptsvriudoilsyofgccsb`) con
-  migraciones `supabase/migrations/0001..0017` aplicadas (0012: Auditoría 5S,
+  migraciones `supabase/migrations/0001..0016` aplicadas (0012: Auditoría 5S,
   0013: Auditoría 5S por cultivo, 0014: observaciones 5S por área,
   0015: Revisión del plan de mantenimiento, 0016: Satisfacción del cliente
-  interno y cultivo en los tiempos de ciclo, 0017: acceso con correo corporativo + PIN).
+  interno y cultivo en los tiempos de ciclo).
 - **Edge Functions desplegadas** (código en `supabase/functions/`):
-  - `admin-usuarios` — dar acceso por correo (con bienvenida), reenviar acceso, correo de prueba, cambiar rol, desactivar.
-  - `correo-bot` — Send Email Hook: PIN de ingreso con el diseño del Bot Don Ricardo (Microsoft Graph).
+  - `admin-usuarios` — crear usuarios, restablecer contraseñas, cambiar rol, desactivar.
   - `sync-sheets` — espejo de auditoría hacia Google Sheets.
 - **Sincronización automática**: `pg_cron` revisa cada 5 min y dispara
   `sync-sheets` cuando pasaron los minutos configurados (60 por defecto).
@@ -49,63 +48,16 @@ Mismo orden del organigrama de Ingeniería de Procesos (lista `GRUPOS` en `index
 3. **Datos históricos del Excel**: `Config → Ajustes → Importar histórico desde
    Excel` → elegir `5.1. TIEMPO DE CICLO ACTUALIZADO.xlsx` → **Importar 234 ciclos**.
 
-## Acceso: correo corporativo + PIN del Bot Don Ricardo (migración 0017)
-
-- Los usuarios escriben su **correo corporativo** (`@adr.com.pe`, parámetro
-  `CORREO_DOMINIOS`) y reciben un **PIN de 6 dígitos** del *Bot Don Ricardo ·
-  Gestión de Procesos*. No hay contraseñas ni contraseña temporal: el PIN es la
-  validación. Solo reciben PIN los correos que un administrador dio de alta.
-- **Solo la cuenta `admin`** entra con usuario y contraseña («Ingresar como
-  administrador» en la pantalla de inicio).
-- El correo lo arma la Edge Function **`correo-bot`** (Send Email Hook de Supabase
-  Auth) con el diseño Don Ricardo (franja azul-naranja-verde, PIN grande, firma del
-  bot con logo y sello B incrustados) y lo envía por **Microsoft Graph** desde el
-  buzón `CORREO_REMITENTE` (hoy `rhaya@adr.com.pe`). Se usa Graph y no SMTP porque
-  Microsoft 365 desactiva por defecto el SMTP con usuario y contraseña desde fines
-  de 2026. Plantillas y envío en `supabase/functions/_shared/correo.ts`.
-- `admin-usuarios` crea usuarios por correo (sin contraseña) y envía la
-  **bienvenida**; también *Reenviar acceso* y *Enviar correo de prueba*.
-- Las cuentas de prueba (ronald, juanito, luis) se eliminaron; sus registros se
-  conservan con el autor en blanco.
-
-### Activación (una sola vez, en este orden)
-
-1. **TI de ADR (Microsoft Entra ID)** — registrar una aplicación «AgriTracer Bot»:
-   - *API permissions* → Microsoft Graph → **Application** → `Mail.Send` →
-     **Grant admin consent**.
-   - *Certificates & secrets* → nuevo *client secret* (anotar el valor).
-   - Recomendado: limitar la app al buzón del bot con una *Application Access
-     Policy* (o RBAC for Applications) de Exchange Online, para que no pueda enviar
-     como cualquier usuario. Ideal: un buzón compartido propio del bot
-     (p. ej. `gestion.procesos@adr.com.pe`) en lugar de un buzón personal.
-   - Entregar: **Directory (tenant) ID**, **Application (client) ID** y el **secret**.
-2. **Supabase → Edge Functions → Secrets**: crear `MS_TENANT_ID`, `MS_CLIENT_ID` y
-   `MS_CLIENT_SECRET` con esos valores.
-3. **AgriTracer → Usuarios y configuración → Usuarios → Correo del Bot Don
-   Ricardo**: revisar buzón, dominios y dirección de la app, **Guardar** y **Enviar
-   correo de prueba**. Si llega, Graph está listo.
-4. **Supabase → Authentication → Hooks → Send Email hook** → tipo *HTTPS* → URL
-   `https://ptsvriudoilsyofgccsb.supabase.co/functions/v1/correo-bot` →
-   **Generate secret** → copiarlo → guardar el hook → crear el secret
-   `SEND_EMAIL_HOOK_SECRET` (valor completo `v1,whsec_…`) en Edge Functions → Secrets.
-5. **Supabase → Authentication → Providers → Email**: *Email OTP expiration* =
-   **600** segundos (el correo dice «vence en 10 minutos») y *Email OTP length* = **6**.
-6. Crear los usuarios reales desde la app y probar el ingreso con un correo.
-
-Mientras el paso 4 no esté hecho, Supabase no envía PIN con el diseño del bot; el
-admin siempre puede entrar con usuario y contraseña.
-
 ## Cómo crear usuarios
 
-1. Entra como **admin** → tarjeta **Usuarios y configuración**.
-2. Escribe el **nombre completo** y el **correo corporativo**.
+1. Entra con una cuenta **admin** → tarjeta **Usuarios y configuración**.
+2. Escribe el **nombre completo**; el usuario se sugiere solo (ej. `juan.perez`).
 3. Elige qué podrá hacer: **Captura en campo**, **Solo consulta** o **Administrador**.
-4. **Dar acceso y enviar bienvenida** → el Bot Don Ricardo le envía los pasos. Si el
-   correo no sale, el usuario igual queda creado y luego se usa *Reenviar acceso*.
-5. La persona abre la página de inicio, escribe su correo y entra con el PIN.
+4. **Crear usuario** → aparece su usuario y una contraseña temporal con botones
+   **Copiar** y **Enviar por WhatsApp**. No se vuelve a mostrar.
+5. La persona entra a la página de inicio y crea su propia contraseña.
 
-Desde la misma lista: cambiar rol, *Reenviar acceso* o *Desactivar* (bloquea el
-ingreso y deja de recibir PIN).
+Desde la misma lista: *Nueva contraseña*, cambiar rol o *Desactivar*.
 
 ## Datos históricos del Excel (actualización repetible)
 
@@ -339,18 +291,12 @@ satisfaccion/            Satisfacción del cliente interno (Resultados · Encues
 campo/uva/               Toma de tiempos campo · Uva (en definición)
 
 supabase/migrations/     Esquema SQL completo (ya aplicado)
-supabase/functions/      Edge Functions admin-usuarios, correo-bot y sync-sheets (ya desplegadas)
-  _shared/correo.ts      Plantillas HTML del bot y envío por Microsoft Graph
-  _shared/imagenes.ts    Logo y sello B de la firma (base64, van incrustados en el correo)
+supabase/functions/      Edge Functions admin-usuarios y sync-sheets (ya desplegadas)
 JSON/                    Clave de Google — ignorada por git, NUNCA subir
 ```
 
 ## Notas de seguridad
 
-- Ingreso sin contraseñas: PIN de un solo uso por correo, solo para correos dados de alta
-  y de los dominios de `CORREO_DOMINIOS` (lo validan la app, `admin-usuarios` y `correo-bot`).
-- `correo-bot` se despliega sin verificación de JWT y valida la firma del hook
-  (`SEND_EMAIL_HOOK_SECRET`). Las credenciales de Microsoft viven en los secretos de Supabase.
 - Toda escritura sensible pasa por RPC que validan el rol con `exigir_rol()`;
   sin sesión o sin perfil activo → "No autorizado".
 - Solo `rpc_registrar_escaneo` es pública a propósito (escaneo sin login).

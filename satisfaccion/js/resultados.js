@@ -261,7 +261,7 @@ RSCI.descargarBD = function () {
     var sug = {};
     RSCI.filas.forEach(function (f) { sug[f.codigo] = f; });
     var libro = new ExcelJS.Workbook();
-    libro.creator = 'AgriTracer · Don Ricardo';
+    libro.creator = 'Integra · Don Ricardo';
     var hoja = libro.addWorksheet('Data Power BI');
     var fechaExcel = function (f) { var m = String(f || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])) : null; };
     hoja.addTable({

@@ -1,4 +1,4 @@
-# AgriTracer · Don Ricardo — Tiempos de Ciclo + Reubicación de Personal
+# Integra · Don Ricardo — Tiempos de Ciclo + Reubicación de Personal
 
 Sitio único en **Vercel** (HTML/CSS/JS plano, sin build, anime.js UMD)
 respaldado por **Supabase** (Postgres + Auth + Edge Functions + Vault + pg_cron).
@@ -21,6 +21,19 @@ respaldado por **Supabase** (Postgres + Auth + Edge Functions + Vault + pg_cron)
   como Editor con la cuenta de servicio (verificado).
 - **Vercel no necesita variables de entorno**: las funciones de administración
   viven en Supabase.
+
+## Nombre y dirección web
+
+- La app se llama **Integra** (antes AgriTracer). Se renombró solo lo visible: títulos,
+  portada, manifiesto, informes y mensajes. Quedan con el nombre anterior, a propósito,
+  los identificadores técnicos: el dominio interno de las cuentas `@agritracer.interno`
+  (cambiarlo rompería todos los ingresos), las claves de guardado del celular
+  (`agritracer.*`, conservan borradores), el proyecto Supabase y el cron.
+- Todos los enlaces internos son relativos, así que cambiar la dirección en Vercel
+  (Settings → Domains) no rompe nada. El ingreso con usuario y contraseña no depende de
+  la URL; conviene igual actualizar *Site URL* en Supabase → Authentication → URL
+  Configuration. Quien tenga la app «instalada» en el celular debe volver a agregarla
+  desde la nueva dirección.
 
 ## Portada por grupos
 

@@ -275,7 +275,7 @@ INF.pdfResultados = function (opc) {
     fuente('normal', 8, GRIS);
     var ahora = new Date();
     doc.text('Generado el ' + S5.fecha(S5.hoy()) + ' a las ' + S5._p(ahora.getHours()) + ':' + S5._p(ahora.getMinutes()) +
-      ((AT.perfil && AT.perfil.nombre) ? ' por ' + AT.perfil.nombre : '') + ' · AgriTracer', M, y);
+      ((AT.perfil && AT.perfil.nombre) ? ' por ' + AT.perfil.nombre : '') + ' · Integra', M, y);
     y += 7;
 
     /* ---- tarjetas por fecha */
@@ -384,7 +384,7 @@ INF.pdfResultados = function (opc) {
         var wp = doc.internal.pageSize.getWidth(), hp = doc.internal.pageSize.getHeight();
         color('setDrawColor', LINEA); doc.setLineWidth(0.3); doc.line(M, hp - 11, wp - M, hp - 11);
         fuente('normal', 7.5, GRIS);
-        doc.text('AgriTracer · Ingeniería de Procesos · Don Ricardo', M, hp - 6.5);
+        doc.text('Integra · Ingeniería de Procesos · Don Ricardo', M, hp - 6.5);
         doc.text(cul.nombre + (opc.area ? ' · ' + opc.area.nombre : ''), wp / 2, hp - 6.5, { align: 'center' });
         doc.text('Página ' + p + ' de ' + paginas, wp - M, hp - 6.5, { align: 'right' });
       }
@@ -552,7 +552,7 @@ INF.excelObservaciones = function (opc) {
     notas = r[0];
     bd = r[1] || [];
     var wb = new ExcelJS.Workbook();
-    wb.creator = 'AgriTracer · Ingeniería de Procesos · Don Ricardo';
+    wb.creator = 'Integra · Ingeniería de Procesos · Don Ricardo';
     wb.created = new Date();
     var usados = [], fotos = [], porArea = {};
     // El área es de la observación (vive en la zona), no de su auditoría de origen.

@@ -1,6 +1,6 @@
 /* ============================================================================
  * supabase-cliente.js — CONEXIÓN A SUPABASE, SESIÓN Y HELPERS DE RPC
- * Namespace AT ("AgriTracer"). Requiere vendor/supabase.min.js cargado antes.
+ * Namespace AT ("Integra"). Requiere vendor/supabase.min.js cargado antes.
  * ==========================================================================*/
 
 var SB_URL = 'https://ptsvriudoilsyofgccsb.supabase.co';

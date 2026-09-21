@@ -28,13 +28,17 @@ SCI.cargar = function (forzar) {
   if (SCI._carga && !forzar) return SCI._carga;
   SCI._carga = Promise.all([
     sb.from('s5_cultivos').select('id,nombre,icono,color,campana,activo,orden').order('orden').order('nombre'),
-    sb.from('s5_areas').select('id,nombre,alias,activo,orden').order('orden').order('nombre'),
+    sb.from('s5_areas').select('id,nombre,nombre_ci,alias,activo,orden').order('orden').order('nombre'),
     sb.from('listas_maestras').select('valor,codigo,activo,orden').eq('tipo', 'fundo').order('orden').order('valor'),
     sb.from('sci_items').select('*').order('id')
   ]).then(function (r) {
     r.forEach(function (x) { if (x.error) throw new Error(x.error.message); });
     SCI.cultivos = r[0].data || [];
-    SCI.areas = r[1].data || [];
+    // En este módulo el área se muestra con su nombre legal (Config → Áreas); el de 5S y los
+    // anteriores quedan como alias para reconocerlos al importar Excel.
+    SCI.areas = (r[1].data || []).map(function (x) {
+      return { id: x.id, nombre: x.nombre_ci || x.nombre, nombre_5s: x.nombre, alias: (x.alias || []).concat(x.nombre_ci ? [x.nombre] : []), activo: x.activo, orden: x.orden };
+    });
     SCI.fundos = r[2].data || [];
     SCI.items = r[3].data || [];
     if (!SCI.items.length) throw new Error('Falta aplicar la migración 0016 (Satisfacción del cliente interno) en Supabase.');

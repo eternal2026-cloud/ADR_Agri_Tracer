@@ -181,7 +181,7 @@ ENC.pasoResumen = function () {
   var faltan = ENC.faltanDatos().map(function (x) { return 'Falta ' + x + '.'; })
     .concat(ENC.faltanItems().length ? ['Faltan los ítems ' + ENC.faltanItems().join(', ') + '.'] : []);
   var ae = SCI.area(b.area_evaluada_id), ao = SCI.area(b.area_evaluadora_id), cul = SCI.cultivo(b.cultivo_id);
-  var grupo = ao ? SCI.grupo(ao.nombre, b.sub_area, b.planta, cul && cul.nombre) : '—';
+  var grupo = ao ? SCI.grupo(ao.nombre_5s === 'Producción' ? 'Producción' : ao.nombre, b.sub_area, b.planta, cul && cul.nombre) : '—';
   return UI.panel('4. Resumen', '', '<div class="sci-resumen">' +
       '<div class="sci-radar-caja">' + SCI.radarSvg([{ nombre: grupo, color: '#76B729', criterios: calc.criterios }]) + '</div>' +
       '<div><div class="sci-kpi-grande" style="--c:' + SCI.colorPct(calc.total) + '"><span>Resultado</span><b>' + SCI.pct(calc.total) + '</b></div>' +

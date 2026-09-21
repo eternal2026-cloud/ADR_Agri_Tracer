@@ -4,7 +4,7 @@
  * (admin-usuarios, sync-sheets): no dependen de variables en Vercel.
  * ==========================================================================*/
 
-var CONFIG = { tab: 'usuarios', parametros: {}, listas: [], usuarios: [], sync: null, rolNuevo: 'captura', usuarioEditado: false };
+var CONFIG = { tab: 'usuarios', parametros: {}, listas: [], usuarios: [], sync: null, rolNuevo: 'captura', usuarioEditado: false, fundosNuevo: [] };
 
 CONFIG.TABS = [
   { id: 'usuarios', t: 'Usuarios', ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.8-3.2 3-5 5.5-5s4.7 1.8 5.5 5"/><path d="M17 8v6M14 11h6"/></svg>' },
@@ -108,6 +108,8 @@ CONFIG.tabUsuarios = function (c) {
     '<div class="campo"><label for="nuUsuario">Usuario para ingresar</label><input id="nuUsuario" placeholder="juan.perez" autocapitalize="none" autocomplete="off" spellcheck="false"><div class="ayuda-campo">Se sugiere solo; puedes cambiarlo.</div></div>' +
     '<div class="campo"><label for="nuArea">Área (opcional)</label><input id="nuArea" placeholder="Ej. Calidad campo" autocomplete="off"></div>' +
     '<div class="campo ancho"><label>¿Qué podrá hacer?</label>' + roles + '</div>' +
+    '<div class="campo ancho"><label>Fundos donde registra ciclos</label>' + CONFIG.selectorFundos('nuFundos', CONFIG.fundosNuevo) +
+      '<div class="ayuda-campo">Marca uno o más para que solo pueda elegir esos. Sin marcar = todos los fundos.</div></div>' +
     '<div class="campo ancho"><label for="nuClave">Contraseña (opcional)</label><input id="nuClave" placeholder="Déjalo vacío y se genera una temporal" autocomplete="off"></div>' +
     '</div><div class="acciones"><button type="button" class="btn verde grande" id="btnCrearUsuario">' + DR.ICONOS.mas + '<span>Crear usuario</span></button></div>';
 
@@ -116,13 +118,15 @@ CONFIG.tabUsuarios = function (c) {
     var pills = UI.pill(CONFIG.NOMBRE_ROL[u.rol] || u.rol, { 'Administrador': 'naranja', 'Captura en campo': 'verde', 'Solo consulta': 'azul' }) +
       (u.activo ? '' : ' <span class="pill rojo">Desactivado</span>') +
       (u.activo && u.debe_cambiar_password ? ' <span class="pill gris">Aún no crea su contraseña</span>' : '') +
-      (u.id === yo ? ' <span class="pill gris">Tú</span>' : '');
+      (u.id === yo ? ' <span class="pill gris">Tú</span>' : '') +
+      (u.rol === 'admin' ? '' : ' <span class="pill ' + ((u.fundos || []).length ? 'azul' : 'gris') + '">' + DR.esc(CONFIG.textoFundos(u.fundos)) + '</span>');
     var selector = '<select data-rol-de="' + u.id + '"' + (u.id === yo ? ' disabled' : '') + ' aria-label="Rol de ' + DR.esc(u.nombre) + '">' +
       CONFIG.ROLES.map(function (r) { return '<option value="' + r.id + '"' + (r.id === u.rol ? ' selected' : '') + '>' + r.t + '</option>'; }).join('') + '</select>';
     return '<div class="usuario-card' + (u.activo ? '' : ' inactivo') + '"><div class="ini">' + CONFIG.iniciales(u.nombre || u.usuario) + '</div>' +
       '<div class="u-cuerpo"><div class="u-nombre">' + DR.esc(u.nombre) + '</div>' +
       '<div class="u-det">' + DR.esc(u.usuario) + (u.area ? ' · ' + DR.esc(u.area) : '') + '</div><div class="u-pills">' + pills + '</div></div>' +
       '<div class="u-acciones">' + selector +
+        (u.rol === 'admin' ? '' : '<button type="button" class="btn sec chico" data-fundos-de="' + u.id + '">Fundos</button>') +
         '<button type="button" class="btn sec chico" data-reset="' + u.id + '">Nueva contraseña</button>' +
         (u.id === yo ? '' : '<button type="button" class="btn sec chico" data-activo-de="' + u.id + '" data-activo="' + u.activo + '">' + (u.activo ? 'Desactivar' : 'Reactivar') + '</button>') +
       '</div></div>';
@@ -145,6 +149,10 @@ CONFIG.tabUsuarios = function (c) {
     };
   });
   DR.$('#btnCrearUsuario').onclick = CONFIG.crearUsuario;
+  CONFIG.enlazarSelectorFundos('nuFundos', function (lista) { CONFIG.fundosNuevo = lista; });
+  DR.$$('[data-fundos-de]', c).forEach(function (b) {
+    b.onclick = function () { CONFIG.editarFundos(CONFIG.buscarUsuario(this.getAttribute('data-fundos-de'))); };
+  });
 
   DR.$$('[data-reset]', c).forEach(function (b) {
     b.onclick = function () {
@@ -180,6 +188,58 @@ CONFIG.tabUsuarios = function (c) {
   });
 };
 
+/* ---- fundos asignados: el usuario solo puede elegir estos al registrar ciclos ([] = todos) ---- */
+CONFIG.fundosDisponibles = function (extra) {
+  var l = CONFIG.listas.filter(function (x) { return x.tipo === 'fundo' && x.activo; }).map(function (x) { return x.valor; });
+  (extra || []).forEach(function (f) { if (l.indexOf(f) < 0) l.push(f); });
+  return l;
+};
+CONFIG.textoFundos = function (fundos) {
+  fundos = fundos || [];
+  if (!fundos.length) return 'Todos los fundos';
+  return fundos.length <= 2 ? fundos.join(' · ') : fundos.length + ' fundos';
+};
+CONFIG.selectorFundos = function (id, marcados) {
+  var ops = CONFIG.fundosDisponibles(marcados);
+  if (!ops.length) return '<span class="nota-vacia">No hay fundos. Agrégalos en Config → Listas.</span>';
+  return '<div class="opciones" id="' + id + '">' + ops.map(function (f) {
+    return '<button type="button" class="opcion' + (marcados.indexOf(f) > -1 ? ' activa' : '') + '" data-fundo="' + DR.esc(f) + '">' + DR.esc(f) + '</button>';
+  }).join('') + '</div>';
+};
+CONFIG.enlazarSelectorFundos = function (id, alCambiar) {
+  var grupo = DR.$('#' + id);
+  if (!grupo) return;
+  grupo.onclick = function (ev) {
+    var op = ev.target.closest('.opcion');
+    if (!op) return;
+    op.classList.toggle('activa');
+    if (DR.anima) anime({ targets: op, scale: [0.9, 1], duration: 320, easing: 'easeOutBack' });
+    alCambiar(DR.$$('.opcion.activa', grupo).map(function (o) { return o.getAttribute('data-fundo'); }));
+  };
+};
+CONFIG.editarFundos = function (u) {
+  if (!u) return;
+  var elegidos = (u.fundos || []).slice();
+  UI.abrirHoja('<div class="asa"></div>' +
+    '<div class="res-nombre">' + DR.esc(u.nombre) + '</div>' +
+    '<div class="res-dni">Fundos donde puede registrar ciclos</div>' +
+    '<div style="margin-top:14px">' + CONFIG.selectorFundos('hojaFundos', elegidos) + '</div>' +
+    '<div class="aviso" style="margin-top:14px">Solo verá y podrá elegir los fundos marcados, y solo podrá seguir ciclos de esos fundos. <b>Sin marcar ninguno = todos los fundos.</b></div>' +
+    '<div class="acciones"><button type="button" class="btn sec" id="btnFundosCancelar" style="flex:1">Cancelar</button>' +
+    '<button type="button" class="btn verde" id="btnFundosGuardar" style="flex:1">Guardar</button></div>');
+  CONFIG.enlazarSelectorFundos('hojaFundos', function (lista) { elegidos = lista; });
+  DR.$('#btnFundosCancelar').onclick = UI.cerrarHoja;
+  DR.$('#btnFundosGuardar').onclick = function () {
+    var btn = this;
+    btn.disabled = true;
+    AT.llamarFuncion('admin-usuarios', { accion: 'actualizar', id: u.id, fundos: elegidos }).then(function () {
+      UI.cerrarHoja();
+      DR.toast(u.nombre + ': ' + CONFIG.textoFundos(elegidos) + '.');
+      return CONFIG.refrescar();
+    }).catch(function (e) { btn.disabled = false; DR.toast(e.message, 'error'); });
+  };
+};
+
 CONFIG.buscarUsuario = function (id) { return CONFIG.usuarios.filter(function (u) { return u.id === id; })[0]; };
 
 CONFIG.crearUsuario = function () {
@@ -190,8 +250,9 @@ CONFIG.crearUsuario = function () {
   btn.classList.add('cargando');
   AT.llamarFuncion('admin-usuarios', {
     accion: 'crear', nombre: nombre, usuario: usuario, area: DR.$('#nuArea').value.trim(),
-    rol: CONFIG.rolNuevo, password: DR.$('#nuClave').value
+    rol: CONFIG.rolNuevo, password: DR.$('#nuClave').value, fundos: CONFIG.rolNuevo === 'admin' ? [] : CONFIG.fundosNuevo
   }).then(function (r) {
+    CONFIG.fundosNuevo = [];
     CONFIG.mostrarCredenciales(r, 'creado');
     return CONFIG.refrescar();
   }).catch(function (e) {

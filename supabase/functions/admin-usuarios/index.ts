@@ -4,9 +4,10 @@
  * incluida en las Edge Functions, así que no hay variables que configurar.
  * Solo un admin activo puede llamarla (se valida el JWT de su sesión).
  *
- * POST { accion: 'crear', usuario, nombre, area, rol, password? }
+ * POST { accion: 'crear', usuario, nombre, area, rol, password?, fundos? }
  * POST { accion: 'reset', id }
- * POST { accion: 'actualizar', id, rol?, activo?, nombre?, area? }
+ * POST { accion: 'actualizar', id, rol?, activo?, nombre?, area?, fundos? }
+ * fundos: lista de fundos donde puede registrar ciclos ([] = todos).
  * ==========================================================================*/
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
@@ -45,6 +46,12 @@ function claveTemporal(): string {
   return s;
 }
 
+/** Lista de fundos limpia: textos sin repetir y sin vacíos. */
+function limpiarFundos(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return [...new Set(v.map((x) => String(x || '').trim()).filter(Boolean))].slice(0, 100);
+}
+
 type Perfil = { id: string; usuario: string; nombre: string; rol: string; activo: boolean };
 
 const anotar = (sb: SupabaseClient, yo: Perfil, accion: string, detalle: string) =>
@@ -75,6 +82,7 @@ async function crear(sb: SupabaseClient, yo: Perfil, b: Record<string, unknown>)
 
   const { error: insErr } = await sb.from('perfiles').insert({
     id: nuevo.user.id, usuario, nombre, area: String(b.area || '').trim(), rol, activo: true, debe_cambiar_password: true,
+    fundos: limpiarFundos(b.fundos),
   });
   if (insErr) {
     await sb.auth.admin.deleteUser(nuevo.user.id).catch(() => {});
@@ -109,6 +117,7 @@ async function actualizar(sb: SupabaseClient, yo: Perfil, b: Record<string, unkn
   if (b.activo !== undefined) cambios.activo = !!b.activo;
   if (b.nombre !== undefined) cambios.nombre = String(b.nombre).trim() || p.nombre;
   if (b.area !== undefined) cambios.area = String(b.area).trim();
+  if (b.fundos !== undefined) cambios.fundos = limpiarFundos(b.fundos);
   if (id === yo.id && (cambios.activo === false || (cambios.rol && cambios.rol !== 'admin'))) {
     return responder({ error: 'No puedes quitarte a ti mismo el acceso de administrador.' }, 400);
   }

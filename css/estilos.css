@@ -791,3 +791,36 @@ td.mp-sangria{padding-left:26px}
 .sci-kpi-grande{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;margin-bottom:10px;border-radius:14px;border:1px solid var(--borde);border-left:4px solid var(--c);background:#17120F}
 .sci-kpi-grande span{color:var(--texto-2)}
 .sci-kpi-grande b{font-size:28px;font-weight:600;color:var(--c)}
+
+/* ==================== TIEMPOS · GRÁFICO POR FUNDO (barras horizontales) ==================== */
+.gf-barras{padding-top:2px}
+.gf-leyenda{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;font-size:12.5px;color:var(--texto-3);margin-bottom:12px}
+.gf-muestra-umbral{width:16px;border-top:2px dashed #E07A3F;margin-left:2px}
+.gf-muestra-exceso{width:12px;height:10px;border-radius:3px;background:#B94A02;margin-left:10px}
+.gf-fila{display:grid;grid-template-columns:minmax(96px,34%) 1fr 58px;gap:4px 12px;align-items:center;margin-bottom:12px;font-size:13.5px}
+.gf-nombre{color:var(--texto-2);line-height:1.25;overflow-wrap:anywhere}
+.gf-pista{position:relative;height:16px;background:#2A221C;border-radius:4px}
+.gf-barra{position:absolute;left:0;top:0;bottom:0;width:0;background:#0097CE;border-radius:0 4px 4px 0}
+.gf-barra.sobre{background:#B94A02}
+.gf-umbral{position:absolute;top:-4px;bottom:-4px;border-left:2px dashed #E07A3F;z-index:1}
+.gf-cifra{text-align:right;color:var(--texto);font-variant-numeric:tabular-nums;font-weight:500;white-space:nowrap}
+.gf-alerta{font-size:10px;color:#FFA36B}
+@media (max-width:520px){
+  .gf-fila{grid-template-columns:1fr 52px;margin-bottom:14px}
+  .gf-nombre{grid-column:1/-1}
+}
+
+/* ==================== CAPTURA · VARIOS CICLOS A LA VEZ ==================== */
+.ciclo-item{margin-bottom:10px}
+.ciclo-item .ciclo-card{margin-bottom:0}
+.ciclo-item.con-rapido .ciclo-card{border-bottom-left-radius:6px;border-bottom-right-radius:6px}
+.cc-rapido{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:3px;padding:11px 12px;border-radius:6px 6px 14px 14px;border:1px solid color-mix(in srgb,var(--c) 45%,var(--borde));border-left:4px solid var(--c);background:color-mix(in srgb,var(--c) 14%,#1A1411);color:var(--texto);font:500 14.5px var(--fuente);cursor:pointer}
+.cc-rapido svg{width:18px;height:18px;color:var(--c)}
+.cc-rapido:disabled{opacity:.55}
+.cc-rapido b{font-weight:600}
+.wiz-otros{display:flex;gap:8px;overflow-x:auto;margin:-6px 0 14px;padding-bottom:4px;scrollbar-width:none}
+.wiz-otros::-webkit-scrollbar{display:none}
+.wiz-otros span.etq{flex:0 0 auto;align-self:center;font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--texto-3)}
+.wiz-otro{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-start;padding:7px 12px;border-radius:12px;border:1px solid var(--borde);border-left:3px solid var(--c);background:var(--panel);color:var(--texto);font:500 14px var(--fuente);cursor:pointer;text-align:left}
+.wiz-otro small{font-size:12px;color:var(--texto-3);font-weight:400;white-space:nowrap}
+.aviso-fundos{font-size:13.5px;color:var(--texto-3);margin:8px 2px 0}

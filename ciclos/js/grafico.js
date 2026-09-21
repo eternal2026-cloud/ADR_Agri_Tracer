@@ -1,37 +1,38 @@
 /* ============================================================================
- * grafico.js — SVG de barras verticales, tiempo de ciclo total por fundo
- * (mismo patrón que VISOR_TIEMPO_CICLO/Grafico.html)
+ * grafico.js — Barras horizontales: tiempo de ciclo total por fundo.
+ * Horizontales para que el nombre del fundo se lea completo (antes, en barras
+ * verticales, se cortaba a 9 letras). En celular el nombre pasa a otra línea.
  * ==========================================================================*/
 var GRAFICO = {};
 
 GRAFICO.barrasFundo = function (items, umbral) {
   if (!items.length) return '<div class="vacio">Sin datos para graficar.</div>';
-  var alto = 200, base = 26, pad = 30;
-  var ancho = Math.max(560, items.length * 66);
-  var max = Math.max(Number(umbral) || 0, items.reduce(function (m, i) { return Math.max(m, i.valor); }, 0)) * 1.08 || 1;
-  var escala = function (v) { return (alto - base) * (v / max); };
+  umbral = Number(umbral) || 0;
+  var max = Math.max(umbral, items.reduce(function (m, i) { return Math.max(m, Number(i.valor) || 0); }, 0)) * 1.05 || 1;
+  var pct = function (v) { return Math.max(0, Math.min(100, (Number(v) || 0) / max * 100)); };
+  var linea = umbral ? '<span class="gf-umbral" style="left:' + pct(umbral).toFixed(2) + '%"></span>' : '';
 
-  var svg = '<div class="grafico" style="width:100%;overflow-x:auto"><svg viewBox="0 0 ' + ancho + ' ' + (alto + 30) + '" preserveAspectRatio="xMinYMid meet" style="display:block;min-width:520px">';
+  var h = '<div class="gf-barras">';
   if (umbral) {
-    var y = alto - base - escala(umbral);
-    svg += '<line x1="0" y1="' + y + '" x2="' + ancho + '" y2="' + y + '" stroke="#B94A02" stroke-width="1.4" stroke-dasharray="6,5"/>';
-    svg += '<text x="6" y="' + (y - 6) + '" fill="#B94A02" font-size="10">Umbral ' + Math.round(umbral) + ' min</text>';
+    h += '<div class="gf-leyenda"><span class="gf-muestra-umbral"></span>Umbral ' + DR.num(umbral, 0) + ' min' +
+      '<span class="gf-muestra-exceso"></span>Supera el umbral</div>';
   }
-  items.forEach(function (it, i) {
-    var w = 34, x = pad + i * (ancho - pad) / items.length;
-    var h = escala(it.valor), y2 = alto - base - h;
-    svg += '<rect class="gf-barra" data-y="' + y2 + '" data-h="' + h + '" x="' + x + '" y="' + (alto - base) + '" width="' + w + '" height="0" rx="4" fill="' + (umbral && it.valor > umbral ? '#B94A02' : '#0097CE') + '"></rect>';
-    svg += '<text x="' + (x + w / 2) + '" y="' + (alto - base + 16) + '" text-anchor="middle" font-size="9" fill="#B7A99C">' + DR.esc(String(it.etq).substring(0, 9)) + '</text>';
-    svg += '<text x="' + (x + w / 2) + '" y="' + (y2 - 6) + '" text-anchor="middle" font-size="9.5" fill="#F1EBE4">' + DR.num(it.valor, 0) + '</text>';
+  items.forEach(function (it) {
+    var sobre = umbral && it.valor > umbral;
+    var titulo = it.etq + ': ' + DR.num(it.valor, 1) + ' min' + (sobre ? ' · supera el umbral' : '');
+    h += '<div class="gf-fila" title="' + DR.esc(titulo) + '">' +
+      '<div class="gf-nombre">' + DR.esc(it.etq) + '</div>' +
+      '<div class="gf-pista">' + linea + '<span class="gf-barra' + (sobre ? ' sobre' : '') + '" data-ancho="' + pct(it.valor).toFixed(2) + '"></span></div>' +
+      '<div class="gf-cifra">' + DR.num(it.valor, 0) + (sobre ? ' <span class="gf-alerta" aria-label="Supera el umbral">▲</span>' : '') + '</div>' +
+    '</div>';
   });
-  svg += '</svg></div>';
-  return svg;
+  return h + '</div>';
 };
 
 GRAFICO.animarBarrasFundo = function () {
-  DR.$$('.gf-barra').forEach(function (r) {
-    var y = r.getAttribute('data-y'), h = r.getAttribute('data-h');
-    if (DR.anima) anime({ targets: r, y: y, height: h, duration: 800, easing: 'easeOutQuart' });
-    else { r.setAttribute('y', y); r.setAttribute('height', h); }
+  DR.$$('.gf-barra').forEach(function (b, i) {
+    var ancho = b.getAttribute('data-ancho') + '%';
+    if (DR.anima) anime({ targets: b, width: ['0%', ancho], duration: 800, delay: i * 40, easing: 'easeOutQuart' });
+    else b.style.width = ancho;
   });
 };

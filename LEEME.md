@@ -6,10 +6,11 @@ respaldado por **Supabase** (Postgres + Auth + Edge Functions + Vault + pg_cron)
 ## Estado actual
 
 - **Proyecto Supabase** `agritracer-don-ricardo` (ref `ptsvriudoilsyofgccsb`) con
-  migraciones `supabase/migrations/0001..0016` aplicadas (0012: Auditoría 5S,
+  migraciones `supabase/migrations/0001..0018` aplicadas (0012: Auditoría 5S,
   0013: Auditoría 5S por cultivo, 0014: observaciones 5S por área,
   0015: Revisión del plan de mantenimiento, 0016: Satisfacción del cliente
-  interno y cultivo en los tiempos de ciclo).
+  interno y cultivo en los tiempos de ciclo, 0017: acceso por correo —retirado
+  en la app, se volvió a usuario y contraseña—, 0018: fundos por usuario).
 - **Edge Functions desplegadas** (código en `supabase/functions/`):
   - `admin-usuarios` — crear usuarios, restablecer contraseñas, cambiar rol, desactivar.
   - `sync-sheets` — espejo de auditoría hacia Google Sheets.
@@ -57,7 +58,13 @@ Mismo orden del organigrama de Ingeniería de Procesos (lista `GRUPOS` en `index
    **Copiar** y **Enviar por WhatsApp**. No se vuelve a mostrar.
 5. La persona entra a la página de inicio y crea su propia contraseña.
 
-Desde la misma lista: *Nueva contraseña*, cambiar rol o *Desactivar*.
+Desde la misma lista: *Fundos*, *Nueva contraseña*, cambiar rol o *Desactivar*.
+
+**Fundos asignados** (migración 0018): al crear el usuario o con el botón *Fundos*
+se marcan uno o más fundos. En Captura solo verá y podrá elegir esos fundos, y
+solo verá los ciclos en curso de esos fundos. Sin marcar ninguno = todos. La base
+lo hace cumplir (trigger `trg_ciclo_fundo_permitido`), no solo la pantalla.
+Los administradores siempre ven todos.
 
 ## Datos históricos del Excel (actualización repetible)
 
@@ -102,6 +109,12 @@ Protecciones en la base de datos (migración 0011):
   marcar y **Guardar y continuar** pasa sola a la siguiente etapa.
 - Cada marca con **Ahora** se guarda de inmediato.
 - Avisa horas en el futuro o fuera de orden antes de avanzar.
+- **Varios ciclos a la vez y entre varias personas**: cualquier usuario de captura
+  sigue un ciclo que abrió otro (de sus fundos). Cada ciclo en curso tiene en la
+  lista el botón **Marcar … ahora** para su siguiente hora sin entrar, y dentro de
+  un ciclo la franja **Ir a** salta a otro. Al abrir un ciclo se traen sus datos
+  del momento, al guardar solo se envían los campos que tocó esa persona (no se
+  pisa lo que marcó otra) y la pantalla se refresca sola cada 20 s.
 
 ## Auditoría 5S (módulo `auditoria5s/`, migraciones 0012, 0013 y 0014)
 

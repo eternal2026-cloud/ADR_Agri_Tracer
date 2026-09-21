@@ -5,6 +5,13 @@
  * botón grande inferior siempre dice qué toca marcar a continuación.
  * Marcar con "Ahora" guarda de inmediato (si el ciclo ya existe) para no
  * perder marcas si el celular se queda sin batería o sin señal.
+ *
+ * Varios ciclos a la vez y entre varias personas: cualquier usuario de captura
+ * puede seguir un ciclo que abrió otro (si es de sus fundos). Al abrir un ciclo
+ * se traen sus datos al momento, cada guardado envía solo los campos que tocó
+ * (no borra ni pisa lo que marcó otra persona) y la pantalla se refresca sola.
+ * Desde la lista, cada ciclo en curso tiene «Marcar … ahora» para registrar su
+ * siguiente hora sin entrar, y dentro de un ciclo se salta a otro con un toque.
  * ==========================================================================*/
 
 var ETAPAS = [
@@ -67,8 +74,25 @@ ETAPAS.forEach(function (e) { e.campos.forEach(function (c) { if (c.tipo === 'ho
 var CAPTURA = {
   listas: { fundo: [], variedad: [], calibre: [], presentacion: [], tareadora: [] },
   vista: 'lista', fila: null, borrador: null, etapaIdx: 0,
-  sucio: false, guardando: false, insistir: false,
-  abiertos: [], cerrados: [], filtro: '', _pct: 0
+  sucio: false, guardando: false, insistir: false, cambiados: {},
+  abiertos: [], cerrados: [], filtro: '', _pct: 0, _timer: null
+};
+
+/* ------------------------------------------------ fundos asignados al usuario ([] = todos) */
+CAPTURA.misFundos = function () {
+  if (AT.esAdmin() || !AT.perfil) return [];
+  return (AT.perfil.fundos || []).filter(Boolean);
+};
+CAPTURA.fundoPermitido = function (f) {
+  var m = CAPTURA.misFundos();
+  return !m.length || m.indexOf(f) > -1;
+};
+/** Opciones de una lista maestra; la de fundos se limita a los fundos del usuario. */
+CAPTURA.opciones = function (lista) {
+  var ops = (CAPTURA.listas[lista] || []).slice(), m = CAPTURA.misFundos();
+  if (lista !== 'fundo' || !m.length) return ops;
+  return ops.filter(function (f) { return m.indexOf(f) > -1; })
+    .concat(m.filter(function (f) { return ops.indexOf(f) < 0; }));
 };
 
 /* ------------------------------------------------ fechas (hora local del celular) */
@@ -126,7 +150,50 @@ VISTAS.captura = function (cont) {
     return;
   }
   var listo = CAPTURA.listas.fundo.length ? Promise.resolve() : CAPTURA.cargarListas();
-  listo.then(function () { CAPTURA.pintarLista(); }).catch(function (e) { UI.error(cont, e); });
+  listo.then(function () { CAPTURA.pintarLista(); CAPTURA.iniciarRefresco(); }).catch(function (e) { UI.error(cont, e); });
+};
+
+/* ------------------------------------------------ refresco automático (otras personas pueden estar marcando) */
+CAPTURA.traerCiclo = function (codigo) {
+  return sb.from('ciclos_cosecha').select('*').eq('codigo', codigo).maybeSingle().then(function (r) {
+    if (r.error) throw new Error(r.error.message);
+    return r.data;
+  });
+};
+
+/** Reemplaza la fila en las listas locales (en curso / cerrados) sin recargar todo. */
+CAPTURA.recordar = function (fila) {
+  var fuera = function (f) { return f.codigo !== fila.codigo; };
+  CAPTURA.abiertos = CAPTURA.abiertos.filter(fuera);
+  CAPTURA.cerrados = CAPTURA.cerrados.filter(fuera);
+  if (fila.cerrado) CAPTURA.cerrados.unshift(fila); else CAPTURA.abiertos.unshift(fila);
+};
+
+CAPTURA.iniciarRefresco = function () {
+  if (CAPTURA._timer) return;
+  var ocupado = false;
+  var tic = function () {
+    if (ocupado || DR.vista !== 'captura' || document.visibilityState !== 'visible' || CAPTURA.guardando) return;
+    ocupado = true;
+    var p;
+    if (CAPTURA.vista === 'lista' && DR.$('#listaCiclos') && !DR.$('.cc-rapido.cargando')) {
+      p = CAPTURA.cargarCiclos().then(function () { if (CAPTURA.vista === 'lista') CAPTURA.pintarTarjetas(false); });
+    } else if (CAPTURA.vista === 'ciclo' && CAPTURA.fila && !CAPTURA.sucio) {
+      var codigo = CAPTURA.fila.codigo;
+      p = CAPTURA.traerCiclo(codigo).then(function (f) {
+        if (!f || CAPTURA.vista !== 'ciclo' || !CAPTURA.fila || CAPTURA.fila.codigo !== codigo || CAPTURA.sucio || CAPTURA.guardando) return;
+        if (f.actualizado_en === CAPTURA.fila.actualizado_en) return;
+        CAPTURA.fila = f;
+        CAPTURA.recordar(f);
+        CAPTURA.pintarCiclo(0);
+        if (!AT.perfil || f.actualizado_por !== AT.perfil.id) DR.toast('Otra persona registró datos en ' + f.codigo + '. Pantalla actualizada.', 'info');
+      });
+    }
+    Promise.resolve(p).catch(function () { /* sin señal: se reintenta en el siguiente ciclo */ })
+      .then(function () { ocupado = false; });
+  };
+  CAPTURA._timer = setInterval(tic, 20000);
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') tic(); });
 };
 
 CAPTURA.pintarLista = function () {
@@ -138,6 +205,7 @@ CAPTURA.pintarLista = function () {
     '<button class="btn verde grande entra" id="btnNuevoCiclo" type="button">' + DR.ICONOS.mas + '<span>Iniciar nuevo ciclo</span></button>' +
     '<div class="buscador entra" style="margin-top:16px">' + DR.ICONOS.lupa +
     '<input id="inpFiltroCiclos" type="search" placeholder="Buscar código, fundo, lote o líder…" autocomplete="off" value="' + DR.esc(CAPTURA.filtro) + '"></div>' +
+    (CAPTURA.misFundos().length ? '<div class="aviso-fundos entra">Tus fundos: <b>' + CAPTURA.misFundos().map(DR.esc).join(' · ') + '</b></div>' : '') +
     '<div id="listaCiclos"><div class="vacio">Cargando ciclos en curso…</div></div>';
   DR.entrarPaneles('#contenido');
 
@@ -151,11 +219,15 @@ CAPTURA.pintarLista = function () {
 };
 
 CAPTURA.cargarCiclos = function () {
-  var desde = new Date(Date.now() - 36 * 3600 * 1000).toISOString();
+  var desde = new Date(Date.now() - 36 * 3600 * 1000).toISOString(), m = CAPTURA.misFundos();
+  // Solo ciclos capturados en la app (los importados del Excel histórico no son "en curso"),
+  // de cualquier persona, y solo de los fundos asignados al usuario.
+  var q1 = sb.from('ciclos_cosecha').select('*').eq('origen', 'app').eq('cerrado', false);
+  var q2 = sb.from('ciclos_cosecha').select('*').eq('origen', 'app').eq('cerrado', true).gte('actualizado_en', desde);
+  if (m.length) { q1 = q1.in('fundo', m); q2 = q2.in('fundo', m); }
   return Promise.all([
-    // Solo ciclos capturados en la app: los importados del Excel histórico no son "en curso".
-    sb.from('ciclos_cosecha').select('*').eq('origen', 'app').eq('cerrado', false).order('actualizado_en', { ascending: false }).limit(200),
-    sb.from('ciclos_cosecha').select('*').eq('origen', 'app').eq('cerrado', true).gte('actualizado_en', desde).order('actualizado_en', { ascending: false }).limit(10)
+    q1.order('actualizado_en', { ascending: false }).limit(200),
+    q2.order('actualizado_en', { ascending: false }).limit(10)
   ]).then(function (r) {
     if (r[0].error) throw new Error(r[0].error.message);
     CAPTURA.abiertos = r[0].data || [];
@@ -172,11 +244,55 @@ CAPTURA.tarjetaHtml = function (f) {
   var pie = et
     ? '<span>Etapa ' + (idx + 1) + ' de ' + ETAPAS.length + ' · Siguiente: <b>' + et.titulo + '</b></span>'
     : '<span><b>Cerrado</b> · ' + (f.t_ciclo_total !== null ? DR.num(f.t_ciclo_total, 0) + ' min de ciclo' : 'ver detalle') + '</span>';
-  return '<button type="button" class="ciclo-card entra" data-codigo="' + DR.esc(f.codigo) + '" style="--c:' + (et ? et.color : '#76B729') + '">' +
+  var sig = CAPTURA.siguienteHora(f), color = et ? et.color : '#76B729';
+  return '<div class="ciclo-item entra' + (sig ? ' con-rapido' : '') + '" style="--c:' + color + '">' +
+    '<button type="button" class="ciclo-card" data-codigo="' + DR.esc(f.codigo) + '">' +
     '<div class="cc-top"><span class="cc-codigo">' + DR.esc(f.codigo) + '</span><span class="cc-hace">' + DR.hace(f.actualizado_en) + '</span></div>' +
     '<div class="cc-sub">' + (sub || '&nbsp;') + '</div>' +
     '<div class="cc-pasos">' + segmentos + '</div>' +
-    '<div class="cc-sig">' + pie + DR.ICONOS.chevron + '</div></button>';
+    '<div class="cc-sig">' + pie + DR.ICONOS.chevron + '</div></button>' +
+    (sig ? '<button type="button" class="cc-rapido" data-rapido="' + DR.esc(f.codigo) + '">' + DR.ICONOS.reloj +
+      '<span>Marcar <b>' + DR.esc(sig.campo.label.toLowerCase()) + '</b> ahora</span></button>' : '') +
+    '</div>';
+};
+
+/** Siguiente hora vacía de un ciclo en curso (la que marcaría «Ahora»); null si no aplica. */
+CAPTURA.siguienteHora = function (f) {
+  if (!f || f.cerrado) return null;
+  var idx = CAPTURA.proximaIdx(f);
+  if (idx < 0) return null;
+  var c = ETAPAS[idx].campos.filter(function (x) { return x.tipo === 'hora' && !f[x.clave]; })[0];
+  return c ? { etapa: ETAPAS[idx], campo: c } : null;
+};
+
+/** Marca la siguiente hora de un ciclo desde la lista, sin entrar (para llevar varios ciclos a la vez). */
+CAPTURA.marcarRapido = function (btn, codigo) {
+  var f = CAPTURA.abiertos.filter(function (x) { return x.codigo === codigo; })[0], sig = CAPTURA.siguienteHora(f);
+  if (!sig) return;
+  var datos = {}, ahora = new Date();
+  datos[sig.campo.clave] = ahora.toISOString();
+  btn.disabled = true;
+  btn.classList.add('cargando');
+  DR.vibrar(25);
+  // Antes de marcar se relee el ciclo: si otra persona ya marcó esa hora, no se pisa.
+  CAPTURA.traerCiclo(codigo).then(function (actual) {
+    if (!actual) throw new Error('El ciclo ' + codigo + ' ya no existe.');
+    if (actual[sig.campo.clave]) return { fila: actual, yaEstaba: true };
+    return AT.rpc('rpc_agregar_etapa', { p_codigo: codigo, p_etapa: sig.etapa.id, p_datos: datos }).then(function (fila) { return { fila: fila }; });
+  }).then(function (r) {
+    CAPTURA.recordar(r.fila);
+    if (r.yaEstaba) DR.toast(codigo + ': otra persona ya marcó «' + sig.campo.label + '». Lista actualizada.', 'info');
+    else {
+      DR.sonar(true);
+      DR.toast(codigo + ' · ' + sig.campo.label + ' ' + CAPTURA.horaCorta(CAPTURA.localDe(ahora)) + ' guardado.');
+    }
+    CAPTURA.pintarTarjetas(false);
+  }).catch(function (e) {
+    btn.disabled = false;
+    btn.classList.remove('cargando');
+    DR.vibrar([60, 40, 60]);
+    DR.toast('No se guardó: ' + e.message, 'error');
+  });
 };
 
 CAPTURA.pintarTarjetas = function (animar) {
@@ -203,25 +319,42 @@ CAPTURA.pintarTarjetas = function (animar) {
       if (fila) CAPTURA.abrirCiclo(fila);
     };
   });
+  DR.$$('.cc-rapido', cont).forEach(function (b) {
+    b.onclick = function () { DR.desbloquearAudio(); CAPTURA.marcarRapido(this, this.getAttribute('data-rapido')); };
+  });
   DR.$('#btnRecargarCiclos').onclick = function () {
     this.disabled = true;
     CAPTURA.cargarCiclos().then(function () { CAPTURA.pintarTarjetas(true); DR.toast('Lista actualizada.', 'info'); })
       .catch(function (e) { DR.toast(e.message, 'error'); });
   };
   if (animar) DR.entrarPaneles('#listaCiclos');
-  else DR.$$('.entra', cont).forEach(function (n) { n.style.opacity = 1; });
+  else DR.$$('.entra', cont).forEach(function (n) { n.style.opacity = 1; n.style.transform = 'none'; });
 };
 
 /* ============================================================ ASISTENTE POR ETAPAS */
 CAPTURA.nuevoCiclo = function () {
-  var prefs = CAPTURA.leerPrefs();
+  var prefs = CAPTURA.leerPrefs(), mios = CAPTURA.opciones('fundo');
+  var fundo = prefs.fundo && CAPTURA.fundoPermitido(prefs.fundo) ? prefs.fundo : (CAPTURA.misFundos().length === 1 ? mios[0] : '');
   CAPTURA.fila = null;
-  CAPTURA.borrador = { fecha: CAPTURA.hoyLocal(), fundo: prefs.fundo || '', lider: prefs.lider || '', variedad: prefs.variedad || '', calibre: prefs.calibre || '', presentacion: prefs.presentacion || '' };
+  CAPTURA.borrador = { fecha: CAPTURA.hoyLocal(), fundo: fundo || '', lider: prefs.lider || '', variedad: prefs.variedad || '', calibre: prefs.calibre || '', presentacion: prefs.presentacion || '' };
   CAPTURA.etapaIdx = 0;
   CAPTURA.entrarAsistente();
 };
 
+/** Abre un ciclo con sus datos al momento (otra persona pudo avanzarlo); sin señal usa los de la lista. */
 CAPTURA.abrirCiclo = function (fila) {
+  CAPTURA.traerCiclo(fila.codigo).then(function (f) {
+    if (!f) {
+      DR.toast('El ciclo ' + fila.codigo + ' ya no existe (lo eliminaron).', 'error');
+      CAPTURA.pintarLista();
+      return;
+    }
+    CAPTURA.recordar(f);
+    CAPTURA.mostrarCiclo(f);
+  }).catch(function () { CAPTURA.mostrarCiclo(fila); });
+};
+
+CAPTURA.mostrarCiclo = function (fila) {
   CAPTURA.fila = fila; CAPTURA.borrador = null;
   var idx = CAPTURA.proximaIdx(fila);
   if (idx < 0) { CAPTURA.mostrarFin(fila); return; }
@@ -230,7 +363,7 @@ CAPTURA.abrirCiclo = function (fila) {
 };
 
 CAPTURA.entrarAsistente = function () {
-  CAPTURA.vista = 'ciclo'; CAPTURA.sucio = false; CAPTURA.insistir = false;
+  CAPTURA.vista = 'ciclo'; CAPTURA.sucio = false; CAPTURA.insistir = false; CAPTURA.cambiados = {};
   CAPTURA._pct = 0;
   CAPTURA.pintarCiclo(1);
 };
@@ -254,7 +387,7 @@ CAPTURA.campoHtml = function (c) {
   var clase = 'campo' + (c.medio ? '' : ' ancho');
   var etiqueta = '<label for="' + id + '">' + c.label + (c.requerido ? '<em>obligatorio</em>' : '') + '</label>';
   if (c.tipo === 'lista') {
-    var ops = (CAPTURA.listas[c.lista] || []).slice();
+    var ops = CAPTURA.opciones(c.lista);
     if (v && ops.indexOf(v) < 0) ops.unshift(v);
     if (ops.length > 14) {
       return '<div class="' + clase + '">' + etiqueta + '<select id="' + id + '" data-campo="' + c.clave + '"><option value="">—</option>' +
@@ -300,6 +433,7 @@ CAPTURA.pintarCiclo = function (direccion) {
     '<div class="wiz-cab">' +
       '<button type="button" class="wiz-volver" id="btnVolverLista">' + DR.ICONOS.atras + '<span>Ciclos</span></button>' +
       '<div class="wiz-id"><b id="wizCodigo">' + (fila ? DR.esc(fila.codigo) : 'Nuevo ciclo') + '</b><span>' + sub + '</span></div></div>' +
+    CAPTURA.otrosHtml() +
     '<div class="pasos"><div class="pasos-pista"><div class="pasos-relleno" id="pasosRelleno" style="width:' + CAPTURA._pct + '%"></div></div>' + CAPTURA.pasosHtml() + '</div>' +
     '<section class="etapa" id="etapaCard" style="--c:' + e.color + '">' +
       '<div class="etapa-cab"><span class="etapa-num">Etapa ' + (CAPTURA.etapaIdx + 1) + ' de ' + ETAPAS.length + '</span>' +
@@ -323,8 +457,29 @@ CAPTURA.pintarCiclo = function (direccion) {
   }
 };
 
+/** Accesos a los otros ciclos en curso, para ir y venir entre varios sin volver a la lista. */
+CAPTURA.otrosHtml = function () {
+  var actual = CAPTURA.fila ? CAPTURA.fila.codigo : null;
+  var otros = CAPTURA.abiertos.filter(function (f) { return f.codigo !== actual; }).slice(0, 12);
+  if (!otros.length) return '';
+  return '<div class="wiz-otros"><span class="etq">Ir a</span>' + otros.map(function (f) {
+    var idx = CAPTURA.proximaIdx(f), et = idx > -1 ? ETAPAS[idx] : null;
+    return '<button type="button" class="wiz-otro" data-otro="' + DR.esc(f.codigo) + '" style="--c:' + (et ? et.color : '#76B729') + '">' +
+      DR.esc(f.codigo) + '<small>' + DR.esc([f.fundo, et ? et.corto : 'Cerrado'].filter(Boolean).join(' · ')) + '</small></button>';
+  }).join('') + '</div>';
+};
+
 CAPTURA.enlazarCiclo = function (cont) {
   DR.$('#btnVolverLista').onclick = function () { if (CAPTURA.puedeSalir()) CAPTURA.pintarLista(); };
+  DR.$$('[data-otro]', cont).forEach(function (b) {
+    b.onclick = function () {
+      var codigo = this.getAttribute('data-otro');
+      var f = CAPTURA.abiertos.filter(function (x) { return x.codigo === codigo; })[0];
+      if (!f || !CAPTURA.puedeSalir()) return;
+      CAPTURA.sucio = false;
+      CAPTURA.abrirCiclo(f);
+    };
+  });
   DR.$$('.paso', cont).forEach(function (p) {
     p.onclick = function () {
       var i = Number(this.getAttribute('data-paso'));
@@ -344,6 +499,7 @@ CAPTURA.enlazarCiclo = function (cont) {
       var op = ev.target.closest('.opcion');
       if (!op) return;
       var inp = DR.$('input[data-campo="' + this.getAttribute('data-opciones') + '"]', cont);
+      CAPTURA.cambiados[this.getAttribute('data-opciones')] = true;
       var yaActiva = op.classList.contains('activa');
       DR.$$('.opcion', this).forEach(function (o) { o.classList.remove('activa'); });
       if (!yaActiva) op.classList.add('activa');
@@ -354,7 +510,9 @@ CAPTURA.enlazarCiclo = function (cont) {
   });
 };
 
-CAPTURA.alEditar = function () {
+CAPTURA.alEditar = function (ev) {
+  var campo = ev && ev.target && ev.target.getAttribute && ev.target.getAttribute('data-campo');
+  if (campo) CAPTURA.cambiados[campo] = true;
   CAPTURA.sucio = true;
   CAPTURA.insistir = false;
   CAPTURA.revisar();
@@ -362,7 +520,7 @@ CAPTURA.alEditar = function () {
 
 CAPTURA.irEtapa = function (i) {
   var dir = i >= CAPTURA.etapaIdx ? 1 : -1, card = DR.$('#etapaCard');
-  CAPTURA.sucio = false; CAPTURA.insistir = false;
+  CAPTURA.sucio = false; CAPTURA.insistir = false; CAPTURA.cambiados = {};
   if (!DR.anima || !card) { CAPTURA.etapaIdx = i; CAPTURA.pintarCiclo(dir); return; }
   anime.remove(card);
   anime({ targets: card, opacity: [1, 0], translateX: [0, -44 * dir], duration: 190, easing: 'easeInQuad',
@@ -481,6 +639,7 @@ CAPTURA.marcarAhora = function (clave) {
   var inp = DR.$('#cp_' + clave);
   if (!inp || CAPTURA.guardando) return;
   inp.value = CAPTURA.ahoraLocal();
+  CAPTURA.cambiados[clave] = true;
   var fila = inp.closest('.hora');
   DR.vibrar(25);
   if (DR.anima) {
@@ -500,6 +659,7 @@ CAPTURA.guardar = function (opc) {
   if (CAPTURA.guardando) return;
   var e = ETAPAS[CAPTURA.etapaIdx], v = CAPTURA.leer();
   if (!CAPTURA.fila && !v.fundo) { DR.toast('Elige el fundo antes de guardar.', 'error'); return; }
+  if (!CAPTURA.fila && !CAPTURA.fundoPermitido(v.fundo)) { DR.toast('No tienes asignado el fundo «' + v.fundo + '».', 'error'); return; }
 
   if (opc.avanzar && !CAPTURA.insistir && CAPTURA.validar(v).lista.length) {
     CAPTURA.insistir = true;
@@ -524,8 +684,10 @@ CAPTURA.guardar = function (opc) {
       inicio_cosecha: CAPTURA.aIso(v.inicio_cosecha), fin_cosecha: CAPTURA.aIso(v.fin_cosecha)
     } });
   } else {
+    // Solo los campos que tocó esta persona: lo que otra registró en el mismo ciclo no se pisa.
     var datos = {};
     e.campos.forEach(function (c) {
+      if (!CAPTURA.cambiados[c.clave]) return;
       var x = v[c.clave];
       if (c.tipo === 'hora') datos[c.clave] = CAPTURA.aIso(x);
       else if (x === '' || x === undefined) datos[c.clave] = null;
@@ -539,7 +701,8 @@ CAPTURA.guardar = function (opc) {
   promesa.then(function (fila) {
     var eraNuevo = !CAPTURA.fila;
     CAPTURA.fila = fila; CAPTURA.borrador = null;
-    CAPTURA.sucio = false; CAPTURA.insistir = false; CAPTURA.guardando = false;
+    CAPTURA.recordar(fila);
+    CAPTURA.sucio = false; CAPTURA.insistir = false; CAPTURA.guardando = false; CAPTURA.cambiados = {};
     DR.vibrar(40);
     DR.sonar(true);
     if (opc.avanzar) {

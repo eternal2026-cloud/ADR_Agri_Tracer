@@ -6,13 +6,13 @@ respaldado por **Supabase** (Postgres + Auth + Edge Functions + Vault + pg_cron)
 ## Estado actual
 
 - **Proyecto Supabase** `agritracer-don-ricardo` (ref `ptsvriudoilsyofgccsb`) con
-  migraciones `supabase/migrations/0001..0021` aplicadas (0012: Auditoría 5S,
+  migraciones `supabase/migrations/0001..0022` aplicadas (0012: Auditoría 5S,
   0013: Auditoría 5S por cultivo, 0014: observaciones 5S por área,
   0015: Revisión del plan de mantenimiento, 0016: Satisfacción del cliente
   interno y cultivo en los tiempos de ciclo, 0017: acceso por correo —retirado
   en la app, se volvió a usuario y contraseña—, 0018: fundos por usuario,
   0019: evolución semanal y plantas/áreas por evaluador en Cliente interno,
-  0020-0021: nombre legal de las áreas solo para Cliente interno).
+  0020-0022: áreas propias de Cliente interno).
 - **Edge Functions desplegadas** (código en `supabase/functions/`):
   - `admin-usuarios` — crear usuarios, restablecer contraseñas, cambiar rol, desactivar.
   - `sync-sheets` — espejo de auditoría hacia Google Sheets.
@@ -36,17 +36,22 @@ respaldado por **Supabase** (Postgres + Auth + Edge Functions + Vault + pg_cron)
   Configuration. Quien tenga la app «instalada» en el celular debe volver a agregarla
   desde la nueva dirección.
 
-## Áreas: nombre legal para Cliente interno (Config → Áreas, migraciones 0020-0021)
+## Áreas de Cliente interno (Config → Áreas, migración 0022)
 
-- **Solo cambia Satisfacción del cliente interno.** Auditoría 5S mantiene sus nombres y
-  su catálogo por cultivo (se edita, como siempre, en 5S → Catálogo).
-- El nombre legal se guarda en `s5_areas.nombre_ci` (vacío = el mismo de 5S) con
-  `rpc_sci_nombre_area`. `fn_sci_resultados` y `fn_sci_bd` lo usan, así que llega a la
-  app, la presentación, el Excel de Power BI y Google Sheets, también en lo ya registrado.
-- Los nombres anteriores quedan en `s5_areas.alias` («Antes: …»): el importador de Excel
-  los sigue reconociendo, igual que el nombre de 5S. «Usar el de 5S» quita el nombre propio.
-- Los grupos de Producción conservan la abreviatura «Prod.» aunque se renombre el área.
-- Bitácora: módulo `SATISFACCION_CI`, acción «Nombre legal de área».
+- **Catálogo propio** `sci_areas`, solo para Satisfacción del cliente interno. Auditoría 5S
+  sigue con `s5_areas`, sin cambios. Permite separar lo que en 5S es una sola área
+  (Producción → Producción Cítricos, Producción Arándano, Producción Uva Limpieza).
+  Se creó con los mismos id y nombres que ya tenía el módulo, así que las encuestas y
+  permisos anteriores siguen igual.
+- Agregar, renombrar (también cambia lo ya registrado) y desactivar: `rpc_sci_guardar_area`.
+  El nombre anterior queda en `sci_areas.alias` para el importador de Excel.
+- **Su área** por usuario (`perfiles.sci_area`, en Cliente interno → Evaluadores): queda
+  fija como área evaluadora de sus encuestas (lo exige `trg_sci_permisos`).
+- **Encuesta**: campaña por defecto «<Cultivo> <año actual>» (ej. Arándano 2026), evaluador
+  = nombre del usuario, planta/áreas según Evaluadores, sub-área solo si el dato ya la
+  trae. Las tres sugerencias son obligatorias y cada ítem en «En desacuerdo» o
+  «Totalmente en desacuerdo» exige su mejora (`sci_encuestas.mejoras_items`; también se
+  agrega como línea en «Aspectos a mejorar»). Lo valida `rpc_sci_guardar_encuesta`.
 
 ## Portada por grupos
 

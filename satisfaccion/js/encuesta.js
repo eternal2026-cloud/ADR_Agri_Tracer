@@ -10,16 +10,37 @@ ENC.PASOS = ['Datos', 'Evaluación', 'Sugerencias', 'Resumen'];
 
 ENC.nuevo = function () {
   var cul = SCI.cultivo(SCI.cultivoFiltro()) || SCI.cultivos.filter(function (c) { return c.activo; })[0] || {};
-  var plantas = SCI.misPlantas(), areas = SCI.misAreas();
+  var plantas = SCI.misPlantas(), areas = SCI.misAreas(), mia = SCI.miArea();
   return {
-    id: SCI.uuid(), cultivo_id: cul.id || '', campana: cul.campana || '', fecha: SCI.hoy(),
-    area_evaluada_id: areas.length === 1 ? String(areas[0]) : '', area_evaluadora_id: '', sub_area: '',
-    planta: plantas.length === 1 ? plantas[0] : '', cargo: '', evaluador: '',
-    respuestas: {}, aspectos_valorados: '', aspectos_mejorar: '', recomendaciones: ''
+    id: SCI.uuid(), cultivo_id: cul.id || '', campana: SCI.campanaDefecto(cul.id ? cul : null), fecha: SCI.hoy(),
+    area_evaluada_id: areas.length === 1 ? String(areas[0]) : '', area_evaluadora_id: mia ? String(mia) : '', sub_area: '',
+    planta: plantas.length === 1 ? plantas[0] : '', cargo: '', evaluador: (AT.perfil && AT.perfil.nombre) || '',
+    respuestas: {}, aspectos_valorados: '', aspectos_mejorar: '', recomendaciones: '', mejoras: {}
   };
 };
 ENC.leer = function () {
-  try { return JSON.parse(SCI.leerLocal(ENC.CLAVE) || 'null'); } catch (e) { return null; }
+  try {
+    var b = JSON.parse(SCI.leerLocal(ENC.CLAVE) || 'null');
+    if (!b) return null;
+    b.mejoras = b.mejoras || {};
+    // El área evaluadora es la que asignó el administrador.
+    if (SCI.miArea() && !AT.esAdmin()) b.area_evaluadora_id = String(SCI.miArea());
+    return b;
+  } catch (e) { return null; }
+};
+
+/** Ítems marcados «En desacuerdo» o «Totalmente en desacuerdo»: exigen escribir su mejora. */
+ENC.itemsBajos = function () {
+  return Object.keys(ENC.b.respuestas).map(Number).filter(function (n) { return Number(ENC.b.respuestas[n]) <= 6.5; }).sort(function (a, b) { return a - b; });
+};
+ENC.faltanSugerencias = function () {
+  var b = ENC.b, x = [];
+  if (!String(b.aspectos_valorados || '').trim()) x.push('aspectos que valoras');
+  if (!String(b.aspectos_mejorar || '').trim()) x.push('aspectos a mejorar');
+  if (!String(b.recomendaciones || '').trim()) x.push('sugerencia de coordinación');
+  var sinMejora = ENC.itemsBajos().filter(function (n) { return !String((b.mejoras || {})[n] || '').trim(); });
+  if (sinMejora.length) x.push('mejora de los ítems ' + sinMejora.join(', '));
+  return x;
 };
 ENC.guardarLocal = function () { SCI.escribirLocal(ENC.CLAVE, JSON.stringify(ENC.b)); };
 ENC.descartar = function () { SCI.escribirLocal(ENC.CLAVE, null); ENC.b = null; ENC.paso = 1; };
@@ -42,6 +63,7 @@ ENC.faltanDatos = function () {
   if (!b.fecha) x.push('fecha');
   if (!b.area_evaluada_id) x.push('área evaluada');
   if (!b.area_evaluadora_id) x.push('área evaluadora');
+  if (!String(b.evaluador || '').trim()) x.push('nombre del evaluador');
   if (b.area_evaluada_id && b.area_evaluada_id === b.area_evaluadora_id) x.push('áreas distintas (un área no se evalúa a sí misma)');
   if (SCI.misPlantas().length && SCI.misPlantas().indexOf(String(b.planta || '').toUpperCase()) < 0) x.push('planta (una de las tuyas: ' + SCI.misPlantas().join(', ') + ')');
   if (b.area_evaluada_id && SCI.misAreas().length && SCI.misAreas().indexOf(Number(b.area_evaluada_id)) < 0) x.push('un área a evaluar que tengas asignada');
@@ -55,7 +77,7 @@ ENC.pintar = function (cont) {
   cont = cont || DR.$('#contenido');
   var b = ENC.b, paso = ENC.paso;
   var pasos = '<div class="sci-pasos entra">' + ENC.PASOS.map(function (t, i) {
-    var n = i + 1, hecho = (n === 1 && !ENC.faltanDatos().length) || (n === 2 && !ENC.faltanItems().length) || (n === 3 && n < paso);
+    var n = i + 1, hecho = (n === 1 && !ENC.faltanDatos().length) || (n === 2 && !ENC.faltanItems().length) || (n === 3 && !ENC.faltanSugerencias().length);
     return '<button type="button" class="sci-paso' + (n === paso ? ' activo' : '') + (hecho ? ' hecho' : '') + '" data-paso="' + n + '"><i>' + n + '</i><span>' + t + '</span></button>';
   }).join('') + '</div>';
   var cuerpo = [null, ENC.pasoDatos, ENC.pasoItems, ENC.pasoSugerencias, ENC.pasoResumen][paso]();
@@ -87,11 +109,14 @@ ENC.pintar = function (cont) {
       b[k] = el.value;
       if (k === 'cultivo_id') {
         var c = SCI.cultivo(el.value);
-        if (c && c.campana) { b.campana = c.campana; if (DR.$('[data-enc="campana"]')) DR.$('[data-enc="campana"]').value = c.campana; }
+        if (c) { b.campana = SCI.campanaDefecto(c); if (DR.$('[data-enc="campana"]')) DR.$('[data-enc="campana"]').value = b.campana; }
       }
       ENC.guardarLocal();
     };
     el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', guardar);
+  });
+  DR.$$('[data-mejora]', cont).forEach(function (el) {
+    el.addEventListener('input', function () { b.mejoras[this.getAttribute('data-mejora')] = this.value; ENC.guardarLocal(); });
   });
   DR.$$('[data-opcion]', cont).forEach(function (el) {
     el.onclick = function () {
@@ -120,13 +145,14 @@ ENC.pintar = function (cont) {
 ENC.ir = function (paso, validar) {
   if (validar && ENC.paso === 1 && ENC.faltanDatos().length) { DR.toast('Falta: ' + ENC.faltanDatos().join(', ') + '.', 'error'); return; }
   if (validar && ENC.paso === 2 && ENC.faltanItems().length) { DR.toast('Responde los ítems: ' + ENC.faltanItems().join(', ') + '.', 'error'); return; }
+  if (validar && ENC.paso === 3 && ENC.faltanSugerencias().length) { DR.toast('Falta: ' + ENC.faltanSugerencias().join(', ') + '.', 'error'); return; }
   ENC.paso = Math.max(1, Math.min(4, paso));
   DR.$('#contenido').scrollTop = 0;
   ENC.pintar();
 };
 
 ENC.pasoDatos = function () {
-  var b = ENC.b;
+  var b = ENC.b, fija = !!SCI.miArea() && !AT.esAdmin();
   var chips = function (campo, lista) {
     return '<div class="opciones">' + lista.map(function (v) {
       return '<button type="button" class="opcion' + (b[campo] === v ? ' activa' : '') + '" data-opcion="' + campo + '" data-valor="' + DR.esc(v) + '">' + DR.esc(v) + '</button>';
@@ -135,16 +161,18 @@ ENC.pasoDatos = function () {
   return UI.panel('1. Datos generales', 'Quién evalúa, a qué área y cuándo.',
     '<div class="form">' +
       '<div class="campo"><label for="encCultivo">Cultivo</label><select id="encCultivo" data-enc="cultivo_id">' + SCI.opcionesCultivos(b.cultivo_id, 'Elegir…') + '</select></div>' +
-      '<div class="campo"><label for="encCampana">Campaña</label><input id="encCampana" data-enc="campana" value="' + DR.esc(b.campana) + '" placeholder="Uva 2025 - 2026"></div>' +
+      '<div class="campo"><label for="encCampana">Campaña</label><input id="encCampana" data-enc="campana" value="' + DR.esc(b.campana) + '" placeholder="Arándano ' + new Date().getFullYear() + '"></div>' +
       '<div class="campo"><label for="encFecha">Fecha</label><input id="encFecha" type="date" data-enc="fecha" max="' + SCI.hoy() + '" value="' + DR.esc(b.fecha) + '"></div>' +
-      '<div class="campo"><label for="encEvaluada">Área a evaluar</label><select id="encEvaluada" data-enc="area_evaluada_id">' + SCI.opcionesAreas(b.area_evaluada_id, 'Elegir…', SCI.misAreas()) + '</select></div>' +
-      '<div class="campo"><label for="encEvaluadora">Área evaluadora</label><select id="encEvaluadora" data-enc="area_evaluadora_id">' + SCI.opcionesAreas(b.area_evaluadora_id, 'Elegir…') + '</select></div>' +
+      '<div class="campo"><label for="encEvaluada">Área a evaluar</label><select id="encEvaluada" data-enc="area_evaluada_id">' + SCI.opcionesAreas(b.area_evaluada_id, 'Elegir…', SCI.misAreas().filter(function (id) { return id !== SCI.miArea(); })) + '</select></div>' +
+      '<div class="campo"><label for="encEvaluadora">Área evaluadora <small>(tu área)</small></label><select id="encEvaluadora" data-enc="area_evaluadora_id"' + (fija ? ' disabled' : '') + '>' + SCI.opcionesAreas(b.area_evaluadora_id, 'Elegir…', fija ? [SCI.miArea()] : []) + '</select>' +
+        (fija ? '<div class="ayuda-campo">Asignada por el administrador.</div>' : '') + '</div>' +
       '<div class="campo"><label for="encPlanta">Planta</label><select id="encPlanta" data-enc="planta">' + SCI.opcionesPlantas(b.planta, SCI.misPlantas()) + '</select></div>' +
-      '<div class="campo"><label for="encSub">Sub-área evaluadora <small>(opcional)</small></label><input id="encSub" data-enc="sub_area" list="dlSubEnc" value="' + DR.esc(b.sub_area) + '" placeholder="Limpieza, Packing…">' + SCI.datalistSubAreas('dlSubEnc') + '</div>' +
-      '<div class="campo"><label for="encEvaluador">Nombre del evaluador <small>(opcional)</small></label><input id="encEvaluador" data-enc="evaluador" value="' + DR.esc(b.evaluador) + '"></div>' +
+      // Sub-área: ya va en el nombre del área (p. ej. «Producción Uva Limpieza»); solo se muestra si el dato ya la trae.
+      (String(b.sub_area || '').trim() ? '<div class="campo"><label for="encSub">Sub-área evaluadora</label><input id="encSub" data-enc="sub_area" list="dlSubEnc" value="' + DR.esc(b.sub_area) + '">' + SCI.datalistSubAreas('dlSubEnc') + '</div>' : '') +
+      '<div class="campo"><label for="encEvaluador">Nombre del evaluador</label><input id="encEvaluador" data-enc="evaluador" value="' + DR.esc(b.evaluador) + '"></div>' +
       '<div class="campo ancho"><label>Cargo</label>' + chips('cargo', SCI.CARGOS) + '</div>' +
     '</div>' +
-    '<div class="aviso" style="margin-top:12px">La planta y la sub-área separan los resultados en la presentación (p. ej. «PDC - Prod. Limpieza»).</div>');
+    '<div class="aviso" style="margin-top:12px">La planta separa los resultados en la presentación (p. ej. «PDC - Producción Uva Limpieza»).</div>');
 };
 
 ENC.pasoItems = function () {
@@ -168,20 +196,27 @@ ENC.pasoSugerencias = function () {
   var area = function (k, t) {
     return '<div class="campo ancho"><label for="enc_' + k + '">' + t + '</label><textarea id="enc_' + k + '" data-enc="' + k + '" rows="3">' + DR.esc(b[k]) + '</textarea></div>';
   };
-  return UI.panel('3. Sugerencias (opcional)', 'Aparecen en la presentación como Aspectos valorados, por mejorar y Recomendaciones.',
+  var bajos = ENC.itemsBajos().map(function (n) {
+    var it = SCI.item(n), v = Number(b.respuestas[n]);
+    return '<div class="campo ancho sci-mejora"><label for="encMej' + n + '"><b>Ítem ' + n + '</b> · ' + DR.esc(SCI.textoEscala(v)) + '<span>' + DR.esc(it ? it.texto : '') + '</span>' +
+      '¿Qué debe mejorar el área en este punto?</label><textarea id="encMej' + n + '" data-mejora="' + n + '" rows="2">' + DR.esc((b.mejoras || {})[n] || '') + '</textarea></div>';
+  }).join('');
+  return UI.panel('3. Sugerencias', 'Todas son obligatorias. Aparecen en la presentación como Aspectos valorados, por mejorar y Recomendaciones.',
     '<div class="form">' +
       area('aspectos_valorados', '¿Qué aspectos valoras más del servicio del área evaluada?') +
       area('aspectos_mejorar', '¿Qué aspectos consideras que el área evaluada debería mejorar?') +
       area('recomendaciones', '¿Tienes alguna sugerencia específica para mejorar la coordinación entre tu área y el área evaluada?') +
-    '</div>');
+    '</div>' +
+    (bajos ? '<div class="sep-titulo">Mejoras por ítem en desacuerdo</div><div class="aviso alerta" style="margin-bottom:12px">Marcaste desacuerdo en ' + ENC.itemsBajos().length + ' ítem(s): indica qué debe mejorar el área en cada uno.</div><div class="form">' + bajos + '</div>' : ''));
 };
 
 ENC.pasoResumen = function () {
   var b = ENC.b, calc = IMP_SCI.calcular(ENC.respuestasLista());
   var faltan = ENC.faltanDatos().map(function (x) { return 'Falta ' + x + '.'; })
-    .concat(ENC.faltanItems().length ? ['Faltan los ítems ' + ENC.faltanItems().join(', ') + '.'] : []);
+    .concat(ENC.faltanItems().length ? ['Faltan los ítems ' + ENC.faltanItems().join(', ') + '.'] : [])
+    .concat(ENC.faltanSugerencias().map(function (x) { return 'Falta ' + x + '.'; }));
   var ae = SCI.area(b.area_evaluada_id), ao = SCI.area(b.area_evaluadora_id), cul = SCI.cultivo(b.cultivo_id);
-  var grupo = ao ? SCI.grupo(ao.nombre_5s === 'Producción' ? 'Producción' : ao.nombre, b.sub_area, b.planta, cul && cul.nombre) : '—';
+  var grupo = ao ? SCI.grupo(ao.nombre, b.sub_area, b.planta, cul && cul.nombre) : '—';
   return UI.panel('4. Resumen', '', '<div class="sci-resumen">' +
       '<div class="sci-radar-caja">' + SCI.radarSvg([{ nombre: grupo, color: '#76B729', criterios: calc.criterios }]) + '</div>' +
       '<div><div class="sci-kpi-grande" style="--c:' + SCI.colorPct(calc.total) + '"><span>Resultado</span><b>' + SCI.pct(calc.total) + '</b></div>' +
@@ -195,14 +230,28 @@ ENC.pasoResumen = function () {
     '<div class="acciones"><button type="button" class="btn verde grande" id="btnGuardarEncuesta"' + (faltan.length ? ' disabled' : '') + '>' + DR.ICONOS.checkChico + 'Registrar encuesta</button></div>');
 };
 
+/** Solo las mejoras de ítems que siguen en desacuerdo ({"3": "…"}). */
+ENC.mejorasBajos = function () {
+  var m = {};
+  ENC.itemsBajos().forEach(function (n) { m[n] = String(ENC.b.mejoras[n] || '').trim(); });
+  return m;
+};
+/** Aspectos a mejorar + una línea por ítem en desacuerdo (así salen en resultados y presentación). */
+ENC.textoMejoras = function () {
+  var m = ENC.mejorasBajos();
+  return [String(ENC.b.aspectos_mejorar || '').trim()].concat(ENC.itemsBajos().map(function (n) {
+    return '• Ítem ' + n + ' (' + SCI.textoEscala(ENC.b.respuestas[n]) + '): ' + m[n];
+  })).join('\n');
+};
+
 ENC.guardar = function () {
   var b = ENC.b;
   SCI.accion(this, 'rpc_sci_guardar_encuesta', { p: {
     id: b.id, cultivo_id: Number(b.cultivo_id), campana: String(b.campana).trim(), fecha: b.fecha,
     area_evaluada_id: Number(b.area_evaluada_id), area_evaluadora_id: Number(b.area_evaluadora_id),
     sub_area: b.sub_area || null, planta: b.planta || null, cargo: b.cargo || null, evaluador: b.evaluador || null,
-    aspectos_valorados: b.aspectos_valorados, aspectos_mejorar: b.aspectos_mejorar, recomendaciones: b.recomendaciones,
-    respuestas: ENC.respuestasLista()
+    aspectos_valorados: b.aspectos_valorados, aspectos_mejorar: ENC.textoMejoras(), recomendaciones: b.recomendaciones,
+    mejoras_items: ENC.mejorasBajos(), respuestas: ENC.respuestasLista()
   } }).then(function (r) {
     DR.toast('Encuesta ' + r.codigo + ' registrada: ' + DR.num(r.resultado, 1) + ' %.');
     DR.sonar(true);

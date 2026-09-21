@@ -871,3 +871,9 @@ td.mp-sangria{padding-left:26px}
 .area-acciones{display:flex;gap:8px}
 .area-fila.inactiva input{opacity:.55;text-decoration:line-through}
 .segmento span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+
+/* ==================== CLIENTE INTERNO · título largo y mejoras por ítem ==================== */
+#slotLogo .logo .texto.largo{white-space:normal;font-size:12.5px;letter-spacing:.06em;line-height:1.2;max-width:min(62vw,420px)}
+#slotLogo{min-width:0;flex:1 1 auto}
+.sci-mejora label{display:block;line-height:1.4}
+.sci-mejora label span{display:block;margin:3px 0 6px;font-weight:400;color:var(--texto-3);font-size:13px}

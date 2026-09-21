@@ -53,7 +53,7 @@ function pintarNav() {
 
 function pintarBarraSup() {
   DR.$('#slotLogo').innerHTML = '<a href="../#gestion" class="logo" style="display:flex;align-items:center;gap:10px;text-decoration:none">' +
-    DR.marcaSvg(42) + '<span class="texto">CLIENTE INTERNO</span></a>';
+    DR.marcaSvg(42) + '<span class="texto largo">ENCUESTA DE SATISFACCIÓN CLIENTE INTERNO</span></a>';
   DR.$('#chipDatos').classList.add('ok');
   DR.$('#chipTexto').textContent = (AT.perfil && AT.perfil.nombre) || '—';
 }

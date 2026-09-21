@@ -5,7 +5,7 @@
  *   · resultado de la encuesta = suma de los 10 ítems
  *   · % de un criterio = suma de sus ítems / (n° de ítems × 10)
  *   · consolidado (grupo, área o planta) = promedio por encuesta
- * Áreas: catálogo s5_areas (compartido con 5S). Planta: código del fundo (PDC, PLM…).
+ * Áreas: catálogo propio sci_areas (Config → Áreas; 5S usa s5_areas). Planta: código del fundo (PDC, PLM…).
  * ==========================================================================*/
 var VISTAS = {};
 var SCI = {
@@ -28,17 +28,13 @@ SCI.cargar = function (forzar) {
   if (SCI._carga && !forzar) return SCI._carga;
   SCI._carga = Promise.all([
     sb.from('s5_cultivos').select('id,nombre,icono,color,campana,activo,orden').order('orden').order('nombre'),
-    sb.from('s5_areas').select('id,nombre,nombre_ci,alias,activo,orden').order('orden').order('nombre'),
+    sb.from('sci_areas').select('id,nombre,alias,activo,orden').order('orden').order('nombre'),
     sb.from('listas_maestras').select('valor,codigo,activo,orden').eq('tipo', 'fundo').order('orden').order('valor'),
     sb.from('sci_items').select('*').order('id')
   ]).then(function (r) {
     r.forEach(function (x) { if (x.error) throw new Error(x.error.message); });
     SCI.cultivos = r[0].data || [];
-    // En este módulo el área se muestra con su nombre legal (Config → Áreas); el de 5S y los
-    // anteriores quedan como alias para reconocerlos al importar Excel.
-    SCI.areas = (r[1].data || []).map(function (x) {
-      return { id: x.id, nombre: x.nombre_ci || x.nombre, nombre_5s: x.nombre, alias: (x.alias || []).concat(x.nombre_ci ? [x.nombre] : []), activo: x.activo, orden: x.orden };
-    });
+    SCI.areas = r[1].data || [];
     SCI.fundos = r[2].data || [];
     SCI.items = r[3].data || [];
     if (!SCI.items.length) throw new Error('Falta aplicar la migración 0016 (Satisfacción del cliente interno) en Supabase.');
@@ -67,6 +63,10 @@ SCI.plantas = function () {
 
 /* ------------------------------------------------------------ plantas y áreas asignadas al usuario ([] = todas) */
 SCI.misPlantas = function () { return AT.esAdmin() || !AT.perfil ? [] : (AT.perfil.sci_plantas || []); };
+/** Área del usuario (evaluadora) asignada por el admin; null si no tiene. */
+SCI.miArea = function () { return AT.perfil && AT.perfil.sci_area ? Number(AT.perfil.sci_area) : null; };
+/** Campaña por defecto: «<Cultivo> <año actual>» (p. ej. «Arándano 2026»). */
+SCI.campanaDefecto = function (cul) { return cul ? cul.nombre + ' ' + new Date().getFullYear() : ''; };
 SCI.misAreas = function () { return AT.esAdmin() || !AT.perfil ? [] : (AT.perfil.sci_areas || []).map(Number); };
 SCI.codigosPlanta = function () { return SCI.plantas().map(function (p) { return p.codigo; }); };
 

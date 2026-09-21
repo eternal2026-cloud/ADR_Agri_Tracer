@@ -39,7 +39,7 @@ CONFIG.cargar = function () {
     sb.from('listas_maestras').select('*').order('tipo').order('orden').order('valor'),
     sb.from('perfiles').select('*').order('creado_en'),
     AT.rpc('rpc_estado_sync_sheets').catch(function (e) { return { _error: e.message }; }),
-    sb.from('s5_areas').select('*').order('orden').order('nombre')
+    sb.from('sci_areas').select('*').order('orden').order('nombre')
   ]).then(function (r) {
     [0, 1, 2].forEach(function (i) { if (r[i].error) throw new Error(r[i].error.message); });
     CONFIG.parametros = {};
@@ -290,58 +290,63 @@ CONFIG.mostrarCredenciales = function (r, tipo) {
   DR.vibrar(40);
 };
 
-/* ============================================================ ÁREAS (nombre legal · Cliente interno) */
+/* ============================================================ ÁREAS · CLIENTE INTERNO */
 /**
- * Nombre legal de cada área SOLO para Satisfacción del cliente interno (s5_areas.nombre_ci).
- * Auditoría 5S no cambia: sigue con su nombre y su catálogo por cultivo.
- * En Cliente interno el nombre nuevo se ve en la app, la presentación, el Excel de Power BI
- * y Google Sheets, también en las encuestas ya registradas. El nombre anterior queda como
+ * Catálogo propio de áreas de Satisfacción del cliente interno (sci_areas). Auditoría 5S no
+ * cambia (usa s5_areas). Aquí se separa lo que en 5S es una sola área, p. ej.
+ * Producción → Producción Cítricos, Producción Arándano, Producción Uva Limpieza.
+ * Renombrar actualiza también las encuestas ya registradas; el nombre anterior queda como
  * alias para que el importador de Excel lo siga reconociendo.
  */
 CONFIG.tabAreas = function (c) {
-  var areas = CONFIG.areas.filter(function (a) { return a.activo || a.nombre_ci; });
-  var filas = areas.map(function (a) {
-    var actual = a.nombre_ci || a.nombre;
-    var antes = (a.alias || []).filter(function (x) { return x && x !== actual && x !== a.nombre; });
-    return '<div class="area-fila">' +
-      '<div class="area-campo"><input value="' + DR.esc(actual) + '" data-area-nombre="' + a.id + '" aria-label="Nombre legal de ' + DR.esc(actual) + ' en Cliente interno" autocomplete="off">' +
-      '<small>En Auditoría 5S: ' + DR.esc(a.nombre) + (antes.length ? ' · Antes: ' + antes.map(DR.esc).join(' · ') : '') + '</small></div>' +
+  var filas = CONFIG.areas.map(function (a) {
+    var antes = (a.alias || []).filter(Boolean);
+    return '<div class="area-fila' + (a.activo ? '' : ' inactiva') + '">' +
+      '<div class="area-campo"><input value="' + DR.esc(a.nombre) + '" data-area-nombre="' + a.id + '" aria-label="Nombre legal de ' + DR.esc(a.nombre) + '" autocomplete="off">' +
+      (antes.length ? '<small>Antes: ' + antes.map(DR.esc).join(' · ') + '</small>' : '') + '</div>' +
       '<div class="area-acciones"><button type="button" class="btn chico oculto" data-area-guardar="' + a.id + '">Guardar</button>' +
-      (a.nombre_ci ? '<button type="button" class="btn sec chico" data-area-restablecer="' + a.id + '">Usar el de 5S</button>' : '') + '</div></div>';
+      '<button type="button" class="btn sec chico" data-area-activa="' + a.id + '">' + (a.activo ? 'Desactivar' : 'Activar') + '</button></div></div>';
   }).join('');
-  c.innerHTML = UI.panel('Nombre legal de las áreas · Cliente interno', areas.length + ' área(s) · solo cambia Satisfacción del cliente interno',
-    '<div class="aviso">Escribe el <b>nombre legal</b> y toca <b>Guardar</b>. Se actualiza en Satisfacción del cliente interno: pantallas, presentación, Excel para Power BI y Google Sheets, <b>también en las encuestas ya registradas</b>. <b>Auditoría 5S no cambia</b>: mantiene sus nombres y su organización por cultivo.</div>' +
+  c.innerHTML = UI.panel('Áreas de Satisfacción del cliente interno', CONFIG.areas.filter(function (a) { return a.activo; }).length + ' activa(s) · Auditoría 5S no cambia',
+    '<div class="aviso">Escribe el <b>nombre legal</b> de cada área. Puedes <b>separar</b> lo que en 5S es una sola área (ej. <i>Producción Cítricos</i>, <i>Producción Arándano</i>, <i>Producción Uva Limpieza</i>). Renombrar actualiza también las encuestas ya registradas. Luego asigna a cada usuario su área en <b>Cliente interno → Evaluadores</b>.</div>' +
+    '<div class="lista-add"><input id="inpNuevaArea" placeholder="Nueva área (nombre legal)…" autocomplete="off"><button type="button" class="btn chico verde" id="btnNuevaArea">Agregar</button></div>' +
     '<div class="areas-lista">' + (filas || '<div class="vacio">Todavía no hay áreas.</div>') + '</div>');
 
   var buscar = function (id) { return CONFIG.areas.filter(function (a) { return a.id === Number(id); })[0]; };
-  var guardar = function (btn, a, nombre, ok) {
+  var guardar = function (btn, datos, ok) {
     btn.disabled = true;
-    return AT.rpc('rpc_sci_nombre_area', { p_area: a.id, p_nombre: nombre }).then(function () {
+    return AT.rpc('rpc_sci_guardar_area', { p: datos }).then(function () {
       DR.toast(ok);
       return CONFIG.refrescar();
     }).catch(function (e) { btn.disabled = false; DR.toast(e.message, 'error'); });
   };
   DR.$$('[data-area-nombre]', c).forEach(function (inp) {
     var a = buscar(inp.getAttribute('data-area-nombre')), btn = DR.$('[data-area-guardar="' + a.id + '"]', c);
-    inp.oninput = function () { btn.classList.toggle('oculto', !this.value.trim() || this.value.trim() === (a.nombre_ci || a.nombre)); };
+    inp.oninput = function () { btn.classList.toggle('oculto', !this.value.trim() || this.value.trim() === a.nombre); };
     inp.onkeydown = function (ev) { if (ev.key === 'Enter' && !btn.classList.contains('oculto')) btn.click(); };
   });
   DR.$$('[data-area-guardar]', c).forEach(function (b) {
     b.onclick = function () {
-      var a = buscar(this.getAttribute('data-area-guardar')), antes = a.nombre_ci || a.nombre;
-      var nuevo = DR.$('[data-area-nombre="' + a.id + '"]', c).value.trim();
-      if (!nuevo || nuevo === antes) return;
-      if (!window.confirm('¿Cambiar «' + antes + '» por «' + nuevo + '» en Cliente interno?\n\nSe actualiza también en las encuestas ya registradas. Auditoría 5S no cambia.')) return;
-      guardar(this, a, nuevo, 'Cliente interno: «' + nuevo + '».');
+      var a = buscar(this.getAttribute('data-area-guardar')), nuevo = DR.$('[data-area-nombre="' + a.id + '"]', c).value.trim();
+      if (!nuevo || nuevo === a.nombre) return;
+      if (!window.confirm('¿Cambiar «' + a.nombre + '» por «' + nuevo + '»?' + String.fromCharCode(10, 10) + 'Se actualiza también en las encuestas ya registradas. Auditoría 5S no cambia.')) return;
+      guardar(this, { id: a.id, nombre: nuevo }, 'Área renombrada: «' + nuevo + '».');
     };
   });
-  DR.$$('[data-area-restablecer]', c).forEach(function (b) {
+  DR.$$('[data-area-activa]', c).forEach(function (b) {
     b.onclick = function () {
-      var a = buscar(this.getAttribute('data-area-restablecer'));
-      if (!window.confirm('¿Volver a usar «' + a.nombre + '» (el nombre de 5S) en Cliente interno?')) return;
-      guardar(this, a, '', 'Cliente interno vuelve a usar «' + a.nombre + '».');
+      var a = buscar(this.getAttribute('data-area-activa'));
+      if (a.activo && !window.confirm('¿Desactivar «' + a.nombre + '»? Deja de ofrecerse en la encuesta; lo ya registrado se conserva.')) return;
+      guardar(this, { id: a.id, activo: !a.activo }, a.activo ? 'Área desactivada.' : 'Área activada.');
     };
   });
+  var agregar = function () {
+    var inp = DR.$('#inpNuevaArea'), nombre = inp.value.trim();
+    if (!nombre) { inp.focus(); return; }
+    guardar(DR.$('#btnNuevaArea'), { nombre: nombre }, '«' + nombre + '» agregada.');
+  };
+  DR.$('#btnNuevaArea').onclick = agregar;
+  DR.$('#inpNuevaArea').onkeydown = function (ev) { if (ev.key === 'Enter') agregar(); };
 };
 
 /* ============================================================ LISTAS */

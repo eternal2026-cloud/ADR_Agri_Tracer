@@ -21,7 +21,7 @@ DR.ir = function (vista) {
   DR.vista = vista;
   DR.$$('.nav-btn').forEach(function (b) { b.classList.toggle('activo', b.getAttribute('data-vista') === vista); });
   DR.moverIndicador(vista);
-  if (vista !== 'config' || !/^#(usuarios|listas|sheets|ajustes)$/.test(location.hash)) {
+  if (vista !== 'config' || !/^#(usuarios|areas|listas|sheets|ajustes)$/.test(location.hash)) {
     try { history.replaceState(null, '', '#' + vista); } catch (e) { /* sin history */ }
   }
   var cont = DR.$('#contenido');
@@ -40,7 +40,7 @@ DR.moverIndicador = function (vista) {
 
 function vistaInicial() {
   var h = (location.hash || '').replace('#', '');
-  if (['usuarios', 'listas', 'sheets', 'ajustes'].indexOf(h) > -1) { CONFIG.tab = h; return 'config'; }
+  if (['usuarios', 'areas', 'listas', 'sheets', 'ajustes'].indexOf(h) > -1) { CONFIG.tab = h; return 'config'; }
   if (DR.ORDEN.indexOf(h) > -1) return h;
   return AT.perfil && AT.perfil.rol === 'captura' ? 'captura' : 'resumen';
 }

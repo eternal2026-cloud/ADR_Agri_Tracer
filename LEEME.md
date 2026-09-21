@@ -6,12 +6,13 @@ respaldado por **Supabase** (Postgres + Auth + Edge Functions + Vault + pg_cron)
 ## Estado actual
 
 - **Proyecto Supabase** `agritracer-don-ricardo` (ref `ptsvriudoilsyofgccsb`) con
-  migraciones `supabase/migrations/0001..0019` aplicadas (0012: Auditoría 5S,
+  migraciones `supabase/migrations/0001..0020` aplicadas (0012: Auditoría 5S,
   0013: Auditoría 5S por cultivo, 0014: observaciones 5S por área,
   0015: Revisión del plan de mantenimiento, 0016: Satisfacción del cliente
   interno y cultivo en los tiempos de ciclo, 0017: acceso por correo —retirado
   en la app, se volvió a usuario y contraseña—, 0018: fundos por usuario,
-  0019: evolución semanal y plantas/áreas por evaluador en Cliente interno).
+  0019: evolución semanal y plantas/áreas por evaluador en Cliente interno,
+  0020: nombre legal de las áreas con alias).
 - **Edge Functions desplegadas** (código en `supabase/functions/`):
   - `admin-usuarios` — crear usuarios, restablecer contraseñas, cambiar rol, desactivar.
   - `sync-sheets` — espejo de auditoría hacia Google Sheets.
@@ -34,6 +35,16 @@ respaldado por **Supabase** (Postgres + Auth + Edge Functions + Vault + pg_cron)
   la URL; conviene igual actualizar *Site URL* en Supabase → Authentication → URL
   Configuration. Quien tenga la app «instalada» en el celular debe volver a agregarla
   desde la nueva dirección.
+
+## Áreas: nombre legal (Config → Áreas, migración 0020)
+
+- Un solo catálogo (`s5_areas`) para Auditoría 5S y Satisfacción del cliente interno.
+  Todo lo registrado apunta al área por su **id**, así que renombrarla cambia el nombre
+  en todas las pantallas, informes, presentaciones y Google Sheets, también en lo ya
+  registrado.
+- El nombre anterior queda en `s5_areas.alias` (se ve como «Antes: …»): el importador de
+  Excel de Cliente interno y el alta de áreas en 5S lo siguen reconociendo, sin duplicar.
+- Cada cambio queda en la bitácora (módulo `AREAS`). También se puede desactivar un área.
 
 ## Portada por grupos
 

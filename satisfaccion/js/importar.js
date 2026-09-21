@@ -98,14 +98,22 @@
     IMP.PLANTAS.forEach(function (p) { t = t.replace(new RegExp('\\b' + p + '\\b', 'g'), ' '); });
     t = t.replace(/\s*-\s*(ARANDANO|UVA|CITRICO)\b.*$/, '').replace(/^AREA DE\s+/, '').replace(/\s+/g, ' ').trim();
     if (!t) return null;
-    var porNombre = function (n) { return areas.filter(function (a) { return IMP.norm(a.nombre) === IMP.norm(n); })[0] || null; };
+    // Nombre actual o uno anterior (alias): las áreas se pueden renombrar a su nombre legal en Config → Áreas.
+    var porNombre = function (n) {
+      var k = IMP.norm(n);
+      return areas.filter(function (a) { return IMP.norm(a.nombre) === k; })[0] ||
+        areas.filter(function (a) { return (a.alias || []).some(function (x) { return IMP.norm(x) === k; }); })[0] || null;
+    };
     if (IMP.SINONIMOS[t] && porNombre(IMP.SINONIMOS[t])) return porNombre(IMP.SINONIMOS[t]);
     var exacta = porNombre(t);
     if (exacta) return exacta;
     var mejor = null;
+    var largoMejor = 0;
     areas.forEach(function (a) {
-      var n = IMP.norm(a.nombre);
-      if (t.indexOf(n) > -1 && (!mejor || n.length > IMP.norm(mejor.nombre).length)) mejor = a;
+      [a.nombre].concat(a.alias || []).forEach(function (nom) {
+        var n = IMP.norm(nom);
+        if (n && t.indexOf(n) > -1 && n.length > largoMejor) { mejor = a; largoMejor = n.length; }
+      });
     });
     return mejor;
   };

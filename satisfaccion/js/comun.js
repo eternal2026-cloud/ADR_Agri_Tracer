@@ -28,7 +28,7 @@ SCI.cargar = function (forzar) {
   if (SCI._carga && !forzar) return SCI._carga;
   SCI._carga = Promise.all([
     sb.from('s5_cultivos').select('id,nombre,icono,color,campana,activo,orden').order('orden').order('nombre'),
-    sb.from('s5_areas').select('id,nombre,activo,orden').order('orden').order('nombre'),
+    sb.from('s5_areas').select('id,nombre,alias,activo,orden').order('orden').order('nombre'),
     sb.from('listas_maestras').select('valor,codigo,activo,orden').eq('tipo', 'fundo').order('orden').order('valor'),
     sb.from('sci_items').select('*').order('id')
   ]).then(function (r) {

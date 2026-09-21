@@ -4,10 +4,11 @@
  * (admin-usuarios, sync-sheets): no dependen de variables en Vercel.
  * ==========================================================================*/
 
-var CONFIG = { tab: 'usuarios', parametros: {}, listas: [], usuarios: [], sync: null, rolNuevo: 'captura', usuarioEditado: false, fundosNuevo: [] };
+var CONFIG = { tab: 'usuarios', parametros: {}, listas: [], usuarios: [], areas: [], sync: null, rolNuevo: 'captura', usuarioEditado: false, fundosNuevo: [] };
 
 CONFIG.TABS = [
   { id: 'usuarios', t: 'Usuarios', ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.8-3.2 3-5 5.5-5s4.7 1.8 5.5 5"/><path d="M17 8v6M14 11h6"/></svg>' },
+  { id: 'areas', t: 'Áreas', ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V9l8-5 8 5v11"/><path d="M9 20v-6h6v6"/></svg>' },
   { id: 'listas', t: 'Listas', ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></svg>' },
   { id: 'sheets', t: 'Sheets', ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="3.5" width="16" height="17" rx="2"/><path d="M4 9h16M4 14.5h16M10 9v11.5"/></svg>' },
   { id: 'ajustes', t: 'Ajustes', ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h10M4 12h16M4 18h7"/><circle cx="18" cy="6" r="2"/><circle cx="15" cy="18" r="2"/></svg>' }
@@ -37,7 +38,8 @@ CONFIG.cargar = function () {
     sb.from('parametros').select('*'),
     sb.from('listas_maestras').select('*').order('tipo').order('orden').order('valor'),
     sb.from('perfiles').select('*').order('creado_en'),
-    AT.rpc('rpc_estado_sync_sheets').catch(function (e) { return { _error: e.message }; })
+    AT.rpc('rpc_estado_sync_sheets').catch(function (e) { return { _error: e.message }; }),
+    sb.from('s5_areas').select('*').order('orden').order('nombre')
   ]).then(function (r) {
     [0, 1, 2].forEach(function (i) { if (r[i].error) throw new Error(r[i].error.message); });
     CONFIG.parametros = {};
@@ -45,6 +47,7 @@ CONFIG.cargar = function () {
     CONFIG.listas = r[1].data || [];
     CONFIG.usuarios = r[2].data || [];
     CONFIG.sync = r[3] || {};
+    CONFIG.areas = r[4].error ? [] : (r[4].data || []);
   });
 };
 
@@ -54,7 +57,7 @@ CONFIG.refrescar = function () {
 
 CONFIG.render = function (cont) {
   cont.innerHTML = UI.encabezado('Configuración', 'Panel de administración', 'Da acceso a tu equipo, ajusta las opciones de captura y conecta el espejo en Google Sheets.') +
-    '<div class="segmentos entra" role="tablist">' + CONFIG.TABS.map(function (t) {
+    '<div class="segmentos entra" role="tablist" style="grid-template-columns:repeat(' + CONFIG.TABS.length + ',minmax(0,1fr))">' + CONFIG.TABS.map(function (t) {
       return '<button type="button" role="tab" class="segmento' + (t.id === CONFIG.tab ? ' activo' : '') + '" data-tab="' + t.id + '">' + t.ico + '<span>' + t.t + '</span></button>';
     }).join('') + '</div><div id="cfgCuerpo"></div>';
   DR.$$('.segmento', cont).forEach(function (b) {
@@ -73,7 +76,7 @@ CONFIG.render = function (cont) {
 CONFIG.pintarTab = function () {
   var c = DR.$('#cfgCuerpo');
   if (!c) return;
-  var fn = { usuarios: CONFIG.tabUsuarios, listas: CONFIG.tabListas, sheets: CONFIG.tabSheets, ajustes: CONFIG.tabAjustes }[CONFIG.tab] || CONFIG.tabUsuarios;
+  var fn = { usuarios: CONFIG.tabUsuarios, areas: CONFIG.tabAreas, listas: CONFIG.tabListas, sheets: CONFIG.tabSheets, ajustes: CONFIG.tabAjustes }[CONFIG.tab] || CONFIG.tabUsuarios;
   fn(c);
   DR.entrarPaneles('#cfgCuerpo');
 };
@@ -285,6 +288,64 @@ CONFIG.mostrarCredenciales = function (r, tipo) {
   };
   DR.$('#btnCerrarHoja').onclick = UI.cerrarHoja;
   DR.vibrar(40);
+};
+
+/* ============================================================ ÁREAS (nombre legal) */
+/**
+ * Catálogo único de áreas (s5_areas) para Auditoría 5S y Satisfacción del cliente interno.
+ * Todo lo registrado apunta al área por su id: renombrarla cambia el nombre en todas las
+ * pantallas, informes y en Google Sheets, también en lo ya registrado. El nombre anterior
+ * queda como alias (el importador de Excel lo sigue reconociendo).
+ */
+CONFIG.tabAreas = function (c) {
+  var filas = CONFIG.areas.map(function (a) {
+    var antes = (a.alias || []).filter(Boolean);
+    return '<div class="area-fila' + (a.activo ? '' : ' inactiva') + '" data-area-fila="' + a.id + '">' +
+      '<div class="area-campo"><input value="' + DR.esc(a.nombre) + '" data-area-nombre="' + a.id + '" aria-label="Nombre legal del área ' + DR.esc(a.nombre) + '" autocomplete="off">' +
+      (antes.length ? '<small>Antes: ' + antes.map(DR.esc).join(' · ') + '</small>' : '') + '</div>' +
+      '<div class="area-acciones"><button type="button" class="btn chico oculto" data-area-guardar="' + a.id + '">Guardar</button>' +
+      '<button type="button" class="btn sec chico" data-area-activa="' + a.id + '">' + (a.activo ? 'Desactivar' : 'Activar') + '</button></div></div>';
+  }).join('');
+  c.innerHTML = UI.panel('Nombre legal de las áreas', CONFIG.areas.length + ' área(s) · se usan en Auditoría 5S y en Satisfacción del cliente interno',
+    '<div class="aviso">Escribe el <b>nombre legal</b> y toca <b>Guardar</b>. El cambio se ve al instante en todos los módulos, informes, presentaciones y Google Sheets, <b>también en lo ya registrado</b>. El nombre anterior se conserva como «Antes» para que el Excel histórico lo siga reconociendo.</div>' +
+    '<div class="areas-lista">' + (filas || '<div class="vacio">Todavía no hay áreas.</div>') + '</div>' +
+    '<div class="lista-add"><input id="inpNuevaArea" placeholder="Nueva área (nombre legal)…" autocomplete="off"><button type="button" class="btn chico" id="btnNuevaArea">Agregar</button></div>');
+
+  var buscar = function (id) { return CONFIG.areas.filter(function (a) { return a.id === Number(id); })[0]; };
+  var guardar = function (btn, datos, ok) {
+    btn.disabled = true;
+    return AT.rpc('rpc_s5_guardar_area', { p: datos }).then(function () {
+      DR.toast(ok);
+      return CONFIG.refrescar();
+    }).catch(function (e) { btn.disabled = false; DR.toast(e.message, 'error'); });
+  };
+  DR.$$('[data-area-nombre]', c).forEach(function (inp) {
+    var id = inp.getAttribute('data-area-nombre'), btn = DR.$('[data-area-guardar="' + id + '"]', c);
+    inp.oninput = function () { btn.classList.toggle('oculto', this.value.trim() === buscar(id).nombre || !this.value.trim()); };
+    inp.onkeydown = function (ev) { if (ev.key === 'Enter' && !btn.classList.contains('oculto')) btn.click(); };
+  });
+  DR.$$('[data-area-guardar]', c).forEach(function (b) {
+    b.onclick = function () {
+      var a = buscar(this.getAttribute('data-area-guardar')), nuevo = DR.$('[data-area-nombre="' + a.id + '"]', c).value.trim();
+      if (!nuevo || nuevo === a.nombre) return;
+      if (!window.confirm('¿Cambiar «' + a.nombre + '» por «' + nuevo + '»?\n\nSe actualiza en todos los módulos e informes, también en lo ya registrado.')) return;
+      guardar(this, { id: a.id, nombre: nuevo }, 'Área renombrada: «' + nuevo + '».');
+    };
+  });
+  DR.$$('[data-area-activa]', c).forEach(function (b) {
+    b.onclick = function () {
+      var a = buscar(this.getAttribute('data-area-activa'));
+      if (a.activo && !window.confirm('¿Desactivar «' + a.nombre + '»? Deja de ofrecerse al registrar; lo ya registrado se conserva.')) return;
+      guardar(this, { id: a.id, activo: !a.activo }, a.activo ? 'Área desactivada.' : 'Área activada.');
+    };
+  });
+  var agregar = function () {
+    var inp = DR.$('#inpNuevaArea'), nombre = inp.value.trim();
+    if (!nombre) { inp.focus(); return; }
+    guardar(DR.$('#btnNuevaArea'), { nombre: nombre }, '«' + nombre + '» agregada.');
+  };
+  DR.$('#btnNuevaArea').onclick = agregar;
+  DR.$('#inpNuevaArea').onkeydown = function (ev) { if (ev.key === 'Enter') agregar(); };
 };
 
 /* ============================================================ LISTAS */

@@ -53,10 +53,12 @@ RES.renderGeneral = function (cont) {
 
     var barras = fundos.map(function (f) { return { etq: f.fundo, valor: f.t_ciclo_total, dec: 1 }; });
     h += UI.panel('Tiempo de ciclo total por fundo', 'La línea punteada marca el umbral configurado.', GRAFICO.barrasFundo(barras, RES.umbral));
+    h += EVO.panelHtml();
 
     cont.innerHTML = h;
     DR.entrarPaneles('#contenido');
     GRAFICO.animarBarrasFundo();
+    EVO.montar();
 
     DR.$('#selSemanaIr').onchange = function () { if (this.value) RES.irSemana(Number(this.value)); };
     DR.$$('tbody tr.clicable', cont).forEach(function (tr) {

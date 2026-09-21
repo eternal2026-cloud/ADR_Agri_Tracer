@@ -6,7 +6,7 @@
  * consolidado, detalle por planta con sugerencias, encuestas e histórico.
  * Descargas: BD para Power BI (.xlsx) y presentación (.pptx).
  * ==========================================================================*/
-var RSCI = { area: null, campana: '', desde: '', hasta: '', filas: [] };
+var RSCI = { area: null, anio: null, campana: '', desde: '', hasta: '', filas: [] };
 
 VISTAS.resultados = function (cont) {
   SCI.resultados(SCI.cultivoFiltro()).then(function (filas) {
@@ -18,7 +18,8 @@ VISTAS.resultados = function (cont) {
 /** Filas que cumplen campaña y fechas (sin filtrar el área). */
 RSCI.filtradas = function () {
   return RSCI.filas.filter(function (f) {
-    return (!RSCI.campana || f.campana === RSCI.campana) &&
+    return (!RSCI.anio || String(f.fecha).substring(0, 4) === RSCI.anio) &&
+      (!RSCI.campana || f.campana === RSCI.campana) &&
       (!RSCI.desde || f.fecha >= RSCI.desde) && (!RSCI.hasta || f.fecha <= RSCI.hasta);
   });
 };
@@ -33,6 +34,15 @@ RSCI.grupos = function (filas) {
 
 RSCI.pintar = function (cont) {
   var cul = SCI.cultivo(SCI.cultivoFiltro());
+  // Año: por defecto el actual (2026); si aún no hay encuestas de este año, el más reciente.
+  var anios = [];
+  RSCI.filas.forEach(function (f) { var a = String(f.fecha || '').substring(0, 4); if (a && anios.indexOf(a) < 0) anios.push(a); });
+  anios.sort().reverse();
+  if (RSCI.anio === null) {
+    var actual = String(new Date().getFullYear());
+    RSCI.anio = anios.indexOf(actual) > -1 ? actual : (anios[0] || '');
+  }
+  if (RSCI.anio && anios.indexOf(RSCI.anio) < 0) anios.unshift(RSCI.anio);
   var base = RSCI.filtradas();
   var campanas = [];
   RSCI.filas.forEach(function (f) { if (campanas.indexOf(f.campana) < 0) campanas.push(f.campana); });
@@ -47,6 +57,8 @@ RSCI.pintar = function (cont) {
   var area = porArea.filter(function (a) { return a.id === RSCI.area; })[0];
 
   var filtros = '<section class="panel entra"><div class="form">' +
+    '<div class="campo"><label for="fAnio">Año</label><select id="fAnio"><option value="">Todos</option>' +
+      anios.map(function (a) { return '<option' + (a === RSCI.anio ? ' selected' : '') + '>' + a + '</option>'; }).join('') + '</select></div>' +
     '<div class="campo"><label for="fCampana">Campaña</label><select id="fCampana"><option value="">Todas</option>' +
       campanas.map(function (c) { return '<option' + (c === RSCI.campana ? ' selected' : '') + '>' + DR.esc(c) + '</option>'; }).join('') + '</select></div>' +
     '<div class="campo"><label for="fDesde">Desde</label><input id="fDesde" type="date" value="' + DR.esc(RSCI.desde) + '"></div>' +
@@ -76,6 +88,7 @@ RSCI.pintar = function (cont) {
 
   var recargar = function () { cont.innerHTML = '<div class="vacio">Cargando resultados…</div>'; VISTAS.resultados(cont); };
   SCI.enlazarSelectorCultivo(cont, recargar);
+  DR.$('#fAnio').onchange = function () { RSCI.anio = this.value; RSCI.pintar(cont); };
   DR.$('#fCampana').onchange = function () { RSCI.campana = this.value; RSCI.pintar(cont); };
   DR.$('#fDesde').onchange = function () { RSCI.desde = this.value; RSCI.pintar(cont); };
   DR.$('#fHasta').onchange = function () { RSCI.hasta = this.value; RSCI.pintar(cont); };

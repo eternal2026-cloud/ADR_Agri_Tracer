@@ -10,9 +10,11 @@ ENC.PASOS = ['Datos', 'Evaluación', 'Sugerencias', 'Resumen'];
 
 ENC.nuevo = function () {
   var cul = SCI.cultivo(SCI.cultivoFiltro()) || SCI.cultivos.filter(function (c) { return c.activo; })[0] || {};
+  var plantas = SCI.misPlantas(), areas = SCI.misAreas();
   return {
     id: SCI.uuid(), cultivo_id: cul.id || '', campana: cul.campana || '', fecha: SCI.hoy(),
-    area_evaluada_id: '', area_evaluadora_id: '', sub_area: '', planta: '', cargo: '', evaluador: '',
+    area_evaluada_id: areas.length === 1 ? String(areas[0]) : '', area_evaluadora_id: '', sub_area: '',
+    planta: plantas.length === 1 ? plantas[0] : '', cargo: '', evaluador: '',
     respuestas: {}, aspectos_valorados: '', aspectos_mejorar: '', recomendaciones: ''
   };
 };
@@ -41,6 +43,8 @@ ENC.faltanDatos = function () {
   if (!b.area_evaluada_id) x.push('área evaluada');
   if (!b.area_evaluadora_id) x.push('área evaluadora');
   if (b.area_evaluada_id && b.area_evaluada_id === b.area_evaluadora_id) x.push('áreas distintas (un área no se evalúa a sí misma)');
+  if (SCI.misPlantas().length && SCI.misPlantas().indexOf(String(b.planta || '').toUpperCase()) < 0) x.push('planta (una de las tuyas: ' + SCI.misPlantas().join(', ') + ')');
+  if (b.area_evaluada_id && SCI.misAreas().length && SCI.misAreas().indexOf(Number(b.area_evaluada_id)) < 0) x.push('un área a evaluar que tengas asignada');
   return x;
 };
 ENC.faltanItems = function () {
@@ -133,9 +137,9 @@ ENC.pasoDatos = function () {
       '<div class="campo"><label for="encCultivo">Cultivo</label><select id="encCultivo" data-enc="cultivo_id">' + SCI.opcionesCultivos(b.cultivo_id, 'Elegir…') + '</select></div>' +
       '<div class="campo"><label for="encCampana">Campaña</label><input id="encCampana" data-enc="campana" value="' + DR.esc(b.campana) + '" placeholder="Uva 2025 - 2026"></div>' +
       '<div class="campo"><label for="encFecha">Fecha</label><input id="encFecha" type="date" data-enc="fecha" max="' + SCI.hoy() + '" value="' + DR.esc(b.fecha) + '"></div>' +
-      '<div class="campo"><label for="encEvaluada">Área a evaluar</label><select id="encEvaluada" data-enc="area_evaluada_id">' + SCI.opcionesAreas(b.area_evaluada_id, 'Elegir…') + '</select></div>' +
+      '<div class="campo"><label for="encEvaluada">Área a evaluar</label><select id="encEvaluada" data-enc="area_evaluada_id">' + SCI.opcionesAreas(b.area_evaluada_id, 'Elegir…', SCI.misAreas()) + '</select></div>' +
       '<div class="campo"><label for="encEvaluadora">Área evaluadora</label><select id="encEvaluadora" data-enc="area_evaluadora_id">' + SCI.opcionesAreas(b.area_evaluadora_id, 'Elegir…') + '</select></div>' +
-      '<div class="campo"><label for="encPlanta">Planta</label><select id="encPlanta" data-enc="planta">' + SCI.opcionesPlantas(b.planta) + '</select></div>' +
+      '<div class="campo"><label for="encPlanta">Planta</label><select id="encPlanta" data-enc="planta">' + SCI.opcionesPlantas(b.planta, SCI.misPlantas()) + '</select></div>' +
       '<div class="campo"><label for="encSub">Sub-área evaluadora <small>(opcional)</small></label><input id="encSub" data-enc="sub_area" list="dlSubEnc" value="' + DR.esc(b.sub_area) + '" placeholder="Limpieza, Packing…">' + SCI.datalistSubAreas('dlSubEnc') + '</div>' +
       '<div class="campo"><label for="encEvaluador">Nombre del evaluador <small>(opcional)</small></label><input id="encEvaluador" data-enc="evaluador" value="' + DR.esc(b.evaluador) + '"></div>' +
       '<div class="campo ancho"><label>Cargo</label>' + chips('cargo', SCI.CARGOS) + '</div>' +

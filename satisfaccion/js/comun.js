@@ -15,6 +15,9 @@ var SCI = {
   ESCALA: IMP_SCI.ESCALA,
   COLOR_ESCALA: { 4: '#E5484D', 6.5: '#EF7C3B', 8.5: '#0097CE', 10: '#76B729' },
   CARGOS: ['Jefe', 'Coordinador', 'Analista', 'Supervisor'],
+  // Nombre de la planta en este módulo cuando no es el del fundo de campo
+  // (el fundo La Máquina tiene su planta en Los Molinos; «La Máquina» queda solo para campo).
+  NOMBRE_PLANTA: { PLM: 'Los Molinos' },
   SUB_AREAS: ['Limpieza', 'Packing', 'Pesado', 'Etiquetado'],
   // Semáforo del resultado (solo visual).
   UMBRAL_BIEN: 85, UMBRAL_REGULAR: 70
@@ -52,11 +55,15 @@ SCI.plantas = function () {
   var lista = [];
   SCI.fundos.forEach(function (f) {
     var cod = (f.codigo || '').trim().toUpperCase();
-    if (cod && f.activo && !lista.some(function (p) { return p.codigo === cod; })) lista.push({ codigo: cod, fundo: f.valor });
+    if (cod && f.activo && !lista.some(function (p) { return p.codigo === cod; })) lista.push({ codigo: cod, fundo: SCI.NOMBRE_PLANTA[cod] || f.valor });
   });
-  IMP_SCI.PLANTAS.forEach(function (c) { if (!lista.some(function (p) { return p.codigo === c; })) lista.push({ codigo: c, fundo: '' }); });
+  IMP_SCI.PLANTAS.forEach(function (c) { if (!lista.some(function (p) { return p.codigo === c; })) lista.push({ codigo: c, fundo: SCI.NOMBRE_PLANTA[c] || '' }); });
   return lista;
 };
+
+/* ------------------------------------------------------------ plantas y áreas asignadas al usuario ([] = todas) */
+SCI.misPlantas = function () { return AT.esAdmin() || !AT.perfil ? [] : (AT.perfil.sci_plantas || []); };
+SCI.misAreas = function () { return AT.esAdmin() || !AT.perfil ? [] : (AT.perfil.sci_areas || []).map(Number); };
 SCI.codigosPlanta = function () { return SCI.plantas().map(function (p) { return p.codigo; }); };
 
 /* ------------------------------------------------------------ cultivo en uso (se recuerda en el celular) */
@@ -211,8 +218,12 @@ SCI.accion = function (btn, nombre, args, ok) {
 };
 
 /* ------------------------------------------------------------ opciones de formularios */
-SCI.opcionesAreas = function (actual, vacio) {
-  return (vacio ? '<option value="">' + DR.esc(vacio) + '</option>' : '') + SCI.areas.filter(function (a) { return a.activo || a.id === Number(actual); }).map(function (a) {
+/** permitidas: ids de área a los que se limita la lista (vacío = todas). */
+SCI.opcionesAreas = function (actual, vacio, permitidas) {
+  permitidas = permitidas || [];
+  return (vacio ? '<option value="">' + DR.esc(vacio) + '</option>' : '') + SCI.areas.filter(function (a) {
+    return (a.activo && (!permitidas.length || permitidas.indexOf(a.id) > -1)) || a.id === Number(actual);
+  }).map(function (a) {
     return '<option value="' + a.id + '"' + (a.id === Number(actual) ? ' selected' : '') + '>' + DR.esc(a.nombre) + '</option>';
   }).join('');
 };
@@ -221,11 +232,13 @@ SCI.opcionesCultivos = function (actual, vacio) {
     return '<option value="' + c.id + '"' + (c.id === Number(actual) ? ' selected' : '') + '>' + DR.esc(c.nombre) + '</option>';
   }).join('');
 };
-SCI.opcionesPlantas = function (actual) {
+/** permitidas: códigos de planta a los que se limita la lista (vacío = todas, con «Sin planta»). */
+SCI.opcionesPlantas = function (actual, permitidas) {
   actual = (actual || '').toUpperCase();
-  var lista = SCI.plantas();
-  if (actual && !lista.some(function (p) { return p.codigo === actual; })) lista.push({ codigo: actual, fundo: '' });
-  return '<option value="">Sin planta</option>' + lista.map(function (p) {
+  permitidas = permitidas || [];
+  var lista = SCI.plantas().filter(function (p) { return !permitidas.length || permitidas.indexOf(p.codigo) > -1 || p.codigo === actual; });
+  if (actual && !lista.some(function (p) { return p.codigo === actual; })) lista.push({ codigo: actual, fundo: SCI.NOMBRE_PLANTA[actual] || '' });
+  return (permitidas.length ? (actual ? '' : '<option value="">Elegir…</option>') : '<option value="">Sin planta</option>') + lista.map(function (p) {
     return '<option value="' + DR.esc(p.codigo) + '"' + (p.codigo === actual ? ' selected' : '') + '>' + DR.esc(p.codigo + (p.fundo ? ' · ' + p.fundo : '')) + '</option>';
   }).join('');
 };

@@ -6,11 +6,12 @@ respaldado por **Supabase** (Postgres + Auth + Edge Functions + Vault + pg_cron)
 ## Estado actual
 
 - **Proyecto Supabase** `agritracer-don-ricardo` (ref `ptsvriudoilsyofgccsb`) con
-  migraciones `supabase/migrations/0001..0018` aplicadas (0012: Auditoría 5S,
+  migraciones `supabase/migrations/0001..0019` aplicadas (0012: Auditoría 5S,
   0013: Auditoría 5S por cultivo, 0014: observaciones 5S por área,
   0015: Revisión del plan de mantenimiento, 0016: Satisfacción del cliente
   interno y cultivo en los tiempos de ciclo, 0017: acceso por correo —retirado
-  en la app, se volvió a usuario y contraseña—, 0018: fundos por usuario).
+  en la app, se volvió a usuario y contraseña—, 0018: fundos por usuario,
+  0019: evolución semanal y plantas/áreas por evaluador en Cliente interno).
 - **Edge Functions desplegadas** (código en `supabase/functions/`):
   - `admin-usuarios` — crear usuarios, restablecer contraseñas, cambiar rol, desactivar.
   - `sync-sheets` — espejo de auditoría hacia Google Sheets.
@@ -115,6 +116,11 @@ Protecciones en la base de datos (migración 0011):
   un ciclo la franja **Ir a** salta a otro. Al abrir un ciclo se traen sus datos
   del momento, al guardar solo se envían los campos que tocó esa persona (no se
   pisa lo que marcó otra) y la pantalla se refresca sola cada 20 s.
+- **Resumen → Evolución semanal por fundo** (`ciclos/js/evolucion.js`, `fn_evolucion_semanal`):
+  gráfico de líneas por semana. Se elige el **tiempo de operación** (total del ciclo o
+  cualquier tramo) y los **fundos** (cada uno agrega su línea y su leyenda; «Todos los
+  fundos» = promedio ponderado, línea punteada). Misma regla que el resumen: cerrados
+  y bajo el umbral. Tocar el gráfico muestra los valores de esa semana; debajo, la tabla.
 
 ## Auditoría 5S (módulo `auditoria5s/`, migraciones 0012, 0013 y 0014)
 
@@ -236,6 +242,14 @@ ENCUESTA) y de la presentación «Evaluación Cliente Interno - <Área>».
 - **Áreas**: catálogo `s5_areas` (compartido con 5S; 0016 activa Ingeniería y crea
   PCP). **Planta**: `listas_maestras.codigo` del fundo (DON CARLOS → PDC,
   LA MAQUINA → PLM, YANCAY → PYA), editable en `Config → Listas → Códigos de planta`.
+  En este módulo PLM se muestra como **Los Molinos** (`SCI.NOMBRE_PLANTA` en
+  `comun.js`); «La Máquina» queda solo para campo (tiempos de ciclo).
+- **Evaluadores** (pestaña solo admin, migración 0019): plantas y áreas que cada
+  usuario puede evaluar (`perfiles.sci_plantas`, `perfiles.sci_areas`, vacío = todas).
+  En la encuesta solo ve esas opciones; la base lo hace cumplir (`trg_sci_permisos`)
+  para lo registrado en la app. El histórico importado de Excel no se restringe.
+- **Resultados** abre por defecto en el **año actual (2026)**; el filtro Año permite
+  ver otro o todos.
 - Tablas `sci_criterios`, `sci_items`, `sci_encuestas`, `sci_respuestas`; RPC
   `rpc_sci_importar`, `rpc_sci_guardar_encuesta`, `rpc_sci_anular_encuesta`;
   lecturas `fn_sci_resultados` y `fn_sci_bd`. Bitácora con módulo `SATISFACCION_CI`.

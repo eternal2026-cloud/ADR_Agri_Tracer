@@ -63,6 +63,44 @@ AT.requiereSesion = function (destino) {
 AT.esAdmin = function () { return !!(AT.perfil && AT.perfil.rol === 'admin'); };
 AT.puedeCapturar = function () { return !!(AT.perfil && (AT.perfil.rol === 'admin' || AT.perfil.rol === 'captura')); };
 
+/**
+ * Accesos por usuario (perfiles.accesos, migración 0024): grupos › módulos › funciones.
+ * Claves grupo.modulo.funcion. registra: la función guarda datos (necesita rol Captura).
+ * Al agregar un módulo nuevo, sumarlo aquí; quien tiene acceso completo lo ve solo.
+ */
+AT.ACCESOS = [
+  { id: 'campo', t: 'Ingeniería · Campo', modulos: [
+    { id: 'campo.arandano', t: 'Toma de tiempos · Arándano', funciones: [
+      { id: 'campo.arandano.captura', t: 'Captura de tiempos', registra: true },
+      { id: 'campo.arandano.resumen', t: 'Resumen de tiempos' }] },
+    { id: 'campo.uva', t: 'Toma de tiempos · Uva', funciones: [
+      { id: 'campo.uva', t: 'Uva (en definición)' }] }] },
+  { id: 'planta', t: 'Ingeniería · Planta', modulos: [
+    { id: 'planta.reubicacion', t: 'Reubicación de personal', funciones: [
+      { id: 'planta.reubicacion', t: 'Reubicación de personal' }] }] },
+  { id: 'gestion', t: 'Gestión de Procesos', modulos: [
+    { id: 'gestion.5s', t: 'Auditoría 5S', funciones: [
+      { id: 'gestion.5s.auditar', t: 'Auditar', registra: true },
+      { id: 'gestion.5s.observaciones', t: 'Observaciones' },
+      { id: 'gestion.5s.resultados', t: 'Resultados' }] },
+    { id: 'gestion.mtto', t: 'Revisión plan de mantenimiento', funciones: [
+      { id: 'gestion.mtto.revisar', t: 'Revisar' },
+      { id: 'gestion.mtto.cargar', t: 'Cargar plan', registra: true },
+      { id: 'gestion.mtto.resultados', t: 'Resultados' }] },
+    { id: 'gestion.sci', t: 'Satisfacción del cliente interno', funciones: [
+      { id: 'gestion.sci.encuesta', t: 'Encuesta', registra: true },
+      { id: 'gestion.sci.cargar', t: 'Cargar histórico', registra: true },
+      { id: 'gestion.sci.resultados', t: 'Resultados' }] }] }
+];
+
+/** Mismo criterio que fn_tiene_acceso: admin o sin lista = todo; 'gestion.5s' vale si tiene alguna función de 5S. */
+AT.tieneAcceso = function (clave, perfil) {
+  var p = perfil || AT.perfil;
+  if (!p) return false;
+  if (p.rol === 'admin' || !p.accesos) return true;
+  return p.accesos.some(function (a) { return a === clave || a.indexOf(clave + '.') === 0; });
+};
+
 /** Llama una función Postgres (fn_/rpc_) vía PostgREST; lanza Error con mensaje legible. */
 AT.rpc = function (nombre, args) {
   return sb.rpc(nombre, args || {}).then(function (r) {

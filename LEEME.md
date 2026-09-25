@@ -6,13 +6,13 @@ respaldado por **Supabase** (Postgres + Auth + Edge Functions + Vault + pg_cron)
 ## Estado actual
 
 - **Proyecto Supabase** `agritracer-don-ricardo` (ref `ptsvriudoilsyofgccsb`) con
-  migraciones `supabase/migrations/0001..0022` aplicadas (0012: Auditoría 5S,
+  migraciones `supabase/migrations/0001..0024` aplicadas (0012: Auditoría 5S,
   0013: Auditoría 5S por cultivo, 0014: observaciones 5S por área,
   0015: Revisión del plan de mantenimiento, 0016: Satisfacción del cliente
   interno y cultivo en los tiempos de ciclo, 0017: acceso por correo —retirado
   en la app, se volvió a usuario y contraseña—, 0018: fundos por usuario,
   0019: evolución semanal y plantas/áreas por evaluador en Cliente interno,
-  0020-0022: áreas propias de Cliente interno).
+  0020-0023: áreas propias de Cliente interno, 0024: accesos por usuario).
 - **Edge Functions desplegadas** (código en `supabase/functions/`):
   - `admin-usuarios` — crear usuarios, restablecer contraseñas, cambiar rol, desactivar.
   - `sync-sheets` — espejo de auditoría hacia Google Sheets.
@@ -95,7 +95,23 @@ Mismo orden del organigrama de Ingeniería de Procesos (lista `GRUPOS` en `index
    **Copiar** y **Enviar por WhatsApp**. No se vuelve a mostrar.
 5. La persona entra a la página de inicio y crea su propia contraseña.
 
-Desde la misma lista: *Fundos*, *Nueva contraseña*, cambiar rol o *Desactivar*.
+Desde la misma lista: *Accesos*, *Fundos*, *Nueva contraseña*, cambiar rol o *Desactivar*.
+
+**Accesos por usuario** (migración 0024): al crear el usuario («¿Qué podrá ver?») o con
+el botón *Accesos* se marcan los grupos (Ingeniería · Campo, Ingeniería · Planta, Gestión
+de Procesos) y, dentro de cada módulo, las funciones: ej. en Auditoría 5S solo *Auditar*
+y no *Resultados*. «Todo el grupo» marca un grupo entero; **Acceso completo** = todo,
+incluidos los módulos que se agreguen después.
+
+- `perfiles.accesos`: claves `grupo.modulo.funcion` (catálogo en `AT.ACCESOS`,
+  `js/supabase-cliente.js`). `NULL` = acceso completo: así quedaron los usuarios que ya
+  existían. Al crear uno nuevo hay que marcar al menos una función o «Acceso completo».
+- El **rol** sigue decidiendo si registra (Captura) o solo consulta; los accesos solo
+  reducen lo que ve. Las funciones con ✎ registran datos. Los administradores ven todo.
+- La portada muestra solo las tarjetas asignadas y cada módulo solo sus pestañas.
+  La base además impide registrar en un módulo no asignado (`fn_exigir_acceso` en
+  ciclos, 5S, mantenimiento y cliente interno); la lectura no se restringe en la base.
+- Módulo nuevo: agregarlo a `AT.ACCESOS` y ponerle `acceso: '…'` a su tarjeta en `index.html`.
 
 **Fundos asignados** (migración 0018): al crear el usuario o con el botón *Fundos*
 se marcan uno o más fundos. En Captura solo verá y podrá elegir esos fundos, y

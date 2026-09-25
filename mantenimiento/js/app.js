@@ -1,15 +1,15 @@
 /* ============================================================================
  * app.js — ARRANQUE Y NAVEGACIÓN DEL MÓDULO REVISIÓN DEL PLAN DE MANTENIMIENTO
- * Exige sesión. Pestañas según rol: Resultados y Revisar (todos; visor solo
+ * Exige sesión. Pestañas según rol y accesos del usuario: Resultados y Revisar (todos; visor solo
  * lectura), Cargar (admin y captura). Enlaces: #resultados, #revisar, #cargar.
  * ==========================================================================*/
 
 DR.TABS = [
-  { id: 'resultados', t: 'Resultados', c: '#0097CE', ver: function () { return true; },
+  { id: 'resultados', t: 'Resultados', c: '#0097CE', ver: function () { return AT.tieneAcceso('gestion.mtto.resultados'); },
     ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 20h16"/><rect x="5.5" y="11" width="3" height="6" rx="1"/><rect x="10.5" y="6" width="3" height="11" rx="1"/><rect x="15.5" y="9" width="3" height="8" rx="1"/></svg>' },
-  { id: 'revisar', t: 'Revisar', c: '#76B729', ver: function () { return true; },
+  { id: 'revisar', t: 'Revisar', c: '#76B729', ver: function () { return AT.tieneAcceso('gestion.mtto.revisar'); },
     ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M8.5 11l2 2 4-4M8.5 17h7"/></svg>' },
-  { id: 'cargar', t: 'Cargar plan', c: '#EF7C3B', ver: function () { return AT.puedeCapturar(); },
+  { id: 'cargar', t: 'Cargar plan', c: '#EF7C3B', ver: function () { return AT.puedeCapturar() && AT.tieneAcceso('gestion.mtto.cargar'); },
     ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5"/><path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>' }
 ];
 
@@ -64,12 +64,15 @@ function pintarBarraSup() {
 function vistaInicial() {
   var h = (location.hash || '').replace('#', '');
   if (DR.tabsVisibles().some(function (t) { return t.id === h; })) return h;
-  return AT.puedeCapturar() ? 'revisar' : 'resultados';
+  var ids = DR.tabsVisibles().map(function (t) { return t.id; });
+  return AT.puedeCapturar() && ids.indexOf('revisar') > -1 ? 'revisar' : ids[0];
 }
 
 document.addEventListener('DOMContentLoaded', function () {
   AT.requiereSesion('../').then(function (perfil) {
     if (perfil.debe_cambiar_password) { location.href = '../'; return; }
+    // Sin ninguna pestaña asignada (Config → Usuarios → Accesos): de vuelta a la portada.
+    if (!DR.tabsVisibles().length) { location.href = '../'; return; }
     pintarBarraSup();
     pintarNav();
     DR.$('#chipDatos').addEventListener('click', function () {

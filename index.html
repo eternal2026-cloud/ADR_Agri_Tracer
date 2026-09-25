@@ -102,6 +102,7 @@ var ICO = {
  * «Toma de tiempos campo» abre la sub-vista #campo con un acceso por cultivo:
  * Arándano (los tiempos de ciclo actuales) y Uva (en definición).
  * Usuarios y configuración es un apartado propio, solo para administradores.
+ * acceso: clave de AT.ACCESOS; la tarjeta solo aparece si el usuario la tiene asignada.
  * Para mover una tarjeta a otro grupo basta con cortar su línea { href: … } y
  * pegarla en la lista «modulos» del grupo destino.
  */
@@ -109,19 +110,19 @@ var TODOS = ['admin', 'captura', 'visor'];
 var GRUPOS = [
   { id: 'campo', titulo: 'Ingeniería · Campo', sub: 'Tiempos en campo por cultivo', modulos: [
     { href: '#campo', color: '#0097CE', nombre: 'Toma de tiempos campo', icono: ICO.cronometro,
-      sub: 'Arándano (tiempos de ciclo de cosecha) · Uva (en definición)', roles: TODOS }
+      sub: 'Arándano (tiempos de ciclo de cosecha) · Uva (en definición)', roles: TODOS, acceso: 'campo' }
   ] },
   { id: 'planta', titulo: 'Ingeniería · Planta', sub: 'Operación en planta', modulos: [
     { href: 'reubicacion/', color: '#EF7C3B', nombre: 'Reubicación de personal', icono: ICO.personas,
-      sub: 'Escanear fotocheck, buscar personal y actualizar la lista', roles: TODOS }
+      sub: 'Escanear fotocheck, buscar personal y actualizar la lista', roles: TODOS, acceso: 'planta.reubicacion' }
   ] },
   { id: 'gestion', titulo: 'Gestión de Procesos', sub: '5S, mantenimiento y cliente interno', modulos: [
     { href: 'auditoria5s/', color: '#D9622B', nombre: 'Auditoría 5S', icono: ICO.auditoria,
-      sub: 'Checklist por zona, observaciones con foto y seguimiento', roles: TODOS },
+      sub: 'Checklist por zona, observaciones con foto y seguimiento', roles: TODOS, acceso: 'gestion.5s' },
     { href: 'mantenimiento/', color: '#5B9BD5', nombre: 'Revisión plan de mantenimiento', icono: ICO.mantenimiento,
-      sub: 'Carga el plan del mes, revisa OT por encargado y puntúa no conformidades', roles: TODOS },
+      sub: 'Carga el plan del mes, revisa OT por encargado y puntúa no conformidades', roles: TODOS, acceso: 'gestion.mtto' },
     { href: 'satisfaccion/', color: '#76B729', nombre: 'Satisfacción del cliente interno', icono: ICO.cliente,
-      sub: 'Histórico de encuestas por área y planta, BD para Power BI y presentación', roles: TODOS }
+      sub: 'Histórico de encuestas por área y planta, BD para Power BI y presentación', roles: TODOS, acceso: 'gestion.sci' }
   ] },
   { id: 'config', titulo: 'Usuarios y configuración', sub: 'Solo administradores', modulos: [
     { href: 'ciclos/#usuarios', color: '#E8B04A', nombre: 'Usuarios y configuración', icono: ICO.usuarios,
@@ -133,11 +134,11 @@ var GRUPOS = [
 var CAMPO = [
   { id: 'arandano', nombre: 'Arándano', color: '#4B5FA8', sub: 'Tiempos de ciclo de cosecha: captura por etapas y resumen por semana y fundo.',
     accesos: [
-      { href: 'ciclos/#captura', t: 'Captura de tiempos', clase: 'verde', roles: ['admin', 'captura'] },
-      { href: 'ciclos/#resumen', t: 'Resumen de tiempos', clase: 'azul', roles: TODOS }
+      { href: 'ciclos/#captura', t: 'Captura de tiempos', clase: 'verde', roles: ['admin', 'captura'], acceso: 'campo.arandano.captura' },
+      { href: 'ciclos/#resumen', t: 'Resumen de tiempos', clase: 'azul', roles: TODOS, acceso: 'campo.arandano.resumen' }
     ] },
   { id: 'uva', nombre: 'Uva', color: '#7A3E8E', sub: 'Toma de tiempos para uva: en definición.',
-    accesos: [{ href: 'campo/uva/', t: 'Ver avance', clase: 'sec', roles: TODOS }] }
+    accesos: [{ href: 'campo/uva/', t: 'Ver avance', clase: 'sec', roles: TODOS, acceso: 'campo.uva' }] }
 ];
 
 function mostrarErrorLogin(msg) { var el = DR.$('#loginError'); el.textContent = msg; el.classList.remove('oculto'); }
@@ -198,13 +199,15 @@ function tarjetaModulo(m) {
 /** Grupos de la portada o, con #campo, los cultivos de Toma de tiempos campo. */
 function pintarModulos() {
   var rol = AT.perfil ? AT.perfil.rol : 'visor';
-  var puede = function (x) { return x.roles.indexOf(rol) > -1; };
+  // Rol (qué puede hacer) y accesos del usuario (qué grupos y funciones ve, Config → Usuarios).
+  var puede = function (x) { return x.roles.indexOf(rol) > -1 && (!x.acceso || AT.tieneAcceso(x.acceso)); };
   var cont = DR.$('#modulos');
   if (location.hash === '#campo') {
     DR.$('#saludoSub').textContent = 'Ingeniería · Campo › Toma de tiempos campo';
     cont.innerHTML = '<div class="grupo-mod entra"><div class="grupo-mod-cab"><h2>Toma de tiempos campo</h2><span>Elige el cultivo</span></div>' +
       '<div class="modulos">' + CAMPO.map(function (c) {
         var accesos = c.accesos.filter(puede);
+        if (!accesos.length) return '';
         return '<section class="cultivo-tarjeta" style="--c:' + c.color + '"><div class="cultivo-tarjeta-cab">' + DR.iconoCultivo(c.id, c.color, 48) +
           '<div><b>' + DR.esc(c.nombre) + '</b><span>' + DR.esc(c.sub) + '</span></div></div>' +
           '<div class="acceso-par">' + accesos.map(function (a) { return '<a class="btn ' + a.clase + '" href="' + a.href + '">' + DR.esc(a.t) + '</a>'; }).join('') + '</div></section>';
@@ -218,7 +221,7 @@ function pintarModulos() {
       if (!mods.length) return '';
       return '<section class="grupo-mod" id="grupo-' + g.id + '"><div class="grupo-mod-cab"><h2>' + DR.esc(g.titulo) + '</h2><span>' + DR.esc(g.sub) + '</span></div>' +
         '<div class="modulos">' + mods.map(tarjetaModulo).join('') + '</div></section>';
-    }).join('');
+    }).join('') || '<div class="aviso entra">Aún no tienes módulos asignados. Pide a un administrador que te dé acceso en <b>Usuarios</b>.</div>';
   }
   DR.entrarPaneles('#landing');
   // #planta o #gestion (enlace de regreso de un módulo) lleva a su grupo.

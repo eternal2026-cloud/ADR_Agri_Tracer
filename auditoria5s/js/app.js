@@ -1,16 +1,16 @@
 /* ============================================================================
  * app.js — ARRANQUE Y NAVEGACIÓN DEL MÓDULO AUDITORÍA 5S
- * Exige sesión. Pestañas según rol: Resultados y Observaciones (todos),
+ * Exige sesión. Pestañas según rol y accesos del usuario: Resultados y Observaciones (todos),
  * Auditar (admin y captura), Catálogo (admin). Enlaces: #auditar,
  * #observaciones, #resultados, #catalogo.
  * ==========================================================================*/
 
 DR.TABS = [
-  { id: 'resultados', t: 'Resultados', c: '#0097CE', ver: function () { return true; },
+  { id: 'resultados', t: 'Resultados', c: '#0097CE', ver: function () { return AT.tieneAcceso('gestion.5s.resultados'); },
     ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 20h16"/><rect x="5.5" y="11" width="3" height="6" rx="1"/><rect x="10.5" y="6" width="3" height="11" rx="1"/><rect x="15.5" y="9" width="3" height="8" rx="1"/></svg>' },
-  { id: 'auditar', t: 'Auditar', c: '#76B729', ver: function () { return AT.puedeCapturar(); },
+  { id: 'auditar', t: 'Auditar', c: '#76B729', ver: function () { return AT.puedeCapturar() && AT.tieneAcceso('gestion.5s.auditar'); },
     ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M8.5 11l2 2 4-4M8.5 17h7"/></svg>' },
-  { id: 'observaciones', t: 'Observaciones', c: '#EF7C3B', ver: function () { return true; },
+  { id: 'observaciones', t: 'Observaciones', c: '#EF7C3B', ver: function () { return AT.tieneAcceso('gestion.5s.observaciones'); },
     ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.7l1.3-2h5l1.3 2h1.7A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.5" r="3.5"/></svg>' },
   { id: 'catalogo', t: 'Catálogo', c: '#E8B04A', ver: function () { return AT.esAdmin(); },
     ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 6h10M4 12h16M4 18h7"/><circle cx="18" cy="6" r="2"/><circle cx="15" cy="18" r="2"/></svg>' }
@@ -65,12 +65,15 @@ function pintarBarraSup() {
 function vistaInicial() {
   var h = (location.hash || '').replace('#', '');
   if (DR.tabsVisibles().some(function (t) { return t.id === h; })) return h;
-  return AT.puedeCapturar() ? 'auditar' : 'resultados';
+  var ids = DR.tabsVisibles().map(function (t) { return t.id; });
+  return ids.indexOf('auditar') > -1 ? 'auditar' : ids[0];
 }
 
 document.addEventListener('DOMContentLoaded', function () {
   AT.requiereSesion('../').then(function (perfil) {
     if (perfil.debe_cambiar_password) { location.href = '../'; return; }
+    // Sin ninguna pestaña asignada (Config → Usuarios → Accesos): de vuelta a la portada.
+    if (!DR.tabsVisibles().length) { location.href = '../'; return; }
     pintarBarraSup();
     pintarNav();
     DR.$('#chipDatos').addEventListener('click', function () {

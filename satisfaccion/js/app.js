@@ -1,18 +1,18 @@
 /* ============================================================================
  * app.js — ARRANQUE Y NAVEGACIÓN DEL MÓDULO SATISFACCIÓN DEL CLIENTE INTERNO
- * Exige sesión. Pestañas según rol: Resultados (todos), Encuesta y Cargar
+ * Exige sesión. Pestañas según rol y accesos del usuario: Resultados (todos), Encuesta y Cargar
  * histórico (admin y captura), Evaluadores (admin: plantas y áreas que cada
  * usuario puede evaluar). Enlaces: #resultados, #encuesta, #evaluadores, #cargar.
  * ==========================================================================*/
 
 DR.TABS = [
-  { id: 'resultados', t: 'Resultados', c: '#0097CE', ver: function () { return true; },
+  { id: 'resultados', t: 'Resultados', c: '#0097CE', ver: function () { return AT.tieneAcceso('gestion.sci.resultados'); },
     ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 20 9.3l-3 9.2H7L4 9.3z"/><path d="M12 8.5l3.6 2.6-1.4 4.2H9.8l-1.4-4.2z" opacity=".55"/></svg>' },
-  { id: 'encuesta', t: 'Encuesta', c: '#76B729', ver: function () { return AT.puedeCapturar(); },
+  { id: 'encuesta', t: 'Encuesta', c: '#76B729', ver: function () { return AT.puedeCapturar() && AT.tieneAcceso('gestion.sci.encuesta'); },
     ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M8.5 11l2 2 4-4M8.5 17h7"/></svg>' },
   { id: 'evaluadores', t: 'Evaluadores', c: '#9085E9', ver: function () { return AT.esAdmin(); },
     ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.8-3.2 3-5 5.5-5s4.7 1.8 5.5 5"/><path d="m15.5 11 1.8 1.8 3.4-3.6"/></svg>' },
-  { id: 'cargar', t: 'Cargar histórico', c: '#EF7C3B', ver: function () { return AT.puedeCapturar(); },
+  { id: 'cargar', t: 'Cargar histórico', c: '#EF7C3B', ver: function () { return AT.puedeCapturar() && AT.tieneAcceso('gestion.sci.cargar'); },
     ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5"/><path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>' }
 ];
 
@@ -61,12 +61,14 @@ function pintarBarraSup() {
 function vistaInicial() {
   var h = (location.hash || '').replace('#', '');
   if (DR.tabsVisibles().some(function (t) { return t.id === h; })) return h;
-  return 'resultados';
+  return DR.tabsVisibles()[0].id;
 }
 
 document.addEventListener('DOMContentLoaded', function () {
   AT.requiereSesion('../').then(function (perfil) {
     if (perfil.debe_cambiar_password) { location.href = '../'; return; }
+    // Sin ninguna pestaña asignada (Config → Usuarios → Accesos): de vuelta a la portada.
+    if (!DR.tabsVisibles().length) { location.href = '../'; return; }
     pintarBarraSup();
     pintarNav();
     DR.$('#chipDatos').addEventListener('click', function () {

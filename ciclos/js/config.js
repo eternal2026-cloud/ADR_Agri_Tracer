@@ -4,7 +4,7 @@
  * (admin-usuarios, sync-sheets): no dependen de variables en Vercel.
  * ==========================================================================*/
 
-var CONFIG = { tab: 'usuarios', parametros: {}, listas: [], usuarios: [], areas: [], sync: null, rolNuevo: 'captura', usuarioEditado: false, fundosNuevo: [] };
+var CONFIG = { tab: 'usuarios', parametros: {}, listas: [], usuarios: [], areas: [], sync: null, rolNuevo: 'captura', usuarioEditado: false, fundosNuevo: [], accesosNuevo: { completo: false, lista: [] } };
 
 CONFIG.TABS = [
   { id: 'usuarios', t: 'Usuarios', ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.8-3.2 3-5 5.5-5s4.7 1.8 5.5 5"/><path d="M17 8v6M14 11h6"/></svg>' },
@@ -121,6 +121,7 @@ CONFIG.tabUsuarios = function (c) {
     '<div class="campo"><label for="nuUsuario">Usuario para ingresar</label><input id="nuUsuario" placeholder="juan.perez" autocapitalize="none" autocomplete="off" spellcheck="false"><div class="ayuda-campo">Se sugiere solo; puedes cambiarlo.</div></div>' +
     '<div class="campo"><label for="nuArea">Área (opcional)</label><input id="nuArea" placeholder="Ej. Calidad campo" autocomplete="off"></div>' +
     '<div class="campo ancho"><label>¿Qué podrá hacer?</label>' + roles + '</div>' +
+    '<div class="campo ancho' + (CONFIG.rolNuevo === 'admin' ? ' oculto' : '') + '" id="nuAccesosCampo"><label>¿Qué podrá ver?</label>' + CONFIG.selectorAccesos('nuAccesos', CONFIG.accesosNuevo) + '</div>' +
     '<div class="campo ancho"><label>Fundos donde registra ciclos</label>' + CONFIG.selectorFundos('nuFundos', CONFIG.fundosNuevo) +
       '<div class="ayuda-campo">Marca uno o más para que solo pueda elegir esos. Sin marcar = todos los fundos.</div></div>' +
     '<div class="campo ancho"><label for="nuClave">Contraseña (opcional)</label><input id="nuClave" placeholder="Déjalo vacío y se genera una temporal" autocomplete="off"></div>' +
@@ -132,6 +133,7 @@ CONFIG.tabUsuarios = function (c) {
       (u.activo ? '' : ' <span class="pill rojo">Desactivado</span>') +
       (u.activo && u.debe_cambiar_password ? ' <span class="pill gris">Aún no crea su contraseña</span>' : '') +
       (u.id === yo ? ' <span class="pill gris">Tú</span>' : '') +
+      (u.rol === 'admin' ? '' : ' <span class="pill ' + (u.accesos ? 'azul' : 'gris') + '">' + DR.esc(CONFIG.textoAccesos(u.accesos)) + '</span>') +
       (u.rol === 'admin' ? '' : ' <span class="pill ' + ((u.fundos || []).length ? 'azul' : 'gris') + '">' + DR.esc(CONFIG.textoFundos(u.fundos)) + '</span>');
     var selector = '<select data-rol-de="' + u.id + '"' + (u.id === yo ? ' disabled' : '') + ' aria-label="Rol de ' + DR.esc(u.nombre) + '">' +
       CONFIG.ROLES.map(function (r) { return '<option value="' + r.id + '"' + (r.id === u.rol ? ' selected' : '') + '>' + r.t + '</option>'; }).join('') + '</select>';
@@ -139,6 +141,7 @@ CONFIG.tabUsuarios = function (c) {
       '<div class="u-cuerpo"><div class="u-nombre">' + DR.esc(u.nombre) + '</div>' +
       '<div class="u-det">' + DR.esc(u.usuario) + (u.area ? ' · ' + DR.esc(u.area) : '') + '</div><div class="u-pills">' + pills + '</div></div>' +
       '<div class="u-acciones">' + selector +
+        (u.rol === 'admin' ? '' : '<button type="button" class="btn sec chico" data-accesos-de="' + u.id + '">Accesos</button>') +
         (u.rol === 'admin' ? '' : '<button type="button" class="btn sec chico" data-fundos-de="' + u.id + '">Fundos</button>') +
         '<button type="button" class="btn sec chico" data-reset="' + u.id + '">Nueva contraseña</button>' +
         (u.id === yo ? '' : '<button type="button" class="btn sec chico" data-activo-de="' + u.id + '" data-activo="' + u.activo + '">' + (u.activo ? 'Desactivar' : 'Reactivar') + '</button>') +
@@ -158,11 +161,16 @@ CONFIG.tabUsuarios = function (c) {
       var yo2 = this;
       CONFIG.rolNuevo = yo2.getAttribute('data-rol');
       DR.$$('.rol-op', c).forEach(function (x) { x.classList.toggle('activo', x === yo2); });
+      DR.$('#nuAccesosCampo').classList.toggle('oculto', CONFIG.rolNuevo === 'admin');
       if (DR.anima) anime({ targets: yo2, scale: [0.97, 1], duration: 300, easing: 'easeOutBack' });
     };
   });
   DR.$('#btnCrearUsuario').onclick = CONFIG.crearUsuario;
   CONFIG.enlazarSelectorFundos('nuFundos', function (lista) { CONFIG.fundosNuevo = lista; });
+  CONFIG.enlazarSelectorAccesos('nuAccesos', CONFIG.accesosNuevo);
+  DR.$$('[data-accesos-de]', c).forEach(function (b) {
+    b.onclick = function () { CONFIG.editarAccesos(CONFIG.buscarUsuario(this.getAttribute('data-accesos-de'))); };
+  });
   DR.$$('[data-fundos-de]', c).forEach(function (b) {
     b.onclick = function () { CONFIG.editarFundos(CONFIG.buscarUsuario(this.getAttribute('data-fundos-de'))); };
   });
@@ -253,19 +261,122 @@ CONFIG.editarFundos = function (u) {
   };
 };
 
+/* ---- accesos: grupos, módulos y funciones que ve el usuario (null = acceso completo) ---- */
+CONFIG.todasFunciones = function (grupo) {
+  var ids = [];
+  AT.ACCESOS.forEach(function (g) {
+    if (grupo && g.id !== grupo) return;
+    g.modulos.forEach(function (m) { m.funciones.forEach(function (f) { ids.push(f.id); }); });
+  });
+  return ids;
+};
+CONFIG.valorAccesos = function (estado) { return estado.completo ? null : estado.lista.slice(); };
+CONFIG.textoAccesos = function (accesos) {
+  if (!accesos) return 'Acceso completo';
+  var p = { rol: 'captura', accesos: accesos };
+  var grupos = AT.ACCESOS.filter(function (g) { return AT.tieneAcceso(g.id, p); }).map(function (g) { return g.t.replace('Ingeniería · ', ''); });
+  if (!grupos.length) return 'Sin módulos';
+  return grupos.join(' · ') + ' (' + accesos.length + ' función' + (accesos.length === 1 ? '' : 'es') + ')';
+};
+CONFIG.selectorAccesos = function (id) {
+  var chip = function (f, t) {
+    return '<button type="button" class="opcion" data-acceso="' + f.id + '">' + DR.esc(t) + (f.registra ? ' ✎' : '') + '</button>';
+  };
+  return '<div class="accesos" id="' + id + '">' +
+    '<button type="button" class="opcion acc-todo" data-acc-todo>Acceso completo</button>' +
+    '<div class="ayuda-campo">Ve todo, incluidos los módulos que se agreguen después. Así quedaron los usuarios que ya existían.</div>' +
+    AT.ACCESOS.map(function (g) {
+      return '<div class="acc-grupo"><div class="acc-grupo-cab"><b>' + DR.esc(g.t) + '</b>' +
+        '<button type="button" class="btn sec chico" data-acc-grupo="' + g.id + '">Todo el grupo</button></div>' +
+        g.modulos.map(function (m) {
+          var solo = m.funciones.length === 1;
+          return '<div class="acc-mod">' + (solo ? '' : '<span>' + DR.esc(m.t) + '</span>') +
+            '<div class="opciones">' + m.funciones.map(function (f) { return chip(f, solo ? m.t : f.t); }).join('') + '</div></div>';
+        }).join('') + '</div>';
+    }).join('') +
+    '<div class="ayuda-campo">✎ = registra datos: solo lo usa quien tiene el rol <b>Captura en campo</b>. Sin ✎ = consulta.</div></div>';
+};
+/** estado = { completo, lista }: se modifica en el lugar. */
+CONFIG.enlazarSelectorAccesos = function (id, estado) {
+  var cont = DR.$('#' + id);
+  if (!cont) return;
+  var pintar = function () {
+    DR.$('[data-acc-todo]', cont).classList.toggle('activa', estado.completo);
+    DR.$$('[data-acceso]', cont).forEach(function (o) {
+      o.classList.toggle('activa', estado.completo || estado.lista.indexOf(o.getAttribute('data-acceso')) > -1);
+    });
+  };
+  // Desde «Acceso completo», tocar una función parte de todo marcado.
+  var salirDeCompleto = function () {
+    if (estado.completo) { estado.completo = false; estado.lista = CONFIG.todasFunciones(); }
+  };
+  cont.onclick = function (ev) {
+    var b = ev.target.closest('button');
+    if (!b) return;
+    if (b.hasAttribute('data-acc-todo')) {
+      estado.completo = !estado.completo;
+      if (!estado.completo) estado.lista = [];
+    } else if (b.hasAttribute('data-acc-grupo')) {
+      salirDeCompleto();
+      var ids = CONFIG.todasFunciones(b.getAttribute('data-acc-grupo'));
+      var todos = ids.every(function (x) { return estado.lista.indexOf(x) > -1; });
+      estado.lista = estado.lista.filter(function (x) { return ids.indexOf(x) < 0; });
+      if (!todos) estado.lista = estado.lista.concat(ids);
+    } else if (b.hasAttribute('data-acceso')) {
+      salirDeCompleto();
+      var k = b.getAttribute('data-acceso'), i = estado.lista.indexOf(k);
+      if (i > -1) estado.lista.splice(i, 1); else estado.lista.push(k);
+    } else return;
+    if (DR.anima) anime({ targets: b, scale: [0.9, 1], duration: 320, easing: 'easeOutBack' });
+    pintar();
+  };
+  pintar();
+};
+CONFIG.editarAccesos = function (u) {
+  if (!u) return;
+  var estado = { completo: !u.accesos, lista: (u.accesos || []).slice() };
+  UI.abrirHoja('<div class="asa"></div>' +
+    '<div class="res-nombre">' + DR.esc(u.nombre) + '</div>' +
+    '<div class="res-dni">Qué grupos y funciones puede ver · ' + DR.esc(CONFIG.NOMBRE_ROL[u.rol] || u.rol) + '</div>' +
+    '<div style="margin-top:14px">' + CONFIG.selectorAccesos('hojaAccesos') + '</div>' +
+    '<div class="acciones"><button type="button" class="btn sec" id="btnAccesosCancelar" style="flex:1">Cancelar</button>' +
+    '<button type="button" class="btn verde" id="btnAccesosGuardar" style="flex:1">Guardar</button></div>');
+  CONFIG.enlazarSelectorAccesos('hojaAccesos', estado);
+  DR.$('#btnAccesosCancelar').onclick = UI.cerrarHoja;
+  DR.$('#btnAccesosGuardar').onclick = function () {
+    var valor = CONFIG.valorAccesos(estado);
+    if (valor && !valor.length) { DR.toast('Marca al menos una función o «Acceso completo».', 'error'); return; }
+    var btn = this;
+    btn.disabled = true;
+    AT.llamarFuncion('admin-usuarios', { accion: 'actualizar', id: u.id, accesos: valor }).then(function () {
+      UI.cerrarHoja();
+      DR.toast(u.nombre + ': ' + CONFIG.textoAccesos(valor) + '.');
+      return CONFIG.refrescar();
+    }).catch(function (e) { btn.disabled = false; DR.toast(e.message, 'error'); });
+  };
+};
+
 CONFIG.buscarUsuario = function (id) { return CONFIG.usuarios.filter(function (u) { return u.id === id; })[0]; };
 
 CONFIG.crearUsuario = function () {
   var nombre = DR.$('#nuNombre').value.trim(), usuario = DR.$('#nuUsuario').value.trim() || CONFIG.sugerirUsuario(nombre);
   if (!nombre) { DR.toast('Escribe el nombre de la persona.', 'error'); DR.$('#nuNombre').focus(); return; }
+  var accesos = CONFIG.rolNuevo === 'admin' ? null : CONFIG.valorAccesos(CONFIG.accesosNuevo);
+  if (accesos && !accesos.length) {
+    DR.toast('Marca qué podrá ver: al menos una función o «Acceso completo».', 'error');
+    DR.$('#nuAccesosCampo').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
   var btn = this;
   btn.disabled = true;
   btn.classList.add('cargando');
   AT.llamarFuncion('admin-usuarios', {
     accion: 'crear', nombre: nombre, usuario: usuario, area: DR.$('#nuArea').value.trim(),
-    rol: CONFIG.rolNuevo, password: DR.$('#nuClave').value, fundos: CONFIG.rolNuevo === 'admin' ? [] : CONFIG.fundosNuevo
+    rol: CONFIG.rolNuevo, password: DR.$('#nuClave').value, fundos: CONFIG.rolNuevo === 'admin' ? [] : CONFIG.fundosNuevo,
+    accesos: accesos
   }).then(function (r) {
     CONFIG.fundosNuevo = [];
+    CONFIG.accesosNuevo = { completo: false, lista: [] };
     CONFIG.mostrarCredenciales(r, 'creado');
     return CONFIG.refrescar();
   }).catch(function (e) {

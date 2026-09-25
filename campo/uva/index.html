@@ -36,6 +36,7 @@
 document.addEventListener('DOMContentLoaded', function () {
   AT.requiereSesion('../../').then(function (perfil) {
     if (perfil.debe_cambiar_password) { location.href = '../../'; return; }
+    if (!AT.tieneAcceso('campo.uva')) { location.href = '../../#campo'; return; }
     DR.$('#slotLogo').innerHTML = '<a href="../../#campo" class="logo" style="display:flex;align-items:center;gap:10px;text-decoration:none">' +
       DR.marcaSvg(42) + '<span class="texto">TIEMPOS · UVA</span></a>';
     DR.$('#chipDatos').classList.add('ok');

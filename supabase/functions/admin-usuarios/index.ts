@@ -4,10 +4,11 @@
  * incluida en las Edge Functions, así que no hay variables que configurar.
  * Solo un admin activo puede llamarla (se valida el JWT de su sesión).
  *
- * POST { accion: 'crear', usuario, nombre, area, rol, password?, fundos? }
+ * POST { accion: 'crear', usuario, nombre, area, rol, password?, fundos?, accesos? }
  * POST { accion: 'reset', id }
- * POST { accion: 'actualizar', id, rol?, activo?, nombre?, area?, fundos? }
+ * POST { accion: 'actualizar', id, rol?, activo?, nombre?, area?, fundos?, accesos? }
  * fundos: lista de fundos donde puede registrar ciclos ([] = todos).
+ * accesos: claves grupo.modulo.funcion que puede ver (null = acceso completo; ver AT.ACCESOS).
  * ==========================================================================*/
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
@@ -52,6 +53,12 @@ function limpiarFundos(v: unknown): string[] {
   return [...new Set(v.map((x) => String(x || '').trim()).filter(Boolean))].slice(0, 100);
 }
 
+/** Claves de acceso limpias; null = acceso completo. */
+function limpiarAccesos(v: unknown): string[] | null {
+  if (v === null || !Array.isArray(v)) return null;
+  return [...new Set(v.map((x) => String(x || '').trim().toLowerCase()).filter((x) => /^[a-z0-9]+(\.[a-z0-9]+)*$/.test(x)))].slice(0, 100);
+}
+
 type Perfil = { id: string; usuario: string; nombre: string; rol: string; activo: boolean };
 
 const anotar = (sb: SupabaseClient, yo: Perfil, accion: string, detalle: string) =>
@@ -68,6 +75,8 @@ async function crear(sb: SupabaseClient, yo: Perfil, b: Record<string, unknown>)
   const propia = String(b.password || '');
   if (propia && propia.length < 6) return responder({ error: 'La contraseña debe tener al menos 6 caracteres.' }, 400);
   const password = propia || claveTemporal();
+  const accesos = rol === 'admin' ? null : limpiarAccesos(b.accesos);
+  if (accesos && !accesos.length) return responder({ error: 'Marca al menos un módulo que podrá ver, o «Acceso completo».' }, 400);
 
   const { data: existe } = await sb.from('perfiles').select('id').eq('usuario', usuario).maybeSingle();
   if (existe) return responder({ error: `El usuario "${usuario}" ya existe. Elige otro nombre de usuario.` }, 409);
@@ -82,7 +91,7 @@ async function crear(sb: SupabaseClient, yo: Perfil, b: Record<string, unknown>)
 
   const { error: insErr } = await sb.from('perfiles').insert({
     id: nuevo.user.id, usuario, nombre, area: String(b.area || '').trim(), rol, activo: true, debe_cambiar_password: true,
-    fundos: limpiarFundos(b.fundos),
+    fundos: limpiarFundos(b.fundos), accesos,
   });
   if (insErr) {
     await sb.auth.admin.deleteUser(nuevo.user.id).catch(() => {});
@@ -118,6 +127,10 @@ async function actualizar(sb: SupabaseClient, yo: Perfil, b: Record<string, unkn
   if (b.nombre !== undefined) cambios.nombre = String(b.nombre).trim() || p.nombre;
   if (b.area !== undefined) cambios.area = String(b.area).trim();
   if (b.fundos !== undefined) cambios.fundos = limpiarFundos(b.fundos);
+  if (b.accesos !== undefined) {
+    cambios.accesos = limpiarAccesos(b.accesos);
+    if (cambios.accesos && !(cambios.accesos as string[]).length) return responder({ error: 'Marca al menos un módulo que podrá ver, o «Acceso completo».' }, 400);
+  }
   if (id === yo.id && (cambios.activo === false || (cambios.rol && cambios.rol !== 'admin'))) {
     return responder({ error: 'No puedes quitarte a ti mismo el acceso de administrador.' }, 400);
   }

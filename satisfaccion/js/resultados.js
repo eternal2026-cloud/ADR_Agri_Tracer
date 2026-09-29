@@ -4,7 +4,8 @@
  * Por área evaluada: puntaje ponderado (promedio por encuesta), matriz de
  * evaluaciones por planta y grupo evaluador (como la presentación), radar
  * consolidado, detalle por planta con sugerencias, encuestas e histórico.
- * Descargas: BD para Power BI (.xlsx) y presentación (.pptx).
+ * Cada usuario ve solo las encuestas que registró (RLS, migración 0025); el admin ve todas.
+ * Descargas (solo admin): BD para Power BI (.xlsx) y presentación (.pptx).
  * ==========================================================================*/
 var RSCI = { area: null, anio: null, campana: '', desde: '', hasta: '', filas: [] };
 
@@ -66,13 +67,15 @@ RSCI.pintar = function (cont) {
     '<div class="campo"><label for="fArea">Área evaluada</label><select id="fArea">' +
       (porArea.length ? porArea.map(function (a) { return '<option value="' + a.id + '"' + (a.id === RSCI.area ? ' selected' : '') + '>' + DR.esc(a.nombre) + ' (' + a.n + ')</option>'; }).join('') : '<option value="">Sin datos</option>') +
     '</select></div></div>' +
-    '<div class="acciones">' +
+    // Descargas: solo el admin (ve todas las encuestas).
+    (AT.esAdmin() ? '<div class="acciones">' +
       '<button type="button" class="btn azul" id="btnPptx"' + (area ? '' : ' disabled') + '>Descargar presentación (.pptx)</button>' +
       '<button type="button" class="btn sec" id="btnBD"' + (RSCI.filas.length ? '' : ' disabled') + '>Descargar BD para Power BI (.xlsx)</button>' +
-    '</div></section>';
+    '</div>' : '') + '</section>';
 
   var h = UI.encabezado('Cliente interno', 'Satisfacción del cliente interno',
-    'Puntaje ponderado = promedio de las encuestas del área evaluada. Cada ítem vale de 4 % a 10 %; 10 ítems «Totalmente de acuerdo» = 100 %.') +
+    'Puntaje ponderado = promedio de las encuestas del área evaluada. Cada ítem vale de 4 % a 10 %; 10 ítems «Totalmente de acuerdo» = 100 %.' +
+    (AT.esAdmin() ? '' : ' Solo ves las encuestas que tú registraste.')) +
     SCI.selectorCultivoHtml(true) + filtros;
 
   if (!base.length) {
@@ -93,8 +96,8 @@ RSCI.pintar = function (cont) {
   DR.$('#fDesde').onchange = function () { RSCI.desde = this.value; RSCI.pintar(cont); };
   DR.$('#fHasta').onchange = function () { RSCI.hasta = this.value; RSCI.pintar(cont); };
   DR.$('#fArea').onchange = function () { RSCI.area = Number(this.value) || null; RSCI.pintar(cont); };
-  DR.$('#btnBD').onclick = RSCI.descargarBD;
-  DR.$('#btnPptx').onclick = function () {
+  if (DR.$('#btnBD')) DR.$('#btnBD').onclick = RSCI.descargarBD;
+  if (DR.$('#btnPptx')) DR.$('#btnPptx').onclick = function () {
     if (!area) return;
     var btn = this;
     btn.disabled = true;

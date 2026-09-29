@@ -81,10 +81,10 @@ ENC.pintar = function (cont) {
     return '<button type="button" class="sci-paso' + (n === paso ? ' activo' : '') + (hecho ? ' hecho' : '') + '" data-paso="' + n + '"><i>' + n + '</i><span>' + t + '</span></button>';
   }).join('') + '</div>';
   var cuerpo = [null, ENC.pasoDatos, ENC.pasoItems, ENC.pasoSugerencias, ENC.pasoResumen][paso]();
-  var calc = IMP_SCI.calcular(ENC.respuestasLista());
+  // El evaluador no ve puntajes ni porcentajes: el sistema los calcula al registrar (solo se muestra el avance).
   cont.innerHTML = UI.encabezado('Cliente interno', 'Nueva encuesta',
     'Encuesta de satisfacción del cliente interno. Se guarda en este dispositivo hasta que la registres.',
-    '<div class="sci-marcador" title="Resultado parcial"><b>' + DR.num(calc.total, 1) + ' %</b><span>' + ENC.respuestasLista().length + '/10 ítems</span></div>') +
+    '<div class="sci-marcador" title="Ítems respondidos"><b>' + ENC.respuestasLista().length + '/10</b><span>ítems respondidos</span></div>') +
     pasos + cuerpo +
     '<div class="acciones">' +
       (paso > 1 ? '<button type="button" class="btn sec" id="btnAnterior">' + DR.ICONOS.atras + 'Anterior</button>' : '') +
@@ -133,9 +133,7 @@ ENC.pintar = function (cont) {
       var fila = this.parentNode;
       DR.$$('.opcion', fila).forEach(function (o) { o.classList.toggle('activa', o === el); });
       fila.parentNode.classList.add('respondido');
-      var calc = IMP_SCI.calcular(ENC.respuestasLista());
-      DR.$('.sci-marcador b').textContent = DR.num(calc.total, 1) + ' %';
-      DR.$('.sci-marcador span').textContent = ENC.respuestasLista().length + '/10 ítems';
+      DR.$('.sci-marcador b').textContent = ENC.respuestasLista().length + '/10';
       DR.vibrar(12);
     };
   });
@@ -184,11 +182,11 @@ ENC.pasoItems = function () {
       h += '<div class="sci-item' + (actual !== undefined ? ' respondido' : '') + '"><div class="sci-item-txt"><b>' + n + '</b><span>' + DR.esc(it ? it.texto : '') + '</span></div>' +
         '<div class="opciones sci-escala">' + SCI.ESCALA.map(function (e) {
           return '<button type="button" class="opcion' + (Number(actual) === e.v ? ' activa' : '') + '" style="--c:' + SCI.COLOR_ESCALA[e.v] + '" data-item="' + n + '" data-valor="' + e.v + '">' +
-            DR.esc(e.t) + '<small>' + DR.num(e.v, 1) + '%</small></button>';
+            DR.esc(e.t) + '</button>';
         }).join('') + '</div></div>';
     });
   });
-  return UI.panel('2. Evaluación del servicio', 'Marca una opción por ítem. Cada ítem vale entre 4 % y 10 %.', h);
+  return UI.panel('2. Evaluación del servicio', 'Marca una opción por ítem según tu experiencia con el área evaluada.', h);
 };
 
 ENC.pasoSugerencias = function () {
@@ -211,21 +209,19 @@ ENC.pasoSugerencias = function () {
 };
 
 ENC.pasoResumen = function () {
-  var b = ENC.b, calc = IMP_SCI.calcular(ENC.respuestasLista());
+  var b = ENC.b;
   var faltan = ENC.faltanDatos().map(function (x) { return 'Falta ' + x + '.'; })
     .concat(ENC.faltanItems().length ? ['Faltan los ítems ' + ENC.faltanItems().join(', ') + '.'] : [])
     .concat(ENC.faltanSugerencias().map(function (x) { return 'Falta ' + x + '.'; }));
   var ae = SCI.area(b.area_evaluada_id), ao = SCI.area(b.area_evaluadora_id), cul = SCI.cultivo(b.cultivo_id);
   var grupo = ao ? SCI.grupo(ao.nombre, b.sub_area, b.planta, cul && cul.nombre) : '—';
-  return UI.panel('4. Resumen', '', '<div class="sci-resumen">' +
-      '<div class="sci-radar-caja">' + SCI.radarSvg([{ nombre: grupo, color: '#76B729', criterios: calc.criterios }]) + '</div>' +
-      '<div><div class="sci-kpi-grande" style="--c:' + SCI.colorPct(calc.total) + '"><span>Resultado</span><b>' + SCI.pct(calc.total) + '</b></div>' +
+  return UI.panel('4. Resumen', '', '<div>' +
       '<div class="dato-fila"><span>Área evaluada</span><b>' + DR.esc(ae ? ae.nombre : '—') + '</b></div>' +
       '<div class="dato-fila"><span>Evaluador</span><b>' + DR.esc(grupo) + (b.cargo ? ' · ' + DR.esc(b.cargo) : '') + '</b></div>' +
       '<div class="dato-fila"><span>Cultivo · campaña</span><b>' + DR.esc((cul ? cul.nombre : '—') + ' · ' + b.campana) + '</b></div>' +
       '<div class="dato-fila"><span>Fecha</span><b>' + DR.esc(SCI.fecha(b.fecha)) + '</b></div>' +
-      SCI.CRITERIOS.map(function (c) { return '<div class="dato-fila"><span>' + DR.esc(c.t) + '</span><b>' + SCI.pct(calc.criterios[c.id]) + '</b></div>'; }).join('') +
-      '</div></div>' +
+      '<div class="dato-fila"><span>Ítems respondidos</span><b>' + ENC.respuestasLista().length + ' de 10</b></div>' +
+      '</div>' +
     (faltan.length ? '<div class="aviso alerta" style="margin-top:12px"><ul>' + faltan.map(function (x) { return '<li>' + DR.esc(x) + '</li>'; }).join('') + '</ul></div>' : '') +
     '<div class="acciones"><button type="button" class="btn verde grande" id="btnGuardarEncuesta"' + (faltan.length ? ' disabled' : '') + '>' + DR.ICONOS.checkChico + 'Registrar encuesta</button></div>');
 };
@@ -253,7 +249,7 @@ ENC.guardar = function () {
     aspectos_valorados: b.aspectos_valorados, aspectos_mejorar: ENC.textoMejoras(), recomendaciones: b.recomendaciones,
     mejoras_items: ENC.mejorasBajos(), respuestas: ENC.respuestasLista()
   } }).then(function (r) {
-    DR.toast('Encuesta ' + r.codigo + ' registrada: ' + DR.num(r.resultado, 1) + ' %.');
+    DR.toast('Encuesta ' + r.codigo + ' registrada. ¡Gracias por tu evaluación!');
     DR.sonar(true);
     ENC.descartar();
     DR.ir('resultados');

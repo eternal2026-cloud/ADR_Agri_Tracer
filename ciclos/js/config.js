@@ -143,6 +143,7 @@ CONFIG.tabUsuarios = function (c) {
       '<div class="u-acciones">' + selector +
         (u.rol === 'admin' ? '' : '<button type="button" class="btn sec chico" data-accesos-de="' + u.id + '">Accesos</button>') +
         (u.rol === 'admin' ? '' : '<button type="button" class="btn sec chico" data-fundos-de="' + u.id + '">Fundos</button>') +
+        '<button type="button" class="btn sec chico" data-usuario-de="' + u.id + '">Cambiar usuario</button>' +
         '<button type="button" class="btn sec chico" data-reset="' + u.id + '">Nueva contraseña</button>' +
         (u.id === yo ? '' : '<button type="button" class="btn sec chico" data-activo-de="' + u.id + '" data-activo="' + u.activo + '">' + (u.activo ? 'Desactivar' : 'Reactivar') + '</button>') +
       '</div></div>';
@@ -173,6 +174,9 @@ CONFIG.tabUsuarios = function (c) {
   });
   DR.$$('[data-fundos-de]', c).forEach(function (b) {
     b.onclick = function () { CONFIG.editarFundos(CONFIG.buscarUsuario(this.getAttribute('data-fundos-de'))); };
+  });
+  DR.$$('[data-usuario-de]', c).forEach(function (b) {
+    b.onclick = function () { CONFIG.cambiarUsuario(CONFIG.buscarUsuario(this.getAttribute('data-usuario-de'))); };
   });
 
   DR.$$('[data-reset]', c).forEach(function (b) {
@@ -207,6 +211,34 @@ CONFIG.tabUsuarios = function (c) {
       }).catch(function (e) { DR.toast(e.message, 'error'); CONFIG.refrescar(); });
     };
   });
+};
+
+/* ---- cambiar usuario: el servidor actualiza también la cuenta de acceso; la contraseña se mantiene ---- */
+CONFIG.cambiarUsuario = function (u) {
+  if (!u) return;
+  UI.abrirHoja('<div class="asa"></div>' +
+    '<div class="res-nombre">' + DR.esc(u.nombre) + '</div>' +
+    '<div class="res-dni">Usuario actual: <b>' + DR.esc(u.usuario) + '</b></div>' +
+    '<div class="campo" style="margin-top:14px"><label for="hojaUsuario">Nuevo usuario</label>' +
+      '<input id="hojaUsuario" value="' + DR.esc(u.usuario) + '" autocapitalize="none" autocomplete="off" spellcheck="false"></div>' +
+    '<div class="aviso" style="margin-top:14px">Desde ahora ingresará con el <b>nuevo usuario</b> y su <b>misma contraseña</b>. Avísale del cambio.</div>' +
+    '<div class="acciones"><button type="button" class="btn sec" id="btnUsuarioCancelar" style="flex:1">Cancelar</button>' +
+    '<button type="button" class="btn verde" id="btnUsuarioGuardar" style="flex:1">Guardar</button></div>');
+  var inp = DR.$('#hojaUsuario');
+  inp.focus(); inp.select();
+  DR.$('#btnUsuarioCancelar').onclick = UI.cerrarHoja;
+  DR.$('#btnUsuarioGuardar').onclick = function () {
+    var nuevo = inp.value.trim(), btn = this;
+    if (!nuevo) { DR.toast('Escribe el nuevo usuario.', 'error'); return; }
+    btn.disabled = true;
+    AT.llamarFuncion('admin-usuarios', { accion: 'actualizar', id: u.id, usuario: nuevo }).then(function (r) {
+      UI.cerrarHoja();
+      var final = r && r.perfil ? r.perfil.usuario : nuevo;
+      if (AT.perfil && AT.perfil.id === u.id) AT.perfil.usuario = final;
+      DR.toast(u.nombre + ' ahora ingresa como ' + final + '.');
+      return CONFIG.refrescar();
+    }).catch(function (e) { btn.disabled = false; DR.toast(e.message, 'error'); });
+  };
 };
 
 /* ---- fundos asignados: el usuario solo puede elegir estos al registrar ciclos ([] = todos) ---- */

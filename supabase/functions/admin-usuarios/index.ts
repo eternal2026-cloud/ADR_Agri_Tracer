@@ -6,7 +6,8 @@
  *
  * POST { accion: 'crear', usuario, nombre, area, rol, password?, fundos?, accesos? }
  * POST { accion: 'reset', id }
- * POST { accion: 'actualizar', id, rol?, activo?, nombre?, area?, fundos?, accesos? }
+ * POST { accion: 'actualizar', id, usuario?, rol?, activo?, nombre?, area?, fundos?, accesos? }
+ * usuario: cambia el nombre de ingreso (y el correo técnico de Auth); la contraseña no cambia.
  * fundos: lista de fundos donde puede registrar ciclos ([] = todos).
  * accesos: claves grupo.modulo.funcion que puede ver (null = acceso completo; ver AT.ACCESOS).
  * ==========================================================================*/
@@ -135,13 +136,39 @@ async function actualizar(sb: SupabaseClient, yo: Perfil, b: Record<string, unkn
     return responder({ error: 'No puedes quitarte a ti mismo el acceso de administrador.' }, 400);
   }
 
+  // Cambiar el usuario también cambia el correo técnico de Auth: el login usa usuario + DOMINIO.
+  if (b.usuario !== undefined) {
+    const usuario = normalizarUsuario(b.usuario);
+    if (!/^[a-z0-9._-]{3,40}$/.test(usuario)) {
+      return responder({ error: 'El usuario debe tener de 3 a 40 caracteres: letras, números, punto o guion (sin espacios ni tildes).' }, 400);
+    }
+    if (usuario !== p.usuario) {
+      const { data: existe } = await sb.from('perfiles').select('id').eq('usuario', usuario).neq('id', id).maybeSingle();
+      if (existe) return responder({ error: `El usuario "${usuario}" ya existe. Elige otro nombre de usuario.` }, 409);
+      const { data: au, error: auErr } = await sb.auth.admin.getUserById(id);
+      if (auErr || !au.user) return responder({ error: 'No se encontró la cuenta de acceso de este usuario.' }, 404);
+      const { error } = await sb.auth.admin.updateUserById(id, {
+        email: usuario + DOMINIO, email_confirm: true, user_metadata: { ...(au.user.user_metadata || {}), usuario },
+      });
+      if (error) {
+        return responder({ error: /already|registered|exists/i.test(error.message) ? `El usuario "${usuario}" ya existe.` : error.message }, 400);
+      }
+      cambios.usuario = usuario;
+    }
+  }
+
   // Desactivar también bloquea el inicio de sesión (no solo la fila de perfil).
   if ('activo' in cambios && cambios.activo !== p.activo) {
     const { error } = await sb.auth.admin.updateUserById(id, { ban_duration: cambios.activo ? 'none' : '876000h' });
     if (error) return responder({ error: error.message }, 400);
   }
   const { data, error } = await sb.from('perfiles').update(cambios).eq('id', id).select().single();
-  if (error) return responder({ error: error.message }, 400);
+  if (error) {
+    if (cambios.usuario) { // deshacer el cambio de correo para que el login siga coincidiendo con el perfil
+      await sb.auth.admin.updateUserById(id, { email: p.usuario + DOMINIO, email_confirm: true }).catch(() => {});
+    }
+    return responder({ error: error.message }, 400);
+  }
   await anotar(sb, yo, 'Usuario actualizado', `${p.usuario} · ${JSON.stringify(cambios)}`);
   return responder({ ok: true, perfil: data });
 }

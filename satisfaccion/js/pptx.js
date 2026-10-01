@@ -278,7 +278,7 @@
     var pptx = new PptxGenJS();
     pptx.defineLayout({ name: 'DR_16_9', width: PPT.W, height: PPT.H });
     pptx.layout = 'DR_16_9';
-    pptx.author = 'Integra · Ingeniería de Procesos';
+    pptx.author = 'Integra Operaciones · Ingeniería de Procesos';
     pptx.company = 'Don Ricardo';
     pptx.title = 'Evaluación Cliente Interno - ' + ctx.area;
     PPT.portada(pptx, ctx);

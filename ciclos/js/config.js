@@ -420,7 +420,7 @@ CONFIG.crearUsuario = function () {
 
 CONFIG.mostrarCredenciales = function (r, tipo) {
   var url = location.origin + '/';
-  var mensaje = 'Hola ' + r.nombre + ', ya tienes acceso a Integra · Don Ricardo.\n\n' +
+  var mensaje = 'Hola ' + r.nombre + ', ya tienes acceso a Integra Operaciones · Don Ricardo.\n\n' +
     'Ingresa en: ' + url + '\nUsuario: ' + r.usuario + '\nContraseña temporal: ' + r.password + '\n\n' +
     'Al entrar, el sistema te pedirá crear tu propia contraseña.';
   UI.abrirHoja('<div class="asa"></div>' +

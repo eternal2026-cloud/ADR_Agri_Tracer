@@ -4,7 +4,8 @@
  * ≤ 1600 px en JPEG antes de subir (≈ 200–400 KB en lugar de varios MB).
  * El bucket es privado: para mostrarlas se piden URLs firmadas temporales.
  * ==========================================================================*/
-var FOTOS = { BUCKET: 'auditoria-5s', cache: {}, MAX: 3 };
+// Hasta 6 fotos «Antes» y 6 «Después» por observación (migración 0026).
+var FOTOS = { BUCKET: 'auditoria-5s', cache: {}, MAX: 6 };
 
 FOTOS.ICONO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.7l1.3-2h5l1.3 2h1.7A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.5" r="3.5"/></svg>';
 

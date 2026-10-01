@@ -575,7 +575,7 @@ tr.fila-cerca td{background:#23170E}
 .lt-cambio{color:#FBE3A6}
 .linea-tiempo .foto-mini{width:64px;height:64px;cursor:zoom-in}
 
-/* ---- varias fotos por observación (hasta 3) */
+/* ---- varias fotos por observación (hasta 6) */
 .foto-multi{display:flex;flex-direction:column;gap:8px}
 .foto-lista{display:flex;flex-wrap:wrap;gap:8px}
 .foto-lista:empty{display:none}
@@ -658,6 +658,49 @@ tr.fila-cerca td{background:#23170E}
 .tabla-obs td.foto{width:110px;text-align:center}
 .tabla-obs img{display:block;width:100px;height:76px;margin:0 auto;object-fit:cover;border-radius:8px;background:#130F0C;cursor:zoom-in}
 .tabla-obs tbody tr{cursor:pointer}
+/* ---- 5S: panel lateral de fotos mientras se puntúa (panel-fotos.js) */
+.pf-tab{position:fixed;right:0;top:40%;z-index:30;display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 8px 12px 10px;border:1px solid #5A4C40;border-right:0;border-radius:14px 0 0 14px;background:linear-gradient(180deg,#33281F,#1E1813);color:#F8B68A;font:600 11.5px var(--fuente);letter-spacing:.12em;text-transform:uppercase;box-shadow:-8px 10px 24px rgba(0,0,0,.5);cursor:pointer}
+.pf-tab svg{width:24px;height:24px}
+.pf-tab span{writing-mode:vertical-rl;transform:rotate(180deg)}
+.pf-tab i{min-width:21px;height:21px;padding:0 5px;border-radius:11px;background:var(--dr-naranja);color:#14100C;font-size:11.5px;font-weight:700;font-style:normal;letter-spacing:0;display:flex;align-items:center;justify-content:center}
+#panelFotos{position:fixed;inset:0;z-index:55;display:flex;justify-content:flex-end}
+.pf-velo{position:absolute;inset:0;background:rgba(5,4,3,.6)}
+.pf-cuerpo{position:relative;width:min(440px,90vw);height:100%;overflow-y:auto;overscroll-behavior:contain;background:linear-gradient(180deg,#261F19,#171210);border-left:1px solid var(--borde);box-shadow:-20px 0 60px rgba(0,0,0,.6);padding:calc(14px + var(--seguro-sup)) 14px calc(18px + var(--seguro-inf))}
+.pf-cab{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px}
+.pf-ruta{display:block;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--texto-3);font-weight:500}
+.pf-cab b{display:block;font-size:18px;font-weight:500;line-height:1.3}
+.pf-cerrar{width:40px;height:40px;flex:0 0 40px;border-radius:50%;border:1px solid var(--borde);background:#1A1411;color:var(--texto);font-size:16px;cursor:pointer}
+.pf-alcance{display:grid;width:100%;margin-bottom:10px}
+.pf-nueva{width:100%;margin-bottom:12px}
+.pf-obs{padding:12px;margin-bottom:10px;border-radius:15px;background:var(--panel);border:1px solid var(--borde);border-left:4px solid var(--c)}
+.pf-texto{display:block;width:100%;margin:6px 0 10px;padding:0;border:0;background:none;text-align:left;font:400 14px/1.4 var(--fuente);color:var(--texto-2);cursor:pointer}
+.pf-fotos{display:grid;gap:5px;margin-bottom:10px}
+.pf-fotos em{font-size:13px;color:var(--texto-3)}
+.pf-etq{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--texto-3);font-weight:500}
+.foto-grupo.pf img{flex:0 0 calc(33.333% - 3px);width:calc(33.333% - 3px);aspect-ratio:1;border-radius:10px}
+.pf-subir{width:100%}
+.pf-subir input{display:none}
+@media (min-width:1100px){#panelFotos{pointer-events:none}.pf-velo{display:none}.pf-cuerpo{pointer-events:auto}}
+
+/* ---- 5S: Excel de avance (avance.js) */
+.av-entrada{width:100%;margin-top:8px}
+.av-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0 10px}
+.av-kpis div{padding:10px;border-radius:13px;background:#130F0C;border:1px solid var(--borde);text-align:center}
+.av-kpis b{display:block;font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
+.av-kpis span{font-size:12px;color:var(--texto-3)}
+.av-bloque{margin-top:8px;border-radius:13px;background:#1A1411;border:1px solid var(--borde)}
+.av-bloque summary,.av-sin{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 13px;cursor:pointer;font-size:14.5px}
+.av-sin{cursor:default;color:var(--texto-3)}
+.av-bloque summary span,.av-sin span{font-size:13px;color:var(--texto-3)}
+.av-bloque ul{list-style:none;display:grid;gap:9px;padding:0 13px 12px}
+.av-bloque li{display:flex;flex-direction:column;gap:3px;font-size:14px;padding-top:9px;border-top:1px solid var(--borde)}
+.av-bloque li small{font-size:12.5px;color:var(--texto-2);line-height:1.4}
+.av-bloque .foto-grupo{margin-top:4px}
+.av-bloque li .pill{align-self:flex-start}
+.av-avisos{margin-top:12px}
+.av-avisos ul{margin:6px 0 0 18px;display:grid;gap:4px;font-size:13px}
+.av-final{margin:12px 0 0 18px;display:grid;gap:6px;font-size:14.5px;color:var(--texto-2)}
+
 .estado-xl{display:inline-block;padding:4px 10px;border-radius:6px;font-weight:600;font-size:12.5px;white-space:nowrap}
 .fechas-lista{display:grid;gap:6px;margin:10px 0}
 .fecha-op{display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px;padding:10px 12px;border-radius:12px;border:1px solid var(--borde);background:#1A1411;cursor:pointer;text-transform:none;letter-spacing:normal;color:var(--texto);font-size:14.5px}

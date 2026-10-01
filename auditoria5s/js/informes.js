@@ -612,7 +612,7 @@ INF.excelObservaciones = function (opc) {
           c.border = b;
         });
         fila.height = 148.5;
-        // Hasta 3 fotos por celda: la celda se divide en bandas horizontales.
+        // Hasta 6 fotos por celda: la celda se divide en bandas horizontales.
         var antes = S5.fotosDe(o, 'antes'), despues = S5.fotosDe(o, 'despues');
         antes.forEach(function (ruta, i) { fotos.push({ ws: ws, ruta: ruta, col: 8, fila: 3 + k, banda: i, bandas: antes.length }); });
         despues.forEach(function (ruta, i) { fotos.push({ ws: ws, ruta: ruta, col: 9, fila: 3 + k, banda: i, bandas: despues.length }); });
@@ -637,15 +637,19 @@ INF.excelObservaciones = function (opc) {
         hechas++;
         progreso('Fotos ' + hechas + ' de ' + fotos.length + '…');
         if (!img) return;
-        // Celda de foto ≈ 250 × 198 px (ancho 34.89, alto 148.5 pt). Con varias fotos se divide
-        // en bandas horizontales de igual alto; con una sola, la geometría es la de siempre.
+        // Celda de foto ≈ 250 × 198 px (ancho 34.89, alto 148.5 pt). Hasta 3 fotos: bandas
+        // horizontales de igual alto; de 4 a 6: cuadrícula de 2 columnas. Con una sola, la geometría
+        // es la de siempre.
         var id = wb.addImage({ base64: img.base64, extension: 'jpeg' });
-        var n = t.bandas || 1, margen = 6, banda = (198 - margen * (n + 1)) / n;
-        var esc = Math.min(236 / img.w, banda / img.h), w = Math.round(img.w * esc), h = Math.round(img.h * esc);
-        var arriba = margen + t.banda * (banda + margen) + (banda - h) / 2;
+        var n = t.bandas || 1, margen = 6, cols = n > 3 ? 2 : 1, filas = Math.ceil(n / cols);
+        var alto = (198 - margen * (filas + 1)) / filas, ancho = (250 - margen * (cols + 1)) / cols;
+        var esc = Math.min((cols === 1 ? 236 : ancho) / img.w, alto / img.h), w = Math.round(img.w * esc), h = Math.round(img.h * esc);
+        var arriba = margen + Math.floor(t.banda / cols) * (alto + margen) + (alto - h) / 2;
+        var izq = cols === 1 ? (250 - w) / 2 : margen + (t.banda % cols) * (ancho + margen) + (ancho - w) / 2;
         // La fracción de fila no se mapea con los 198 px reales: ExcelJS usa alto_pt × 1.05 (medido).
+        // Con 3 filas de fotos la última empieza antes de ese límite y no salta a la fila siguiente.
         var FILA = 148.5 * 1.05;
-        t.ws.addImage(id, { tl: { col: t.col + (250 - w) / 2 / 250, row: t.fila - 1 + arriba / FILA }, ext: { width: w, height: h }, editAs: 'oneCell' });
+        t.ws.addImage(id, { tl: { col: t.col + izq / 250, row: t.fila - 1 + Math.min(arriba, FILA - 1) / FILA }, ext: { width: w, height: h }, editAs: 'oneCell' });
       });
     }).then(function () {
       var audIds = {};

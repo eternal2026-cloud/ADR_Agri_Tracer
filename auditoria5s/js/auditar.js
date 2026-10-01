@@ -8,6 +8,8 @@
  * celular (localStorage) para recuperar puntajes si se va la señal o se
  * cierra la app. Una zona completa solo se reescribe el mismo día; después,
  * los puntajes se corrigen con un seguimiento de observación (con historial).
+ * Mientras se puntúa, la pestaña «Fotos» (panel-fotos.js) muestra la evidencia
+ * del área. «Excel de avance» (avance.js) actualiza una auditoría desde el Excel.
  * ==========================================================================*/
 var AUD = {
   vista: 'lista', abiertas: [], recientes: [], evals: [], pendiente: null, nueva: null,
@@ -58,10 +60,12 @@ AUD.pintarLista = function () {
   cont.innerHTML = UI.encabezado('Auditoría 5S', 'Auditorías', 'Elige el cultivo, inicia una auditoría por área o continúa una en curso. Cada zona se evalúa S por S, igual que el CHECK LIST.') +
     S5.selectorCultivoHtml() +
     '<button class="btn verde grande entra" id="btnNuevaAud" type="button">' + DR.ICONOS.mas + '<span>Nueva auditoría' + (cul ? ' de ' + DR.esc(cul.nombre) : '') + '</span></button>' +
+    '<button class="btn sec entra av-entrada" id="btnExcelAvance" type="button">' + DR.ICONOS.subir + '<span>Subir Excel de avance</span></button>' +
     '<div id="listaAud" style="margin-top:16px"><div class="vacio">Cargando auditorías…</div></div>';
   DR.entrarPaneles('#contenido');
   S5.enlazarSelectorCultivo(cont, AUD.pintarLista);
   DR.$('#btnNuevaAud').onclick = function () { DR.desbloquearAudio(); AUD.pintarNueva(); };
+  DR.$('#btnExcelAvance').onclick = function () { AV.abrir(); };
   AUD.cargarLista().then(AUD.pintarTarjetas).catch(function (e) {
     var l = DR.$('#listaAud');
     if (l) l.innerHTML = '<div class="aviso alerta">' + DR.esc(e.message) + '</div>';
@@ -382,6 +386,7 @@ AUD.pintarZonas = function () {
       (enCurso ? '<button type="button" class="btn verde grande" id="btnCerrarAud"' + (faltan && !AT.esAdmin() ? ' disabled' : '') + '>' + DR.ICONOS.checkChico +
         '<span>' + (faltan ? 'Cerrar auditoría (faltan ' + faltan + ' zona' + (faltan > 1 ? 's' : '') + ')' : 'Cerrar auditoría') + '</span></button>' : '') +
       '<button type="button" class="btn sec" id="btnObsAud">Ver observaciones de esta auditoría</button>' +
+      (a.estado !== 'anulada' && (enCurso || AT.esAdmin()) ? '<button type="button" class="btn sec" id="btnAvanceAud">' + DR.ICONOS.subir + '<span>Actualizar con Excel de avance</span></button>' : '') +
       '<button type="button" class="btn sec" id="btnResAud">Ver resultados</button></div>';
 
   DR.entrarPaneles('#contenido');
@@ -393,6 +398,7 @@ AUD.pintarZonas = function () {
     DR.ir('observaciones');
   };
   DR.$('#btnResAud').onclick = function () { RESUL.auditoria = a.id; DR.ir('resultados'); };
+  if (DR.$('#btnAvanceAud')) DR.$('#btnAvanceAud').onclick = function () { AV.abrir({ auditoria: a }); };
 };
 
 AUD.cerrarAuditoria = function () {
@@ -524,6 +530,8 @@ AUD.pintarS = function (direccion) {
   AUD.ponerBarra();
   AUD.enlazarS(cont);
   AUD.revisar();
+  PFOT.refrescar();
+  PFOT.ponerPestana();
   if (direccion) cont.scrollTop = 0;
 
   var relleno = DR.$('#pasosRelleno');
@@ -609,6 +617,7 @@ AUD.ponerBarra = function () {
 };
 
 AUD.quitarBarra = function () {
+  PFOT.quitar();
   var b = DR.$('#barraAccion');
   if (b) b.remove();
   var c = DR.$('#contenido');
@@ -706,12 +715,14 @@ AUD.nuevaObservacion = function () {
   OBS.abrirFormulario({ auditoria: AUD.aud, zona: AUD.zona, s: AUD.vista === 'zona' ? AUD.s : null, alGuardar: function (o) {
     AUD.obsArea.push(o);
     DR.$$('#btnObsZona span, #btnObsZona2 span').forEach(function (el) { el.textContent = AUD.textoObs(); });
+    PFOT.refrescar();
   } });
 };
 
 AUD.verPrevias = function () {
   OBS.hojaLista('Abiertas de auditorías anteriores', AUD.obsPrevias(AUD.zona.id), { alCambiar: function (n) {
     AUD.obsArea.forEach(function (o, i) { if (o.id === n.id) AUD.obsArea[i] = n; });
+    PFOT.refrescar();
   } });
 };
 
@@ -763,6 +774,7 @@ AUD.pintarResumenZona = function (celebrar) {
       '</div>';
 
     S5.animarBarras(cont);
+    PFOT.ponerPestana();
     if (DR.$('#btnSigZona')) DR.$('#btnSigZona').onclick = function () { AUD.abrirZona(siguiente.id); };
     if (DR.$('#btnObsZona2')) DR.$('#btnObsZona2').onclick = AUD.nuevaObservacion;
     DR.$('#btnVerZonas').onclick = function () { AUD.abrirAuditoria(a); };

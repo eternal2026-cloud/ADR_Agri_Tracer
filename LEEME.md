@@ -6,13 +6,15 @@ respaldado por **Supabase** (Postgres + Auth + Edge Functions + Vault + pg_cron)
 ## Estado actual
 
 - **Proyecto Supabase** `agritracer-don-ricardo` (ref `ptsvriudoilsyofgccsb`) con
-  migraciones `supabase/migrations/0001..0024` aplicadas (0012: Auditoría 5S,
+  migraciones `supabase/migrations/0001..0025` aplicadas (0026 pendiente de aplicar) (0012: Auditoría 5S,
   0013: Auditoría 5S por cultivo, 0014: observaciones 5S por área,
   0015: Revisión del plan de mantenimiento, 0016: Satisfacción del cliente
   interno y cultivo en los tiempos de ciclo, 0017: acceso por correo —retirado
   en la app, se volvió a usuario y contraseña—, 0018: fundos por usuario,
   0019: evolución semanal y plantas/áreas por evaluador en Cliente interno,
-  0020-0023: áreas propias de Cliente interno, 0024: accesos por usuario).
+  0020-0023: áreas propias de Cliente interno, 0024: accesos por usuario,
+  0025: cada usuario ve sus encuestas —reemplazada por 0026—, 0026: Cliente interno
+  por área evaluada, cultivo «-» en 5S, hasta 6 fotos y Excel de avance).
 - **Edge Functions desplegadas** (código en `supabase/functions/`):
   - `admin-usuarios` — crear usuarios, restablecer contraseñas, cambiar rol, desactivar.
   - `sync-sheets` — espejo de auditoría hacia Google Sheets.
@@ -174,7 +176,7 @@ Protecciones en la base de datos (migración 0011):
   fundos» = promedio ponderado, línea punteada). Misma regla que el resumen: cerrados
   y bajo el umbral. Tocar el gráfico muestra los valores de esa semana; debajo, la tabla.
 
-## Auditoría 5S (módulo `auditoria5s/`, migraciones 0012, 0013 y 0014)
+## Auditoría 5S (módulo `auditoria5s/`, migraciones 0012, 0013, 0014 y 0026)
 
 Réplica del proceso de los Excel «TERCERA AUDITORIA 5S - <ÁREA>» (hojas CHECK LIST,
 BD, Observaciones y Resultados), con el mismo estilo secuencial de Captura.
@@ -183,6 +185,9 @@ BD, Observaciones y Resultados), con el mismo estilo secuencial de Captura.
   planta y sus propias zonas por área (verificado contra los 21 Excel de
   `Ejemplo/<CULTIVO>`). Resultados, observaciones, informes y Sheets **nunca
   mezclan cultivos**. Nuevos cultivos, con ícono y color, en Catálogo.
+- **Cultivo «-»** (0026): para áreas sin cultivo asociado, como **Servicios
+  Generales** (ícono propio «servicios»: edificio con escoba). La migración pasa sus
+  zonas, auditorías y observaciones a «-».
 - **Auditar** (admin y captura): Nueva auditoría (cultivo → área → zonas, con
   «+ Agregar área» y «+ Agregar zonas» antes de iniciar; Opinada/Inopinada, N°,
   fecha, campaña y planta del cultivo) → N° de zona → 1S → 2S → 3S → 4S → 5S →
@@ -212,7 +217,7 @@ BD, Observaciones y Resultados), con el mismo estilo secuencial de Captura.
   Observaciones eligiendo área y zona, sin auditoría abierta. N° correlativo por
   zona que continúa entre auditorías. Al entrar a una zona se avisan las
   observaciones abiertas anteriores.
-- **Hasta 3 fotos «Antes» y 3 «Después»** (`fotos_antes`/`fotos_despues`, arrays);
+- **Hasta 6 fotos «Antes» y 6 «Después»** (0026; antes 3) (`fotos_antes`/`fotos_despues`, arrays);
   `foto_antes`/`foto_despues` se mantienen como foto principal (primera del array)
   por un trigger, para que Sheets y el Excel manual sigan igual. Se comprimen en el
   celular y se ven en galería con visor navegable.
@@ -223,6 +228,25 @@ BD, Observaciones y Resultados), con el mismo estilo secuencial de Captura.
   observación** para el rol captura; después solo admin (mismo criterio para editarla
   y para corregir su puntaje). Una zona completa solo se reescribe directo el
   mismo día de la auditoría; luego, únicamente por seguimiento.
+- **Panel de fotos al puntuar** (`panel-fotos.js`): en el checklist y en el resumen de la
+  zona, la pestaña **Fotos** del borde derecho abre un panel con las observaciones de la
+  zona (o de toda el área) y sus fotos Antes/Después. Desde ahí se **agregan fotos** a una
+  observación (sin plazo: solo suma evidencia, queda en su seguimiento) o se registra una
+  nueva. En pantallas anchas el panel no tapa el checklist.
+- **Excel de avance** (`avance.js`, auditores y admin): «Subir Excel de avance» en
+  Auditar o «Actualizar con Excel de avance» dentro de una auditoría. Se elige la
+  auditoría y se sube un Excel con la estructura de «Descargar Excel» (hojas del área +
+  BD). Antes de aplicar muestra qué cambia:
+  - Hoja BD: fecha, tipo, campaña y planta; **nombre de la zona** (SUB ÁREA, por N° de
+    zona; si el N° no existe la crea) y **puntajes** (`rpc_s5_importar_avance`). En
+    curso se escriben como originales y la zona queda completa con las 5 S; una
+    auditoría **cerrada** solo la actualiza un admin y el cambio queda como corrección.
+  - Hojas de observaciones: texto, acción correctiva, **notas « // »** nuevas (cada una
+    queda como seguimiento), estado, fecha de cierre y **fotos nuevas** en las celdas
+    Antes/Después (`rpc_s5_obs_actualizar`). Lee fotos flotantes y las «imagen en celda»
+    de Excel 365, y las compara por huella con las de la app: solo sube las que faltan.
+    Filas nuevas con foto «Antes» se registran como observaciones nuevas. Los textos
+    respetan el plazo de `S5_DIAS_CORRECCION` para el rol captura.
 - **Catálogo** (admin): parámetros, áreas, zonas numeradas, textos del checklist y
   reabrir/anular auditorías. Nada se borra: se desactiva o se anula.
 - Fotos en Storage privado `auditoria-5s` (la app usa URLs firmadas temporales).
@@ -300,6 +324,10 @@ ENCUESTA) y de la presentación «Evaluación Cliente Interno - <Área>».
   usuario puede evaluar (`perfiles.sci_plantas`, `perfiles.sci_areas`, vacío = todas).
   En la encuesta solo ve esas opciones; la base lo hace cumplir (`trg_sci_permisos`)
   para lo registrado en la app. El histórico importado de Excel no se restringe.
+- **Quién ve qué** (migración 0026, reemplaza la regla de 0025): el admin ve todas las
+  encuestas; los demás ven solo las **evaluaciones hechas a su área** («Su área» en
+  Evaluadores, `perfiles.sci_area`). Sin área asignada no ven resultados. Lo hace
+  cumplir el RLS de `sci_encuestas`; la hoja de Google sigue recibiendo todo.
 - **Resultados** abre por defecto en el **año actual (2026)**; el filtro Año permite
   ver otro o todos.
 - Tablas `sci_criterios`, `sci_items`, `sci_encuestas`, `sci_respuestas`; RPC

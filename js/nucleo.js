@@ -169,6 +169,16 @@ DR.iconoCultivo = function (icono, color, tam) {
       '<circle cx="32" cy="36" r="18" fill="#FFE2BF"/>' +
       '<path d="M32 18v36M14 36h36M19.3 23.3l25.4 25.4M44.7 23.3L19.3 48.7" stroke="' + c + '" stroke-width="2.6" opacity=".85"/>' +
       '<circle cx="32" cy="36" r="3.5" fill="#FFF4E6"/>';
+  } else if (icono === 'servicios') {
+    // Sin cultivo (Servicios Generales): edificio de planta + escoba.
+    cuerpo = '<path d="M6 26L26 12l20 14z" fill="' + c + '" opacity=".72"/>' +
+      '<rect x="9" y="25" width="34" height="31" rx="3" fill="' + c + '"/>' +
+      '<rect x="14" y="31" width="7" height="7" rx="1.5" fill="#fff" opacity=".5"/>' +
+      '<rect x="31" y="31" width="7" height="7" rx="1.5" fill="#fff" opacity=".5"/>' +
+      '<rect x="21.5" y="43" width="9" height="13" rx="1.5" fill="#1B1511" opacity=".55"/>' +
+      '<path d="M58 9L45 41" stroke="#5D4835" stroke-width="3.4" stroke-linecap="round"/>' +
+      '<path d="M40 38l10 4-1.5 15.5c-.2 1.6-1.8 2.5-3.3 1.9l-9.6-3.9c-1.5-.6-2-2.4-1.1-3.7z" fill="' + hoja + '"/>' +
+      '<path d="M38.5 50l8.6 3.5M40.6 45l8.4 3.4" stroke="#fff" stroke-opacity=".5" stroke-width="1.6" stroke-linecap="round"/>';
   } else {
     cuerpo = '<path d="M11 53C11 28 27 12 53 11c0 26-15 42-42 42z" fill="' + c + '"/>' +
       '<path d="M13 51L43 21" stroke="#fff" stroke-opacity=".55" stroke-width="2.6" stroke-linecap="round"/>';

@@ -35,7 +35,7 @@ EVAL.pintar = function (cont) {
   };
 
   cont.innerHTML = UI.encabezado('Cliente interno', 'Evaluadores',
-    'Asigna a cada usuario su área (la que evalúa, con su nombre legal), las plantas y las áreas que puede evaluar. En la encuesta solo verá esas opciones y no podrá equivocarse.') +
+    'Asigna a cada usuario su área (la que evalúa, con su nombre legal), las plantas y las áreas que puede evaluar. En la encuesta solo verá esas opciones y no podrá equivocarse. En Resultados verá solo las evaluaciones hechas a su área.') +
     UI.panel('Usuarios que registran encuestas', capturan.length + ' usuario(s) de captura · sin marcar nada = todas las plantas y áreas',
       capturan.length ? capturan.map(tarjeta).join('') : '<div class="vacio">No hay usuarios de captura. Créalos en Usuarios y configuración.</div>') +
     (otros.length ? UI.panel('Solo consulta', 'No registran encuestas; puedes dejarles la asignación lista por si cambian de rol.', otros.map(tarjeta).join('')) : '');

@@ -4,7 +4,8 @@
  * Por área evaluada: puntaje ponderado (promedio por encuesta), matriz de
  * evaluaciones por planta y grupo evaluador (como la presentación), radar
  * consolidado, detalle por planta con sugerencias, encuestas e histórico.
- * Cada usuario ve solo las encuestas que registró (RLS, migración 0025); el admin ve todas.
+ * Cada usuario ve solo las evaluaciones hechas a SU área (perfiles.sci_area, RLS, migración 0026);
+ * el admin ve todas.
  * Descargas (solo admin): BD para Power BI (.xlsx) y presentación (.pptx).
  * ==========================================================================*/
 var RSCI = { area: null, anio: null, campana: '', desde: '', hasta: '', filas: [] };
@@ -31,6 +32,13 @@ RSCI.grupos = function (filas) {
     var c = SCI.consolidar(g.filas);
     return { grupo: g.clave, planta: g.filas[0].planta || '', filas: g.filas, n: c.n, total: c.total, criterios: c.criterios };
   }).sort(SCI.ordenGrupos);
+};
+
+/** Aviso para quien no es admin: solo ve lo que evaluaron a su área (Evaluadores → Su área). */
+RSCI.textoMiArea = function () {
+  var a = SCI.miArea() ? SCI.area(SCI.miArea()) : null;
+  return a ? ' Solo ves las evaluaciones que le hicieron a tu área: ' + a.nombre + '.'
+    : ' Tu usuario aún no tiene área asignada: pide a un administrador que la asigne en Evaluadores para ver sus resultados.';
 };
 
 RSCI.pintar = function (cont) {
@@ -75,7 +83,7 @@ RSCI.pintar = function (cont) {
 
   var h = UI.encabezado('Cliente interno', 'Satisfacción del cliente interno',
     'Puntaje ponderado = promedio de las encuestas del área evaluada. Cada ítem vale de 4 % a 10 %; 10 ítems «Totalmente de acuerdo» = 100 %.' +
-    (AT.esAdmin() ? '' : ' Solo ves las encuestas que tú registraste.')) +
+    (AT.esAdmin() ? '' : RSCI.textoMiArea())) +
     SCI.selectorCultivoHtml(true) + filtros;
 
   if (!base.length) {

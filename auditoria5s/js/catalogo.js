@@ -19,7 +19,7 @@ var S5 = {
   COLOR_ESTADO: { 'Pendiente': '#F06A6E', 'En ejecución': '#EF7C3B', 'Cerrado': '#76B729', 'Cancelado': '#A89A8C', 'Stand By': '#0097CE', 'Recomendación': '#4FC3F0' },
   PILL_MADUREZ: { 'EXCELENTE': 'verde', 'BIEN': 'azul', 'REGULAR': 'naranja', 'CRÍTICO': 'rojo' },
   PUNTOS: [{ v: 0, t: 'No cumple' }, { v: 1, t: 'Parcial' }, { v: 1.5, t: '' }, { v: 2, t: 'Cumple' }],
-  ICONOS_CULTIVO: [{ id: 'arandano', t: 'Arándano' }, { id: 'uva', t: 'Uva' }, { id: 'citrico', t: 'Cítrico' }, { id: 'hoja', t: 'Otro cultivo' }]
+  ICONOS_CULTIVO: [{ id: 'arandano', t: 'Arándano' }, { id: 'uva', t: 'Uva' }, { id: 'citrico', t: 'Cítrico' }, { id: 'hoja', t: 'Otro cultivo' }, { id: 'servicios', t: 'Sin cultivo (servicios)' }]
 };
 
 /* ------------------------------------------------ catálogo */

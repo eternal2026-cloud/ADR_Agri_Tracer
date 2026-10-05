@@ -980,3 +980,11 @@ td.mp-sangria{padding-left:26px}
 .gt-falta{color:#FFA3A3;font-weight:500}
 .gt-nada{color:var(--texto-3)}
 .gt-vista{width:100%;height:360px;border:1px solid var(--borde);border-radius:12px;background:#F7F3EE}
+.gt-marca{display:block;width:100%;text-align:left;background:none;border:1px dashed transparent;border-radius:8px;padding:4px 6px;margin:-4px -6px;color:inherit;font:inherit;cursor:pointer}
+.gt-marca:hover,.gt-marca:focus-visible{border-color:#5E5044;background:rgba(255,255,255,.03)}
+.gt-marca-lista{display:grid;gap:8px;margin-top:12px}
+.gt-marca-fila{display:grid;gap:8px;padding:11px 12px;border-radius:13px;background:#1A1411;border:1px solid var(--borde)}
+.gt-marca-fila.foco{border-color:#4FC3F0;background:#11202A}
+.gt-marca-fila b{display:block;font-size:15px;font-weight:500}
+.gt-marca-fila small{display:block;font-size:12px;color:var(--texto-3);margin-top:2px}
+.opcion.chica{padding:7px 12px;font-size:13.5px}

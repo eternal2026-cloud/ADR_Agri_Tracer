@@ -73,13 +73,20 @@ GANTT.textoSemanas = function (p) {
 GANTT.rango = function (p) { return 'lun ' + S5.fecha(p.semana_inicio).substring(0, 5) + ' a dom ' + S5.fecha(GANTT.fin(p)); };
 
 /* ------------------------------------------------------------ cumplimiento */
-/** { total, hechas, areas: [{ area, fila|null }], estado } de una auditoría programada. */
+/**
+ * { total, hechas, areas: [{ area, fila|null, manual|null, hecho }], estado } de una auditoría programada.
+ * La marca manual (auditorías hechas en Excel) manda sobre lo registrado en Integra; los grupos con
+ * auto_integra = false (p. ej. Servicios Generales, sin cultivo) solo cuentan marcas manuales.
+ */
 GANTT.detalle = function (p) {
   var filas = GANTT.filas.filter(function (f) { return f.programa_id === p.id; });
   var areas = GANTT.areasDe(p.grupo_id).map(function (a) {
-    return { area: a, fila: filas.filter(function (f) { return f.area_id === a.id && f.auditoria_id; })[0] || null };
+    var fa = filas.filter(function (f) { return f.area_id === a.id; })[0] || {};
+    var manual = fa.manual ? { cumplido: fa.manual_cumplido, semana: fa.manual_semana, nota: fa.manual_nota, por: fa.manual_por, en: fa.manual_en } : null;
+    var fila = fa.auditoria_id ? fa : null;
+    return { area: a, fila: fila, manual: manual, hecho: manual ? !!manual.cumplido : !!fila };
   });
-  var hechas = areas.filter(function (x) { return x.fila; }).length, hoy = S5.hoy(), fin = GANTT.fin(p), estado;
+  var hechas = areas.filter(function (x) { return x.hecho; }).length, hoy = S5.hoy(), fin = GANTT.fin(p), estado;
   if (p.estado === 'Cancelado') estado = 'Cancelado';
   else if (areas.length && hechas === areas.length) estado = 'Cumplido';
   else if (hoy > fin) estado = 'Atrasado';
@@ -88,6 +95,8 @@ GANTT.detalle = function (p) {
   else estado = 'Programado';
   return { total: areas.length, hechas: hechas, areas: areas, estado: estado };
 };
+/** El cultivo «-» (icono servicios) es «Sin cultivo». */
+GANTT.nombreCultivo = function (c) { return !c ? '—' : (c.icono === 'servicios' || c.nombre === '-' ? 'Sin cultivo' : c.nombre); };
 GANTT.pillEstado = function (e) { return '<span class="pill ' + GANTT.ESTADOS[e].pill + '">' + e + '</span>'; };
 GANTT.nombreProg = function (p) { var g = GANTT.grupo(p.grupo_id); return (g ? g.nombre : '—') + ' · ' + p.numero_auditoria + '° auditoría'; };
 
@@ -124,7 +133,7 @@ GANTT.cronogramaHtml = function () {
   progs.forEach(function (p) { var e = GANTT.detalle(p).estado; if (kpi[e] !== undefined) kpi[e]++; });
   var h = '<div class="kpis">' +
     UI.kpi('Programadas', DR.num(progs.length), GANTT.grupos.length + ' grupos', '#0097CE') +
-    UI.kpi('Cumplidas', DR.num(kpi.Cumplido), 'todas sus áreas auditadas', '#76B729') +
+    UI.kpi('Cumplidas', DR.num(kpi.Cumplido), 'todas sus áreas cumplidas', '#76B729') +
     UI.kpi('Atrasadas', DR.num(kpi.Atrasado), 'semana vencida con áreas pendientes', '#E5484D') +
     UI.kpi('Próximas', DR.num(kpi['En curso'] + kpi.Próximo), 'esta semana o en las 2 siguientes', '#E8B04A') +
   '</div>';
@@ -175,7 +184,7 @@ GANTT.cronogramaHtml = function () {
   tabla += '</tbody></table>';
 
   h += '<section class="panel entra"><div class="panel-cab"><div><h2>Cronograma consolidado</h2>' +
-    '<div class="sub">Eje horizontal = semanas ISO · la cifra es áreas auditadas / áreas a cumplir · la columna resaltada es esta semana</div></div></div>' +
+    '<div class="sub">Eje horizontal = semanas ISO · la cifra es áreas cumplidas / áreas a cumplir · la columna resaltada es esta semana</div></div></div>' +
     '<div class="gt-cont">' + tabla + '</div>' +
     '<div class="gt-leyenda">' + ['Cumplido', 'En curso', 'Próximo', 'Atrasado', 'Programado', 'Cancelado'].map(function (e) {
       return '<span><i style="background:' + GANTT.ESTADOS[e].c + '"></i>' + e + '</span>';
@@ -190,9 +199,10 @@ GANTT.cronogramaHtml = function () {
         '<button type="button" class="gt-check' + (sel ? ' sel' : '') + '" data-gprog="' + p.id + '" aria-pressed="' + sel + '" aria-label="Marcar ' + DR.esc(GANTT.nombreProg(p)) + '">' + DR.ICONOS.checkChico + '</button>' +
         '<div class="gt-item-cuerpo" data-gprog="' + p.id + '"><b>' + DR.esc(g.nombre) + ' · ' + p.numero_auditoria + '° auditoría</b>' +
           '<span>' + GANTT.textoSemanas(p) + ' · ' + GANTT.rango(p) + '</span>' +
-          '<span>' + d.hechas + ' de ' + d.total + ' áreas auditadas' + (p.nota ? ' · ' + DR.esc(p.nota) : '') + '</span>' +
+          '<span>' + d.hechas + ' de ' + d.total + ' áreas cumplidas' + (p.nota ? ' · ' + DR.esc(p.nota) : '') + '</span>' +
           (p.ultimo_recordatorio ? '<span class="gt-recordado">' + GANTT.ICO_CORREO + 'Recordado ' + DR.hace(p.ultimo_recordatorio) + ' · ' + p.recordatorios + ' envío(s)</span>' : '') +
         '</div><div class="gt-item-der">' + GANTT.pillEstado(d.estado) +
+          (AT.puedeCapturar() ? '<button type="button" class="btn sec mini" data-gmarcar="' + p.id + '">Cumplimiento</button>' : '') +
           (AT.esAdmin() ? '<button type="button" class="btn sec mini" data-geditar="' + p.id + '">Editar</button>' : '') + '</div></div>';
     }).join('') + '</div>');
   return h;
@@ -218,19 +228,26 @@ GANTT.areasHtml = function () {
         return '<th>' + p.numero_auditoria + '° · S' + S5._p(GANTT.semana(p.semana_inicio)) + '</th>';
       }).join('') + '</tr></thead><tbody>' + areas.map(function (a) {
         return '<tr><td>' + DR.esc(a.nombre) + '</td>' + progs.map(function (p, i) {
-          var d = dets[i], x = d.areas.filter(function (y) { return y.area.id === a.id; })[0], f = x && x.fila;
-          if (f) {
-            return '<td><span class="gt-ok">' + DR.ICONOS.checkChico + S5.fecha(f.fecha) + '</span>' +
-              '<small>' + DR.esc(f.codigo) + (f.pct !== null && f.pct !== undefined ? ' · ' + S5.pct(f.pct) : '') + (f.estado_auditoria === 'en_curso' ? ' · en curso' : '') + '</small></td>';
-          }
-          if (d.estado === 'Cancelado') return '<td><span class="gt-nada">Cancelada</span></td>';
-          if (d.estado === 'Atrasado') return '<td><span class="gt-falta">Pendiente · atrasada</span></td>';
-          return '<td><span class="gt-nada">Por auditar</span></td>';
+          var d = dets[i], x = d.areas.filter(function (y) { return y.area.id === a.id; })[0] || {}, f = x.fila, m = x.manual, c;
+          if (m && m.cumplido) {
+            c = '<span class="gt-ok">' + DR.ICONOS.checkChico + 'Cumplido</span><small>Marcado a mano' + (m.semana ? ' · S' + S5._p(GANTT.semana(m.semana)) : '') + '</small>';
+          } else if (m) {
+            c = '<span class="gt-falta">No cumplido</span><small>Marcado a mano</small>';
+          } else if (f) {
+            c = '<span class="gt-ok">' + DR.ICONOS.checkChico + 'S' + S5._p(GANTT.semana(f.fecha)) + '</span>' +
+              '<small>Integra · ' + DR.esc(f.codigo) + (f.pct !== null && f.pct !== undefined ? ' · ' + S5.pct(f.pct) : '') + (f.estado_auditoria === 'en_curso' ? ' · en curso' : '') + '</small>';
+          } else if (d.estado === 'Cancelado') c = '<span class="gt-nada">Cancelada</span>';
+          else if (d.estado === 'Atrasado') c = '<span class="gt-falta">Pendiente · atrasada</span>';
+          else c = '<span class="gt-nada">Por auditar</span>';
+          return '<td>' + (AT.puedeCapturar()
+            ? '<button type="button" class="gt-marca" data-gmarcar="' + p.id + '" data-garea="' + a.id + '" title="Marcar cumplimiento">' + c + '</button>'
+            : c) + '</td>';
         }).join('') + '</tr>';
       }).join('') + '</tbody></table></div>';
     }
     h += '<section class="panel entra"><div class="panel-cab"><div><h2 style="color:' + g.color + '">' + DR.esc(g.nombre) + '</h2>' +
-      '<div class="sub">' + DR.esc(cul ? cul.nombre : '—') + (g.planta ? ' · ' + DR.esc(g.planta) : '') + ' · ' + areas.length + ' áreas a cumplir · ' +
+      '<div class="sub">' + DR.esc(GANTT.nombreCultivo(cul)) + (g.planta ? ' · ' + DR.esc(g.planta) : '') + ' · ' + areas.length + ' áreas a cumplir · ' +
+      (g.auto_integra ? 'cuenta lo registrado en Integra y las marcas a mano' : 'solo marcas a mano') + ' · ' +
       (total ? Math.round(hechas / total * 100) + ' % de cumplimiento (' + hechas + ' de ' + total + ')' : 'sin auditorías programadas') + '</div></div>' +
       (AT.esAdmin() ? '<button type="button" class="btn sec mini" data-ggrupo="' + g.id + '">Editar</button>' : '') + '</div>' +
       '<div class="chips gt-chips">' + areas.map(function (a) { return '<span class="tag">' + DR.esc(a.nombre) + '</span>'; }).join('') + '</div>' +
@@ -286,6 +303,9 @@ GANTT.enlazar = function (cont) {
   var np = DR.$('#gtNuevoProg', cont), ng = DR.$('#gtNuevoGrupo', cont);
   if (np) np.onclick = function () { GANTT.editarPrograma(null); };
   if (ng) ng.onclick = function () { GANTT.editarGrupo(null); };
+  DR.$$('[data-gmarcar]', cont).forEach(function (b) {
+    b.onclick = function () { GANTT.marcar(GANTT.prog(this.getAttribute('data-gmarcar')), Number(this.getAttribute('data-garea')) || null); };
+  });
 };
 
 /* ------------------------------------------------------------ correo HTML */
@@ -296,10 +316,14 @@ GANTT.correoHtml = function (progs, mensaje) {
   var tarjetas = progs.map(function (p) {
     var g = GANTT.grupo(p.grupo_id), d = GANTT.detalle(p), est = GANTT.ESTADOS[d.estado];
     var filas = d.areas.map(function (x) {
-      var ok = !!x.fila;
+      var ok = x.hecho, txt;
+      if (ok) {
+        var sem = x.manual ? x.manual.semana : x.fila.fecha;
+        txt = '&#10004; Cumplida' + (sem ? ' (semana ' + GANTT.semana(sem) + ')' : '');
+      } else txt = x.manual ? 'No cumplida' : (d.estado === 'Atrasado' ? 'Pendiente (atrasada)' : 'Por auditar');
       return '<tr><td style="padding:7px 10px;border-top:1px solid ' + C.borde + ';font-size:14px;color:' + C.texto + '">' + esc(x.area.nombre) + '</td>' +
-        '<td align="right" style="padding:7px 10px;border-top:1px solid ' + C.borde + ';font-size:13px;font-weight:600;color:' + (ok ? '#4C7A20' : (d.estado === 'Atrasado' ? '#C0392B' : C.gris)) + '">' +
-        (ok ? '&#10004; Auditada ' + S5.fecha(x.fila.fecha) : (d.estado === 'Atrasado' ? 'Pendiente (atrasada)' : 'Por auditar')) + '</td></tr>';
+        '<td align="right" style="padding:7px 10px;border-top:1px solid ' + C.borde + ';font-size:13px;font-weight:600;color:' + (ok ? '#4C7A20' : (x.manual || d.estado === 'Atrasado' ? '#C0392B' : C.gris)) + '">' +
+        txt + '</td></tr>';
     }).join('');
     return '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 18px 0;border:1px solid ' + C.borde + ';border-left:5px solid ' + g.color + ';border-radius:10px;border-collapse:separate">' +
       '<tr><td style="padding:14px 14px 10px 14px;font-family:' + fuente + '">' +
@@ -307,7 +331,7 @@ GANTT.correoHtml = function (progs, mensaje) {
         '<div style="font-size:14px;color:' + C.texto + ';margin-top:4px"><b>' + GANTT.textoSemanas(p) + '</b> &middot; ' + GANTT.rango(p) + '</div>' +
         '<div style="font-size:12.5px;color:' + C.gris + ';margin-top:2px">El d&iacute;a se coordina dentro de la semana.</div>' +
         '<div style="margin-top:8px"><span style="display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600;color:#FFFFFF;background:' + est.c + '">' + d.estado + '</span>' +
-        '<span style="font-size:13px;color:' + C.gris + ';margin-left:8px">' + d.hechas + ' de ' + d.total + ' &aacute;reas auditadas</span></div>' +
+        '<span style="font-size:13px;color:' + C.gris + ';margin-left:8px">' + d.hechas + ' de ' + d.total + ' &aacute;reas cumplidas</span></div>' +
         (p.nota ? '<div style="font-size:13px;color:' + C.gris + ';margin-top:6px">' + esc(p.nota) + '</div>' : '') +
       '</td></tr><tr><td style="padding:0 4px 6px 4px;font-family:' + fuente + '"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">' + filas + '</table></td></tr></table>';
   }).join('');
@@ -533,16 +557,21 @@ GANTT.editarPrograma = function (p) {
 
 GANTT.editarGrupo = function (g) {
   var marcadas = g ? (GANTT.areas[g.id] || []).slice() : [];
+  var auto = g ? g.auto_integra !== false : true;
   var op = function (v, t, act) { return '<option value="' + v + '"' + (String(v) === String(act) ? ' selected' : '') + '>' + DR.esc(t) + '</option>'; };
   UI.abrirHoja('<div class="asa"></div>' +
     '<div class="res-estado" style="color:#B7E27C">' + DR.ICONOS.checkChico + '<span>' + (g ? 'Editar grupo' : 'Nuevo grupo') + '</span></div>' +
     '<div class="form" style="margin-top:14px">' +
       '<div class="campo"><label for="ggNombre">Nombre</label><input id="ggNombre" maxlength="60" placeholder="Ej. Uva PLM" value="' + DR.esc(g ? g.nombre : '') + '"></div>' +
       '<div class="campo"><label for="ggCultivo">Cultivo</label><select id="ggCultivo">' +
-        S5.cultivos.map(function (c) { return op(c.id, c.nombre, g ? g.cultivo_id : ''); }).join('') + '</select></div>' +
+        S5.cultivos.map(function (c) { return op(c.id, GANTT.nombreCultivo(c), g ? g.cultivo_id : ''); }).join('') + '</select></div>' +
       '<div class="campo"><label for="ggPlanta">Planta (opcional)</label><input id="ggPlanta" maxlength="80" placeholder="Ej. Planta Don Carlos" value="' + DR.esc(g ? (g.planta || '') : '') + '">' +
         '<div class="ayuda-campo">Si la escribes, solo cuentan las auditorías de esa planta.</div></div>' +
       '<div class="campo"><label for="ggColor">Color</label><input id="ggColor" type="color" value="' + (g ? g.color : '#76B729') + '"></div>' +
+      '<div class="campo ancho"><label>Cumplimiento</label><div class="opciones" id="ggAuto">' +
+        [{ v: true, t: 'Integra + marcas a mano' }, { v: false, t: 'Solo marcas a mano' }].map(function (o) {
+          return '<button type="button" class="opcion' + (o.v === auto ? ' activa' : '') + '" data-valor="' + o.v + '">' + o.t + '</button>';
+        }).join('') + '</div><div class="ayuda-campo">«Solo marcas a mano»: no se cruza con las auditorías registradas en Integra (p. ej. Servicios Generales o auditorías hechas en Excel).</div></div>' +
       '<div class="campo ancho"><label>Áreas que deben cumplirse</label><div class="opciones" id="ggAreas">' +
         S5.areas.filter(function (a) { return a.activo || marcadas.indexOf(a.id) > -1; }).map(function (a) {
           return '<button type="button" class="opcion' + (marcadas.indexOf(a.id) > -1 ? ' activa' : '') + '" data-area="' + a.id + '">' + DR.esc(a.nombre) + '</button>';
@@ -558,16 +587,86 @@ GANTT.editarGrupo = function (g) {
       this.classList.toggle('activa', i < 0);
     };
   });
+  DR.$$('#ggAuto .opcion').forEach(function (b) {
+    b.onclick = function () { auto = this.getAttribute('data-valor') === 'true'; DR.$$('#ggAuto .opcion').forEach(function (x) { x.classList.toggle('activa', x === b); }); };
+  });
   DR.$('#ggCancelar').onclick = UI.cerrarHoja;
   DR.$('#ggGuardar').onclick = function () {
     var btn = this;
     btn.classList.add('cargando');
     AT.rpc('rpc_s5_gantt_guardar_grupo', { p: {
       id: g ? g.id : null, nombre: DR.$('#ggNombre').value, cultivo_id: Number(DR.$('#ggCultivo').value),
-      planta: DR.$('#ggPlanta').value, color: DR.$('#ggColor').value.toUpperCase(), areas: marcadas
+      planta: DR.$('#ggPlanta').value, color: DR.$('#ggColor').value.toUpperCase(), areas: marcadas, auto_integra: auto
     } }).then(function () {
       UI.cerrarHoja();
       DR.toast('Grupo guardado.');
+      return GANTT.refrescar();
+    }).catch(function (e) { btn.classList.remove('cargando'); DR.toast(e.message, 'error'); });
+  };
+};
+
+/* ------------------------------------------------------------ cumplimiento a mano */
+/** Hoja para marcar a mano qué áreas cumplieron una auditoría programada (p. ej. las hechas en Excel). */
+GANTT.marcar = function (p, areaFoco) {
+  if (!p) return;
+  var g = GANTT.grupo(p.grupo_id), d = GANTT.detalle(p), estado = {};
+  // estado[área] = true (cumplido) · false (no cumplido) · null (sin marca)
+  d.areas.forEach(function (x) { estado[x.area.id] = x.manual ? !!x.manual.cumplido : null; });
+  var inicial = JSON.stringify(estado);
+  var focoManual = (d.areas.filter(function (x) { return x.area.id === areaFoco && x.manual && x.manual.semana; })[0] || {}).manual;
+  var base = focoManual ? focoManual.semana : p.semana_inicio, anioHoy = GANTT.anioIso(S5.hoy());
+  var sinMarca = g.auto_integra ? 'Según Integra' : 'Sin marcar';
+  var fila = function (x) {
+    var auto = x.fila ? 'Integra: S' + S5._p(GANTT.semana(x.fila.fecha)) + ' · ' + DR.esc(x.fila.codigo) : (g.auto_integra ? 'Sin auditoría en Integra' : '');
+    var por = x.manual ? 'Marcado por ' + DR.esc(x.manual.por || '—') + ' ' + DR.hace(x.manual.en) : '';
+    return '<div class="gt-marca-fila' + (x.area.id === areaFoco ? ' foco' : '') + '">' +
+      '<div><b>' + DR.esc(x.area.nombre) + '</b><small>' + [auto, por].filter(Boolean).join(' · ') + '</small></div>' +
+      '<div class="opciones">' + [{ v: true, t: 'Cumplido', c: '#76B729' }, { v: false, t: 'No cumplido', c: '#E5484D' }, { v: null, t: sinMarca, c: '#A89A8C' }].map(function (o) {
+        return '<button type="button" class="opcion chica' + (estado[x.area.id] === o.v ? ' activa' : '') + '" data-marea="' + x.area.id + '" data-valor="' + o.v + '" style="--c:' + o.c + '">' + o.t + '</button>';
+      }).join('') + '</div></div>';
+  };
+  var op = function (v, t, act) { return '<option value="' + v + '"' + (String(v) === String(act) ? ' selected' : '') + '>' + t + '</option>'; };
+  UI.abrirHoja('<div class="asa"></div>' +
+    '<div class="res-estado">' + DR.ICONOS.checkChico + '<span>Cumplimiento a mano</span></div>' +
+    '<div class="res-nombre" style="font-size:24px">' + DR.esc(GANTT.nombreProg(p)) + '</div>' +
+    '<div class="res-dni" style="letter-spacing:0">' + GANTT.textoSemanas(p) + ' · ' + GANTT.rango(p) + '</div>' +
+    '<div class="aviso" style="margin-top:12px">Marca las áreas que cumplieron esta auditoría (por ejemplo, las hechas en Excel). La marca a mano manda sobre lo registrado en Integra.</div>' +
+    '<div class="acciones" style="margin-top:10px"><button type="button" class="btn sec chico" id="gmTodas">Todas cumplidas</button>' +
+      '<button type="button" class="btn sec chico" id="gmNinguna">Quitar todas las marcas</button></div>' +
+    '<div class="gt-marca-lista">' + d.areas.map(fila).join('') + '</div>' +
+    '<div class="form" style="margin-top:12px">' +
+      '<div class="campo"><label for="gmSemana">Semana en que se cumplió</label><input id="gmSemana" type="number" min="1" max="53" inputmode="numeric" value="' + GANTT.semana(base) + '"></div>' +
+      '<div class="campo"><label for="gmAnio">Año</label><select id="gmAnio">' + [anioHoy - 1, anioHoy, anioHoy + 1].map(function (a) { return op(a, a, GANTT.anioIso(base)); }).join('') + '</select></div>' +
+      '<div class="campo ancho"><label for="gmNota">Nota (opcional)</label><input id="gmNota" maxlength="200" placeholder="Ej. Auditoría registrada en Excel" value="' + DR.esc(focoManual && focoManual.nota ? focoManual.nota : '') + '"></div>' +
+    '</div>' +
+    '<div class="acciones"><button type="button" class="btn sec" id="gmCancelar">Cancelar</button>' +
+      '<button type="button" class="btn verde" id="gmGuardar" style="flex:1">Guardar</button></div>', { fija: true });
+
+  var leer = function (v) { return v === 'true' ? true : (v === 'false' ? false : null); };
+  var pintarFila = function (id) {
+    DR.$$('[data-marea="' + id + '"]').forEach(function (b) { b.classList.toggle('activa', estado[id] === leer(b.getAttribute('data-valor'))); });
+  };
+  DR.$$('[data-marea]').forEach(function (b) {
+    b.onclick = function () { var id = Number(this.getAttribute('data-marea')); estado[id] = leer(this.getAttribute('data-valor')); pintarFila(id); };
+  });
+  DR.$('#gmTodas').onclick = function () { Object.keys(estado).forEach(function (id) { estado[id] = true; pintarFila(id); }); };
+  DR.$('#gmNinguna').onclick = function () { Object.keys(estado).forEach(function (id) { estado[id] = null; pintarFila(id); }); };
+  var foco = DR.$('.gt-marca-fila.foco');
+  if (foco) foco.scrollIntoView({ block: 'center' });
+  DR.$('#gmCancelar').onclick = UI.cerrarHoja;
+  DR.$('#gmGuardar').onclick = function () {
+    var btn = this, n = parseInt(DR.$('#gmSemana').value, 10), a = Number(DR.$('#gmAnio').value);
+    var lunes = n >= 1 && n <= 53 ? GANTT.lunesDeSemana(a, n) : null;
+    if (!lunes || GANTT.anioIso(lunes) !== a) { DR.toast('Escribe una semana válida para ese año.', 'error'); return; }
+    var antes = JSON.parse(inicial);
+    // Áreas que cambiaron, más las marcadas (así reciben la semana y la nota de este guardado).
+    var marcas = Object.keys(estado).filter(function (id) { return estado[id] !== antes[id] || estado[id] !== null; })
+      .map(function (id) { return { area_id: Number(id), cumplido: estado[id] }; });
+    if (!marcas.length) { UI.cerrarHoja(); return; }
+    btn.classList.add('cargando');
+    AT.rpc('rpc_s5_gantt_marcar', { p_programa: p.id, p_marcas: marcas, p_semana: lunes, p_nota: DR.$('#gmNota').value }).then(function () {
+      UI.cerrarHoja();
+      DR.toast('Cumplimiento guardado.');
       return GANTT.refrescar();
     }).catch(function (e) { btn.classList.remove('cargando'); DR.toast(e.message, 'error'); });
   };

@@ -82,7 +82,7 @@ select g.id, p.numero, p.inicio::date, p.semanas, p.nota
 from (values
   ('Cítricos', 1, '2026-08-03', 1, null), ('Cítricos', 2, '2026-09-07', 1, null),
   ('Cítricos', 3, '2026-09-28', 1, null),
-  ('Arándano', 1, '2026-09-07', 3, null), ('Arándano', 2, '2026-10-05', 1, null),
+  ('Arándano', 1, '2026-09-07', 1, null), ('Arándano', 2, '2026-10-05', 1, null),
   ('Arándano', 3, '2026-11-02', 1, null),
   ('Uva PDC', 1, '2026-10-26', 1, null), ('Uva PDC', 2, '2026-11-30', 1, null), ('Uva PDC', 3, '2026-12-28', 1, null),
   ('Uva PLM', 1, '2026-11-02', 1, null), ('Uva PLM', 2, '2026-12-07', 1, null), ('Uva PLM', 3, '2027-01-04', 1, null),

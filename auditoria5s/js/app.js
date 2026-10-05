@@ -1,8 +1,8 @@
 /* ============================================================================
  * app.js — ARRANQUE Y NAVEGACIÓN DEL MÓDULO AUDITORÍA 5S
  * Exige sesión. Pestañas según rol y accesos del usuario: Resultados y Observaciones (todos),
- * Auditar (admin y captura), Catálogo (admin). Enlaces: #auditar,
- * #observaciones, #resultados, #catalogo.
+ * Auditar (admin y captura), Gantt (cronograma y recordatorios), Catálogo (admin).
+ * Enlaces: #auditar, #observaciones, #resultados, #gantt, #catalogo.
  * ==========================================================================*/
 
 DR.TABS = [
@@ -12,6 +12,8 @@ DR.TABS = [
     ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M8.5 11l2 2 4-4M8.5 17h7"/></svg>' },
   { id: 'observaciones', t: 'Observaciones', c: '#EF7C3B', ver: function () { return AT.tieneAcceso('gestion.5s.observaciones'); },
     ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.7l1.3-2h5l1.3 2h1.7A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.5" r="3.5"/></svg>' },
+  { id: 'gantt', t: 'Gantt', c: '#4FC3F0', ver: function () { return AT.tieneAcceso('gestion.5s.gantt'); },
+    ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3.5" y="4.5" width="17" height="16" rx="2"/><path d="M3.5 9h17M8 3v3M16 3v3"/><path d="M7 13h5M10 16.5h6" stroke-width="2.4"/></svg>' },
   { id: 'catalogo', t: 'Catálogo', c: '#E8B04A', ver: function () { return AT.esAdmin(); },
     ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 6h10M4 12h16M4 18h7"/><circle cx="18" cy="6" r="2"/><circle cx="15" cy="18" r="2"/></svg>' }
 ];

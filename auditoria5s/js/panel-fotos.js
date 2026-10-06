@@ -5,6 +5,7 @@
  * área y sus fotos Antes / Después, para puntuar con la evidencia a la vista.
  * Desde el panel se agregan fotos «Antes» a una observación ya registrada
  * (rpc_s5_obs_actualizar, sin plazo: solo suma evidencia) o se registra una nueva.
+ * «Cargar pendientes de una auditoría pasada» (obs-pasadas.js) sube el Excel manual.
  * En pantallas anchas el panel no tapa el checklist: se puede puntuar con él abierto.
  * ==========================================================================*/
 var PFOT = { abierto: false, alcance: 'zona', subiendo: {} };
@@ -92,7 +93,8 @@ PFOT.pintar = function () {
     '<div class="vista-toggle pf-alcance" role="tablist">' +
       '<button type="button" data-alc="zona"' + (PFOT.alcance === 'zona' ? ' class="activo"' : '') + '>Esta zona · ' + nZona + '</button>' +
       '<button type="button" data-alc="area"' + (PFOT.alcance === 'area' ? ' class="activo"' : '') + '>Toda el área · ' + nArea + '</button></div>' +
-    (puede ? '<button type="button" class="btn verde chico pf-nueva" id="pfNueva">' + FOTOS.ICONO + '<span>Nueva observación con foto</span></button>' : '') +
+    (puede ? '<button type="button" class="btn verde chico pf-nueva" id="pfNueva">' + FOTOS.ICONO + '<span>Nueva observación con foto</span></button>' +
+      '<button type="button" class="btn sec chico pf-nueva" id="pfPasada">' + DR.ICONOS.subir + '<span>Cargar pendientes de una auditoría pasada (Excel)</span></button>' : '') +
     '<div id="pfLista">' + (lista.length ? lista.map(function (o) { return PFOT.tarjeta(o, puede); }).join('')
       : '<div class="vacio">' + (PFOT.alcance === 'zona' ? 'Esta zona no tiene observaciones. Mira «Toda el área» o registra una nueva.' : 'El área aún no tiene observaciones.') + '</div>') + '</div>';
 
@@ -102,6 +104,7 @@ PFOT.pintar = function () {
     b.onclick = function () { PFOT.alcance = this.getAttribute('data-alc'); PFOT.pintar(); };
   });
   if (DR.$('#pfNueva')) DR.$('#pfNueva').onclick = AUD.nuevaObservacion;
+  if (DR.$('#pfPasada')) DR.$('#pfPasada').onclick = OPAS.abrir;
   DR.$$('[data-subir] input', c).forEach(function (inp) {
     inp.onchange = function () {
       var id = this.closest('[data-subir]').getAttribute('data-subir');
@@ -123,7 +126,7 @@ PFOT.tarjeta = function (o, puede) {
   var subiendo = PFOT.subiendo[o.id], lleno = antes.length >= FOTOS.MAX;
   return '<article class="pf-obs" style="--c:' + (S5.COLOR_ESTADO[o.estado] || '#A89A8C') + '">' +
     '<div class="obs-top"><b>N° ' + o.numero + (PFOT.deZona(o) ? '' : ' · ' + DR.esc(S5.nombreZona(z))) +
-      (o.s_referencia ? ' · ' + o.s_referencia + 'S' : '') + '</b>' + S5.pillEstado(o.estado) + '</div>' +
+      (o.s_referencia ? ' · ' + o.s_referencia + 'S' : '') + (o.importada ? ' · auditoría pasada' : '') + '</b>' + S5.pillEstado(o.estado) + '</div>' +
     '<button type="button" class="pf-texto" data-detalle="' + o.id + '">' + DR.esc(DR.recortar(o.descripcion, 200)) + '</button>' +
     '<div class="pf-fotos"><span class="pf-etq">Antes · ' + antes.length + '</span>' + (FOTOS.galeriaHtml(antes, 'foto-grupo pf') || '<em>Sin fotos</em>') + '</div>' +
     (despues.length ? '<div class="pf-fotos"><span class="pf-etq">Después · ' + despues.length + '</span>' + FOTOS.galeriaHtml(despues, 'foto-grupo pf') + '</div>' : '') +

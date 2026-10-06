@@ -688,6 +688,14 @@ tr.fila-cerca td{background:#23170E}
 .av-kpis div{padding:10px;border-radius:13px;background:#130F0C;border:1px solid var(--borde);text-align:center}
 .av-kpis b{display:block;font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
 .av-kpis span{font-size:12px;color:var(--texto-3)}
+/* Auditoría pasada (obs-pasadas.js) */
+.op-todas{display:flex;align-items:center;gap:10px;margin:4px 0 10px;font-size:13.5px;color:var(--texto-2);cursor:pointer}
+.op-todas input,.op-fila input{width:20px;height:20px;flex:0 0 20px;accent-color:var(--dr-naranja)}
+.op-lista{display:grid;gap:8px;max-height:46vh;overflow-y:auto;overscroll-behavior:contain;margin-top:6px}
+.op-fila{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:13px;background:var(--panel);border:1px solid var(--borde);border-left:4px solid var(--c);cursor:pointer}
+.op-cuerpo{display:grid;gap:4px;min-width:0;flex:1}
+.op-desc{font-size:14px;line-height:1.4;color:var(--texto-2)}
+.op-cuerpo small{font-size:12px;color:var(--texto-3)}
 .av-bloque{margin-top:8px;border-radius:13px;background:#1A1411;border:1px solid var(--borde)}
 .av-bloque summary,.av-sin{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 13px;cursor:pointer;font-size:14.5px}
 .av-sin{cursor:default;color:var(--texto-3)}

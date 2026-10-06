@@ -394,30 +394,37 @@ INF.pdfResultados = function (opc) {
 };
 
 /** Última(s) hoja(s) del informe: tabla con el formato de la hoja Observaciones, en apaisado.
- *  La celda de evidencia se divide en dos bandas: arriba las fotos «Antes», abajo las «Después». */
+ *  «Antes» y «Después» van en columnas propias (~45 mm); con varias fotos, cuadrícula de 2 columnas. */
 INF.anexoObservaciones = function (ctx, lista, imgs, opc) {
   var doc = ctx.doc, M = ctx.M, color = ctx.color, fuente = ctx.fuente;
   doc.addPage('a4', 'landscape');
   var W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), ANCHO = W - 2 * M;
   var y = ctx.encabezado(), conArea = !opc.area;
 
-  var cols = [{ t: 'N°', w: 10, al: 'center' }, { t: 'Semana', w: 13, al: 'center' }, { t: 'Fecha de Registro', w: 20, al: 'center' }]
-    .concat(conArea ? [{ t: 'Área', w: 26 }] : [])
-    .concat([{ t: 'Zona', w: 30 }, { t: 'Observaciones', w: conArea ? 45 : 58 }, { t: 'Acción correctiva', w: conArea ? 45 : 58 },
-      { t: 'Estado', w: 22, al: 'center' }, { t: 'Fecha de cierre', w: 20, al: 'center' }, { t: 'Evidencia fotográfica', w: 38, al: 'center' }]);
+  var wFoto = conArea ? 42 : 45;
+  var cols = [{ t: 'N°', w: 8, al: 'center' }, { t: 'Semana', w: 10, al: 'center' }, { t: 'Fecha de Registro', w: 17, al: 'center' }]
+    .concat(conArea ? [{ t: 'Área', w: 22 }] : [])
+    .concat([{ t: 'Zona', w: conArea ? 22 : 25 }, { t: 'Observaciones', w: conArea ? 34 : 42 }, { t: 'Acción correctiva', w: conArea ? 34 : 42 },
+      { t: 'Estado', w: 19, al: 'center' }, { t: 'Fecha de cierre', w: 16, al: 'center' },
+      { t: 'Antes', w: wFoto, al: 'center', foto: 'antes' }, { t: 'Después', w: wFoto, al: 'center', foto: 'despues' }]);
   var total = cols.reduce(function (a, c) { return a + c.w; }, 0);
-  var iEv = cols.length - 1, ALTO_FOTO = 26;
+  // Alto de fila con fotos: caben 3 filas por hoja apaisada; con 5 o 6 fotos (3 filas de fotos), algo más.
+  var ALTO_FOTO = 46;
 
   var cabecera = function () {
-    color('setFillColor', ctx.MARRON); doc.rect(M, y, total, 8, 'F');
+    color('setFillColor', ctx.MARRON); doc.rect(M, y, total, 9, 'F');
     fuente('bold', 7.6, '#FFFFFF');
     var x = M;
     cols.forEach(function (c) {
-      var l = doc.splitTextToSize(c.t, c.w - 2);
-      doc.text(l[0] + (l.length > 1 ? '…' : ''), c.al === 'center' ? x + c.w / 2 : x + 1.5, y + 5.2, c.al === 'center' ? { align: 'center' } : undefined);
+      // Hasta dos líneas («Fecha de / Registro») para no cortar los títulos de columnas angostas.
+      var l = doc.splitTextToSize(c.t, c.w - 2).slice(0, 2);
+      l.forEach(function (t, i) {
+        var ty = y + (l.length > 1 ? 3.9 + i * 3 : 5.6);
+        doc.text(t, c.al === 'center' ? x + c.w / 2 : x + 1.5, ty, c.al === 'center' ? { align: 'center' } : undefined);
+      });
       x += c.w;
     });
-    y += 8;
+    y += 9;
   };
 
   ctx.titulo('Observaciones · sustento de los puntajes');
@@ -431,21 +438,24 @@ INF.anexoObservaciones = function (ctx, lista, imgs, opc) {
     var accion = [o.accion_correctiva].concat((opc.notas || {})[o.id] || []).filter(Boolean).join(' // ');
     var valores = [o.numero, o.semana, S5.fecha(o.fecha_registro)]
       .concat(conArea ? [area.nombre || ''] : [])
-      .concat([S5.nombreZona(zona), o.descripcion || '', accion, o.estado, o.fecha_cierre ? S5.fecha(o.fecha_cierre) : '—', '']);
+      .concat([S5.nombreZona(zona), o.descripcion || '', accion, o.estado, o.fecha_cierre ? S5.fecha(o.fecha_cierre) : '—', '', '']);
 
     fuente('normal', 7.4, ctx.TEXTO);
-    var lineas = valores.map(function (v, j) { return j === iEv ? [] : doc.splitTextToSize(String(v === null || v === undefined ? '' : v), cols[j].w - 3).slice(0, 12); });
+    var lineas = valores.map(function (v, j) { return cols[j].foto ? [] : doc.splitTextToSize(String(v === null || v === undefined ? '' : v), cols[j].w - 3).slice(0, 14); });
     var altoTexto = Math.max.apply(null, lineas.map(function (l) { return l.length; })) * 3.3 + 3.4;
-    var antes = S5.fotosDe(o, 'antes').filter(function (r) { return imgs[r]; });
-    var despues = S5.fotosDe(o, 'despues').filter(function (r) { return imgs[r]; });
-    var h = Math.max(8, altoTexto, (antes.length || despues.length) ? ALTO_FOTO : 0);
+    var fotos = {
+      antes: S5.fotosDe(o, 'antes').filter(function (r) { return imgs[r]; }),
+      despues: S5.fotosDe(o, 'despues').filter(function (r) { return imgs[r]; })
+    };
+    var nMax = Math.max(fotos.antes.length, fotos.despues.length);
+    var h = Math.max(8, altoTexto, nMax ? (nMax > 4 ? ALTO_FOTO + 14 : ALTO_FOTO) : 0);
 
     if (y + h > H - 16) { doc.addPage('a4', 'landscape'); y = ctx.encabezado(); cabecera(); }
     if (k % 2) { color('setFillColor', ctx.FONDO); doc.rect(M, y, total, h, 'F'); }
 
     var x = M;
     cols.forEach(function (c, j) {
-      if (j === iEv) { x += c.w; return; }
+      if (c.foto) { INF.fotosEnCelda(doc, imgs, fotos[c.foto], x, y, c.w, h); x += c.w; return; }
       if (c.t === 'Estado') {
         var col = S5.COLOR_ESTADO[o.estado] || '#A89A8C';
         color('setFillColor', col); doc.roundedRect(x + 1.2, y + h / 2 - 2.4, c.w - 2.4, 4.8, 1.4, 1.4, 'F');
@@ -462,22 +472,6 @@ INF.anexoObservaciones = function (ctx, lista, imgs, opc) {
       x += c.w;
     });
 
-    // evidencia: banda superior «Antes», banda inferior «Después»
-    var xe = M + total - cols[iEv].w, we = cols[iEv].w;
-    [antes, despues].forEach(function (grupo, banda) {
-      var alto = (h - 3) / 2, y0 = y + 1.5 + banda * alto;
-      fuente('bold', 5.4, ctx.GRIS);
-      doc.text(banda ? 'D' : 'A', xe + 1.6, y0 + alto / 2 + 1);
-      if (!grupo.length) return;
-      var wCaja = (we - 6) / grupo.length - 1;
-      grupo.forEach(function (r, i2) {
-        var im = imgs[r], esc = Math.min(wCaja / im.w, (alto - 1) / im.h);
-        var w2 = im.w * esc, h2 = im.h * esc;
-        var x2 = xe + 4.5 + i2 * (wCaja + 1) + (wCaja - w2) / 2;
-        doc.addImage(im.base64, 'JPEG', x2, y0 + (alto - h2) / 2, w2, h2, r, 'FAST');
-      });
-    });
-
     color('setDrawColor', ctx.LINEA); doc.setLineWidth(0.2); doc.line(M, y + h, M + total, y + h);
     y += h;
   });
@@ -487,6 +481,21 @@ INF.anexoObservaciones = function (ctx, lista, imgs, opc) {
     fuente('normal', 7.2, ctx.GRIS);
     doc.text('Informe generado sin fotos. La evidencia completa está en el Excel de Observaciones.', M, y);
   }
+};
+
+/** Fotos dentro de una celda del anexo: 1 ocupa toda la celda; 2 lado a lado; 3 o más, cuadrícula de 2 columnas. */
+INF.fotosEnCelda = function (doc, imgs, rutas, x, y, w, h) {
+  if (!rutas.length) return;
+  var n = rutas.length, m = 1.2, gap = 1;
+  var cols = n === 1 ? 1 : 2, filas = Math.ceil(n / cols);
+  var wc = (w - 2 * m - gap * (cols - 1)) / cols, hc = (h - 2 * m - gap * (filas - 1)) / filas;
+  rutas.forEach(function (r, i) {
+    var im = imgs[r], esc = Math.min(wc / im.w, hc / im.h), w2 = im.w * esc, h2 = im.h * esc;
+    var cx = x + m + (i % cols) * (wc + gap), cy = y + m + Math.floor(i / cols) * (hc + gap);
+    // La última foto impar queda centrada en su fila.
+    if (cols === 2 && i === n - 1 && n % 2) cx = x + (w - wc) / 2;
+    doc.addImage(im.base64, 'JPEG', cx + (wc - w2) / 2, cy + (hc - h2) / 2, w2, h2, r, 'FAST');
+  });
 };
 
 /* ------------------------------------------------------------ Excel de observaciones (formato manual) */
@@ -507,8 +516,8 @@ INF.notasDe = function (ids) {
 
 /** Descarga una foto del bucket privado y la reduce para incrustarla en el Excel. */
 INF.fotoParaExcel = function (ruta) { return INF.fotoEscalada(ruta, 640, 0.72); };
-/** Versión pequeña para el PDF: la celda de evidencia mide ~12 mm. */
-INF.fotoParaPdf = function (ruta) { return INF.fotoEscalada(ruta, 240, 0.62); };
+/** Versión para el PDF: una foto sola ocupa hasta ~45 × 44 mm (≈ 640 px se ven nítidos al imprimir). */
+INF.fotoParaPdf = function (ruta) { return INF.fotoEscalada(ruta, 640, 0.7); };
 
 INF.fotoEscalada = function (ruta, lado, calidad) {
   return sb.storage.from(FOTOS.BUCKET).download(ruta).then(function (r) {

@@ -370,7 +370,8 @@ OBS.abrirFormulario = function (opc) {
     var zonaId = z ? z.id : Number(st.zonaId);
     if (!zonaId) { DR.toast('Elige el área y la zona de la observación.', 'error'); return; }
     if (!desc) { DR.toast('Describe la observación.', 'error'); DR.$('#obsDesc').focus(); return; }
-    if (!st.fotos.length) {
+    // Las importadas de una auditoría pasada (Excel manual) pueden no tener foto.
+    if (!st.fotos.length && !(o && o.importada)) {
       DR.toast('Toma la foto «Antes»: es el sustento del hallazgo.', 'error');
       DR.$('#obsFotoZona').scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;

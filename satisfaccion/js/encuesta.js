@@ -10,11 +10,11 @@ ENC.PASOS = ['Datos', 'Evaluación', 'Sugerencias', 'Resumen'];
 
 ENC.nuevo = function () {
   var cul = SCI.cultivo(SCI.cultivoFiltro()) || SCI.cultivos.filter(function (c) { return c.activo; })[0] || {};
-  var plantas = SCI.misPlantas(), areas = SCI.misAreas(), mia = SCI.miArea();
+  var plantas = SCI.plantasDeCultivo(cul.id), areas = SCI.misAreas(), mia = SCI.miArea();
   return {
     id: SCI.uuid(), cultivo_id: cul.id || '', campana: SCI.campanaDefecto(cul.id ? cul : null), fecha: SCI.hoy(),
     area_evaluada_id: areas.length === 1 ? String(areas[0]) : '', area_evaluadora_id: mia ? String(mia) : '', sub_area: '',
-    planta: plantas.length === 1 ? plantas[0] : '', cargo: '', evaluador: (AT.perfil && AT.perfil.nombre) || '',
+    planta: plantas.length === 1 ? plantas[0] : '', evaluador: (AT.perfil && AT.perfil.nombre) || '',
     respuestas: {}, aspectos_valorados: '', aspectos_mejorar: '', recomendaciones: '', mejoras: {}
   };
 };
@@ -65,7 +65,8 @@ ENC.faltanDatos = function () {
   if (!b.area_evaluadora_id) x.push('área evaluadora');
   if (!String(b.evaluador || '').trim()) x.push('nombre del evaluador');
   if (b.area_evaluada_id && b.area_evaluada_id === b.area_evaluadora_id) x.push('áreas distintas (un área no se evalúa a sí misma)');
-  if (SCI.misPlantas().length && SCI.misPlantas().indexOf(String(b.planta || '').toUpperCase()) < 0) x.push('planta (una de las tuyas: ' + SCI.misPlantas().join(', ') + ')');
+  var pc = SCI.plantasDeCultivo(b.cultivo_id);
+  if (pc.length && pc.indexOf(String(b.planta || '').toUpperCase()) < 0) x.push('planta (' + pc.join(', ') + ')');
   if (b.area_evaluada_id && SCI.misAreas().length && SCI.misAreas().indexOf(Number(b.area_evaluada_id)) < 0) x.push('un área a evaluar que tengas asignada');
   return x;
 };
@@ -110,6 +111,10 @@ ENC.pintar = function (cont) {
       if (k === 'cultivo_id') {
         var c = SCI.cultivo(el.value);
         if (c) { b.campana = SCI.campanaDefecto(c); if (DR.$('[data-enc="campana"]')) DR.$('[data-enc="campana"]').value = b.campana; }
+        // La planta depende del cultivo: se limpia si ya no corresponde y se elige sola si hay una.
+        var pc = SCI.plantasDeCultivo(el.value);
+        if (pc.length && pc.indexOf(String(b.planta || '').toUpperCase()) < 0) b.planta = pc.length === 1 ? pc[0] : '';
+        if (DR.$('#encPlanta')) DR.$('#encPlanta').innerHTML = SCI.opcionesPlantas(b.planta, pc);
       }
       ENC.guardarLocal();
     };
@@ -151,11 +156,6 @@ ENC.ir = function (paso, validar) {
 
 ENC.pasoDatos = function () {
   var b = ENC.b, fija = !!SCI.miArea() && !AT.esAdmin();
-  var chips = function (campo, lista) {
-    return '<div class="opciones">' + lista.map(function (v) {
-      return '<button type="button" class="opcion' + (b[campo] === v ? ' activa' : '') + '" data-opcion="' + campo + '" data-valor="' + DR.esc(v) + '">' + DR.esc(v) + '</button>';
-    }).join('') + '</div>';
-  };
   return UI.panel('1. Datos generales', 'Quién evalúa, a qué área y cuándo.',
     '<div class="form">' +
       '<div class="campo"><label for="encCultivo">Cultivo</label><select id="encCultivo" data-enc="cultivo_id">' + SCI.opcionesCultivos(b.cultivo_id, 'Elegir…') + '</select></div>' +
@@ -164,11 +164,10 @@ ENC.pasoDatos = function () {
       '<div class="campo"><label for="encEvaluada">Área a evaluar</label><select id="encEvaluada" data-enc="area_evaluada_id">' + SCI.opcionesAreas(b.area_evaluada_id, 'Elegir…', SCI.misAreas().filter(function (id) { return id !== SCI.miArea(); })) + '</select></div>' +
       '<div class="campo"><label for="encEvaluadora">Área evaluadora <small>(tu área)</small></label><select id="encEvaluadora" data-enc="area_evaluadora_id"' + (fija ? ' disabled' : '') + '>' + SCI.opcionesAreas(b.area_evaluadora_id, 'Elegir…', fija ? [SCI.miArea()] : []) + '</select>' +
         (fija ? '<div class="ayuda-campo">Asignada por el administrador.</div>' : '') + '</div>' +
-      '<div class="campo"><label for="encPlanta">Planta</label><select id="encPlanta" data-enc="planta">' + SCI.opcionesPlantas(b.planta, SCI.misPlantas()) + '</select></div>' +
+      '<div class="campo"><label for="encPlanta">Planta</label><select id="encPlanta" data-enc="planta">' + SCI.opcionesPlantas(b.planta, SCI.plantasDeCultivo(b.cultivo_id)) + '</select></div>' +
       // Sub-área: ya va en el nombre del área (p. ej. «Producción Uva Limpieza»); solo se muestra si el dato ya la trae.
       (String(b.sub_area || '').trim() ? '<div class="campo"><label for="encSub">Sub-área evaluadora</label><input id="encSub" data-enc="sub_area" list="dlSubEnc" value="' + DR.esc(b.sub_area) + '">' + SCI.datalistSubAreas('dlSubEnc') + '</div>' : '') +
       '<div class="campo"><label for="encEvaluador">Nombre del evaluador</label><input id="encEvaluador" data-enc="evaluador" value="' + DR.esc(b.evaluador) + '"></div>' +
-      '<div class="campo ancho"><label>Cargo</label>' + chips('cargo', SCI.CARGOS) + '</div>' +
     '</div>' +
     '<div class="aviso" style="margin-top:12px">La planta separa los resultados en la presentación (p. ej. «PDC - Producción Uva Limpieza»).</div>');
 };
@@ -217,7 +216,7 @@ ENC.pasoResumen = function () {
   var grupo = ao ? SCI.grupo(ao.nombre, b.sub_area, b.planta, cul && cul.nombre) : '—';
   return UI.panel('4. Resumen', '', '<div>' +
       '<div class="dato-fila"><span>Área evaluada</span><b>' + DR.esc(ae ? ae.nombre : '—') + '</b></div>' +
-      '<div class="dato-fila"><span>Evaluador</span><b>' + DR.esc(grupo) + (b.cargo ? ' · ' + DR.esc(b.cargo) : '') + '</b></div>' +
+      '<div class="dato-fila"><span>Evaluador</span><b>' + DR.esc(grupo) + '</b></div>' +
       '<div class="dato-fila"><span>Cultivo · campaña</span><b>' + DR.esc((cul ? cul.nombre : '—') + ' · ' + b.campana) + '</b></div>' +
       '<div class="dato-fila"><span>Fecha</span><b>' + DR.esc(SCI.fecha(b.fecha)) + '</b></div>' +
       '<div class="dato-fila"><span>Ítems respondidos</span><b>' + ENC.respuestasLista().length + ' de 10</b></div>' +
@@ -245,7 +244,7 @@ ENC.guardar = function () {
   SCI.accion(this, 'rpc_sci_guardar_encuesta', { p: {
     id: b.id, cultivo_id: Number(b.cultivo_id), campana: String(b.campana).trim(), fecha: b.fecha,
     area_evaluada_id: Number(b.area_evaluada_id), area_evaluadora_id: Number(b.area_evaluadora_id),
-    sub_area: b.sub_area || null, planta: b.planta || null, cargo: b.cargo || null, evaluador: b.evaluador || null,
+    sub_area: b.sub_area || null, planta: b.planta || null, cargo: null, evaluador: b.evaluador || null,
     aspectos_valorados: b.aspectos_valorados, aspectos_mejorar: ENC.textoMejoras(), recomendaciones: b.recomendaciones,
     mejoras_items: ENC.mejorasBajos(), respuestas: ENC.respuestasLista()
   } }).then(function (r) {

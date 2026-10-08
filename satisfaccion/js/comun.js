@@ -14,7 +14,9 @@ var SCI = {
   CRITERIOS: IMP_SCI.CRITERIOS,
   ESCALA: IMP_SCI.ESCALA,
   COLOR_ESCALA: { 4: '#E5484D', 6.5: '#EF7C3B', 8.5: '#0097CE', 10: '#76B729' },
-  CARGOS: ['Jefe', 'Coordinador', 'Analista', 'Supervisor'],
+  // Plantas de cada cultivo (por nombre): al elegir el cultivo en la encuesta solo se ofrecen estas.
+  // Un cultivo que no figure aquí (p. ej. «-») muestra todas las plantas.
+  PLANTAS_CULTIVO: { 'Arándano': ['PDC'], 'Uva': ['PDC', 'PLM', 'PYA'], 'Cítrico': ['PCCH'] },
   // Nombre de la planta en este módulo cuando no es el del fundo de campo
   // (el fundo La Máquina tiene su planta en Los Molinos; «La Máquina» queda solo para campo).
   NOMBRE_PLANTA: { PLM: 'Los Molinos' },
@@ -61,8 +63,15 @@ SCI.plantas = function () {
   return lista;
 };
 
-/* ------------------------------------------------------------ plantas y áreas asignadas al usuario ([] = todas) */
-SCI.misPlantas = function () { return AT.esAdmin() || !AT.perfil ? [] : (AT.perfil.sci_plantas || []); };
+/** Códigos de planta del cultivo ([] = todas). */
+SCI.plantasDeCultivo = function (cultivoId) {
+  var c = SCI.cultivo(cultivoId);
+  if (!c) return [];
+  var k = Object.keys(SCI.PLANTAS_CULTIVO).filter(function (n) { return IMP_SCI.norm(n) === IMP_SCI.norm(c.nombre); })[0];
+  return k ? SCI.PLANTAS_CULTIVO[k] : [];
+};
+
+/* ------------------------------------------------------------ áreas asignadas al usuario ([] = todas) */
 /** Área del usuario (evaluadora) asignada por el admin; null si no tiene. */
 SCI.miArea = function () { return AT.perfil && AT.perfil.sci_area ? Number(AT.perfil.sci_area) : null; };
 /** Campaña por defecto: «<Cultivo> <año actual>» (p. ej. «Arándano 2026»). */

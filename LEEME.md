@@ -207,7 +207,7 @@ BD, Observaciones y Resultados), con el mismo estilo secuencial de Captura.
   y `vendor/exceljs.min.js` (se cargan solo al generar).
 - Checklist de 26 ítems (5-5-6-5-5), puntaje 0 · 1 · 1.5 · 2 por ítem.
   `% de la S = SUMA / (n° de ítems × 2)`; zona = promedio de las 5 S; madurez
-  ≥ 90 % EXCELENTE · ≥ 75 % BIEN · ≥ 65 % REGULAR · resto CRÍTICO
+  ≥ 90 % EXCELENTE · ≥ 77 % BIEN · ≥ 65 % REGULAR · resto CRÍTICO
   (validado contra la auditoría 3 de Producción: 0.80 · 0.80 · 0.75 · 0.80 · 0.70 → 0.77 BIEN).
 - Cada S se guarda al continuar; cada toque queda además en el celular y se
   recupera si se va la señal o se cierra la app.
@@ -320,10 +320,14 @@ ENCUESTA) y de la presentación «Evaluación Cliente Interno - <Área>».
   LA MAQUINA → PLM, YANCAY → PYA), editable en `Config → Listas → Códigos de planta`.
   En este módulo PLM se muestra como **Los Molinos** (`SCI.NOMBRE_PLANTA` en
   `comun.js`); «La Máquina» queda solo para campo (tiempos de ciclo).
-- **Evaluadores** (pestaña solo admin, migración 0019): plantas y áreas que cada
-  usuario puede evaluar (`perfiles.sci_plantas`, `perfiles.sci_areas`, vacío = todas).
+- **Evaluadores** (pestaña solo admin, migración 0019): áreas que cada
+  usuario puede evaluar (`perfiles.sci_areas`, vacío = todas).
   En la encuesta solo ve esas opciones; la base lo hace cumplir (`trg_sci_permisos`)
   para lo registrado en la app. El histórico importado de Excel no se restringe.
+- **Planta según cultivo** (migración 0031): el admin ya no asigna plantas. En la
+  encuesta la planta se filtra por el cultivo elegido (`SCI.PLANTAS_CULTIVO` en
+  `comun.js`: Arándano → PDC, Uva → PDC/PLM/PYA, Cítrico → PCCH; otro cultivo = todas).
+  La encuesta ya no pide el cargo (la columna se conserva para el histórico).
 - **Quién ve qué** (migración 0026, reemplaza la regla de 0025): el admin ve todas las
   encuestas; los demás ven solo las **evaluaciones hechas a su área** («Su área» en
   Evaluadores, `perfiles.sci_area`). Sin área asignada no ven resultados. Lo hace

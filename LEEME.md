@@ -332,6 +332,10 @@ ENCUESTA) y de la presentación «Evaluación Cliente Interno - <Área>».
   encuestas; los demás ven solo las **evaluaciones hechas a su área** («Su área» en
   Evaluadores, `perfiles.sci_area`). Sin área asignada no ven resultados. Lo hace
   cumplir el RLS de `sci_encuestas`; la hoja de Google sigue recibiendo todo.
+- **Recibidas / realizadas** (migración 0032): en Resultados, el selector «Ver» muestra las
+  evaluaciones recibidas por mi área, las realizadas por mi área (`area_evaluadora_id`) o las
+  realizadas por mí (`creado_por`); el admin además ve todas. Cada encuesta indica quién evaluó
+  (evaluador y, si es otro, el usuario que la registró).
 - **Resultados** abre por defecto en el **año actual (2026)**; el filtro Año permite
   ver otro o todos.
 - Tablas `sci_criterios`, `sci_items`, `sci_encuestas`, `sci_respuestas`; RPC

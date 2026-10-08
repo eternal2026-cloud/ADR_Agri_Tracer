@@ -4,15 +4,17 @@
  * Por área evaluada: puntaje ponderado (promedio por encuesta), matriz de
  * evaluaciones por planta y grupo evaluador (como la presentación), radar
  * consolidado, detalle por planta con sugerencias, encuestas e histórico.
- * Cada usuario ve solo las evaluaciones hechas a SU área (perfiles.sci_area, RLS, migración 0026);
- * el admin ve todas.
+ * Selector «Ver»: evaluaciones recibidas por mi área, realizadas por mi área o realizadas por mí
+ * (perfiles.sci_area y creado_por, RLS de la migración 0032); el admin ve además todas.
+ * Cada encuesta muestra quién la hizo (evaluador y usuario que la registró).
  * Descargas (solo admin): BD para Power BI (.xlsx) y presentación (.pptx).
  * ==========================================================================*/
-var RSCI = { area: null, anio: null, campana: '', desde: '', hasta: '', filas: [] };
+var RSCI = { area: null, anio: null, campana: '', desde: '', hasta: '', vista: null, todas: [], filas: [] };
 
 VISTAS.resultados = function (cont) {
   SCI.resultados(SCI.cultivoFiltro()).then(function (filas) {
-    RSCI.filas = filas || [];
+    RSCI.todas = filas || [];
+    RSCI.aplicarVista();
     RSCI.pintar(cont);
   }).catch(function (e) { UI.error(cont, e); });
 };
@@ -34,11 +36,34 @@ RSCI.grupos = function (filas) {
   }).sort(SCI.ordenGrupos);
 };
 
-/** Aviso para quien no es admin: solo ve lo que evaluaron a su área (Evaluadores → Su área). */
+/** Opciones del selector «Ver» según el usuario: [{ id, t, filtro }]. */
+RSCI.vistas = function () {
+  var mia = SCI.miArea(), yo = AT.perfil ? AT.perfil.id : null, v = [];
+  if (AT.esAdmin()) v.push({ id: 'todas', t: 'Todas las evaluaciones', filtro: function () { return true; } });
+  if (mia) {
+    v.push({ id: 'recibidas', t: 'Recibidas por mi área', filtro: function (f) { return f.area_evaluada_id === mia; } });
+    v.push({ id: 'area', t: 'Realizadas por mi área', filtro: function (f) { return f.area_evaluadora_id === mia; } });
+  }
+  v.push({ id: 'mias', t: 'Realizadas por mí', filtro: function (f) { return !!yo && f.creado_por === yo; } });
+  return v;
+};
+RSCI.aplicarVista = function () {
+  var v = RSCI.vistas();
+  if (!v.some(function (x) { return x.id === RSCI.vista; })) RSCI.vista = v[0].id;
+  var actual = v.filter(function (x) { return x.id === RSCI.vista; })[0];
+  RSCI.filas = RSCI.todas.filter(actual.filtro);
+};
+
+/** Aviso para quien no es admin sin área asignada. */
 RSCI.textoMiArea = function () {
-  var a = SCI.miArea() ? SCI.area(SCI.miArea()) : null;
-  return a ? ' Solo ves las evaluaciones que le hicieron a tu área: ' + a.nombre + '.'
-    : ' Tu usuario aún no tiene área asignada: pide a un administrador que la asigne en Evaluadores para ver sus resultados.';
+  return SCI.miArea() ? '' : ' Tu usuario aún no tiene área asignada: pide a un administrador que la asigne en Evaluadores para ver las evaluaciones de tu área.';
+};
+
+/** Quién hizo la evaluación: evaluador y, si es otro, el usuario que la registró en la app. */
+RSCI.quien = function (f) {
+  var ev = String(f.evaluador || '').trim(), reg = String(f.registrado_por || '').trim();
+  if (!ev) return reg;
+  return reg && f.origen === 'app' && reg.toLowerCase() !== ev.toLowerCase() ? ev + ' (registró: ' + reg + ')' : ev;
 };
 
 RSCI.pintar = function (cont) {
@@ -65,7 +90,11 @@ RSCI.pintar = function (cont) {
   if (!porArea.some(function (a) { return a.id === RSCI.area; })) RSCI.area = porArea.length ? porArea[0].id : null;
   var area = porArea.filter(function (a) { return a.id === RSCI.area; })[0];
 
+  var vistas = RSCI.vistas();
   var filtros = '<section class="panel entra"><div class="form">' +
+    '<div class="campo"><label for="fVista">Ver</label><select id="fVista">' + vistas.map(function (v) {
+      return '<option value="' + v.id + '"' + (v.id === RSCI.vista ? ' selected' : '') + '>' + DR.esc(v.t) + ' (' + RSCI.todas.filter(v.filtro).length + ')</option>';
+    }).join('') + '</select></div>' +
     '<div class="campo"><label for="fAnio">Año</label><select id="fAnio"><option value="">Todos</option>' +
       anios.map(function (a) { return '<option' + (a === RSCI.anio ? ' selected' : '') + '>' + a + '</option>'; }).join('') + '</select></div>' +
     '<div class="campo"><label for="fCampana">Campaña</label><select id="fCampana"><option value="">Todas</option>' +
@@ -78,7 +107,7 @@ RSCI.pintar = function (cont) {
     // Descargas: solo el admin (ve todas las encuestas).
     (AT.esAdmin() ? '<div class="acciones">' +
       '<button type="button" class="btn azul" id="btnPptx"' + (area ? '' : ' disabled') + '>Descargar presentación (.pptx)</button>' +
-      '<button type="button" class="btn sec" id="btnBD"' + (RSCI.filas.length ? '' : ' disabled') + '>Descargar BD para Power BI (.xlsx)</button>' +
+      '<button type="button" class="btn sec" id="btnBD"' + (RSCI.todas.length ? '' : ' disabled') + '>Descargar BD para Power BI (.xlsx)</button>' +
     '</div>' : '') + '</section>';
 
   var h = UI.encabezado('Cliente interno', 'Satisfacción del cliente interno',
@@ -99,6 +128,7 @@ RSCI.pintar = function (cont) {
 
   var recargar = function () { cont.innerHTML = '<div class="vacio">Cargando resultados…</div>'; VISTAS.resultados(cont); };
   SCI.enlazarSelectorCultivo(cont, recargar);
+  DR.$('#fVista').onchange = function () { RSCI.vista = this.value; RSCI.aplicarVista(); RSCI.area = null; RSCI.pintar(cont); };
   DR.$('#fAnio').onchange = function () { RSCI.anio = this.value; RSCI.pintar(cont); };
   DR.$('#fCampana').onchange = function () { RSCI.campana = this.value; RSCI.pintar(cont); };
   DR.$('#fDesde').onchange = function () { RSCI.desde = this.value; RSCI.pintar(cont); };
@@ -200,12 +230,19 @@ RSCI.porPlantaHtml = function (grupos) {
     var tarjetas = p.filas.map(function (g) {
       return '<article class="sci-grupo">' +
         '<div class="sci-grupo-cab"><b>' + DR.esc(g.grupo) + '</b>' + SCI.pillPct(g.total) + '</div>' +
+        RSCI.evaluadoresHtml(g.filas) +
         '<div class="sci-caja-tit">Evaluación criterio' + (g.n > 1 ? ' · ' + g.n + ' encuestas' : '') + '</div>' +
         SCI.radarSvg([{ nombre: g.grupo, color: '#B7A99C', criterios: g.criterios }], { ancho: 330, alto: 270 }) +
         RSCI.sugerenciasHtml(g.filas) + '</article>';
     }).join('');
     return UI.panel(titulo, p.filas.length + ' grupo(s) evaluador(es).', '<div class="sci-grupos">' + tarjetas + '</div>');
   }).join('');
+};
+
+RSCI.evaluadoresHtml = function (filas) {
+  var nombres = [];
+  filas.forEach(function (f) { var q = RSCI.quien(f); if (q && nombres.indexOf(q) < 0) nombres.push(q); });
+  return nombres.length ? '<div class="ayuda-campo">Evaluó: ' + DR.esc(nombres.join(' · ')) + '</div>' : '';
 };
 
 RSCI.encuestasHtml = function (filas) {
@@ -215,7 +252,7 @@ RSCI.encuestasHtml = function (filas) {
     { t: 'Cultivo', k: 'cultivo' },
     { t: 'Campaña', k: 'campana' },
     { t: 'Grupo evaluador', r: function (f) { return '<b>' + DR.esc(f.grupo) + '</b>'; } },
-    { t: 'Cargo', k: 'cargo' }
+    { t: 'Evaluó', r: function (f) { return DR.esc(RSCI.quien(f) || '—'); } }
   ].concat(SCI.CRITERIOS.map(function (c) {
     var k = ['p_atencion', 'p_tiempo', 'p_comunicacion', 'p_calidad'][c.id - 1];
     return { t: c.t, num: true, r: function (f) { return SCI.pct(SCI.num(f[k])); } };
@@ -270,7 +307,7 @@ RSCI.descargarBD = function () {
   Promise.all([SCI.excelJS(), SCI.bd(cultivoId, null)]).then(function (r) {
     var ExcelJS = r[0], filas = r[1];
     var sug = {};
-    RSCI.filas.forEach(function (f) { sug[f.codigo] = f; });
+    RSCI.todas.forEach(function (f) { sug[f.codigo] = f; });
     var libro = new ExcelJS.Workbook();
     libro.creator = 'Integra Operaciones · Don Ricardo';
     var hoja = libro.addWorksheet('Data Power BI');
@@ -300,15 +337,16 @@ RSCI.descargarBD = function () {
     // Hoja de resultados por encuesta (una fila por encuesta).
     var res = libro.addWorksheet('Resultados');
     var colsRes = [['Código', 'codigo', 12], ['Fecha', 'fecha', 12], ['Semana', 'semana', 9], ['Cultivo', 'cultivo', 11], ['Campaña', 'campana', 18],
-      ['Área evaluada', 'area_evaluada', 22], ['Grupo evaluador', 'grupo', 24], ['Planta', 'planta', 9], ['Cargo', 'cargo', 13],
+      ['Área evaluada', 'area_evaluada', 22], ['Grupo evaluador', 'grupo', 24], ['Planta', 'planta', 9], ['Cargo', 'cargo', 13], ['Evaluó', 'quien', 26],
       ['Atención y trato', 'p_atencion', 14], ['Tiempo de respuesta', 'p_tiempo', 14], ['Comunicación', 'p_comunicacion', 14],
       ['Calidad de servicio', 'p_calidad', 14], ['Resultado', 'resultado', 12]];
     res.addTable({
       name: 'TablaSCIResultados', ref: 'A1', headerRow: true, style: { theme: 'TableStyleMedium7', showRowStripes: true },
       columns: colsRes.map(function (c) { return { name: c[0], filterButton: true }; }),
-      rows: RSCI.filas.map(function (f) {
+      rows: RSCI.todas.map(function (f) {
         return colsRes.map(function (c) {
           if (c[1] === 'fecha') return fechaExcel(f.fecha);
+          if (c[1] === 'quien') return RSCI.quien(f);
           if (/^p_|resultado/.test(c[1])) return f[c[1]] === null ? '' : Number(f[c[1]]) / 100;
           return f[c[1]] === null || f[c[1]] === undefined ? '' : f[c[1]];
         });

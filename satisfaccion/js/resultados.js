@@ -9,7 +9,7 @@
  * Cada encuesta muestra quién la hizo (evaluador y usuario que la registró).
  * Descargas (solo admin): BD para Power BI (.xlsx) y presentación (.pptx).
  * ==========================================================================*/
-var RSCI = { area: null, anio: null, campana: '', desde: '', hasta: '', vista: null, todas: [], filas: [] };
+var RSCI = { area: null, anio: null, campana: '', desde: '', hasta: '', vista: null, evaluadora: '', evaluador: '', todas: [], filas: [] };
 
 VISTAS.resultados = function (cont) {
   SCI.resultados(SCI.cultivoFiltro()).then(function (filas) {
@@ -51,7 +51,56 @@ RSCI.aplicarVista = function () {
   var v = RSCI.vistas();
   if (!v.some(function (x) { return x.id === RSCI.vista; })) RSCI.vista = v[0].id;
   var actual = v.filter(function (x) { return x.id === RSCI.vista; })[0];
-  RSCI.filas = RSCI.todas.filter(actual.filtro);
+  var deVista = RSCI.todas.filter(actual.filtro);
+  // Admin: filtro por área evaluadora y por evaluador (quién hizo las encuestas).
+  RSCI.filas = deVista.filter(function (f) {
+    return (!RSCI.evaluadora || String(f.area_evaluadora_id) === RSCI.evaluadora) &&
+      (!RSCI.evaluador || RSCI.nombreEvaluador(f) === RSCI.evaluador);
+  });
+  RSCI.deVista = deVista;
+};
+/** Nombre con el que se agrupa al evaluador (el escrito en la encuesta o, si falta, quien la registró). */
+RSCI.nombreEvaluador = function (f) { return String(f.evaluador || '').trim() || String(f.registrado_por || '').trim() || 'Sin nombre'; };
+
+/** Selects de área evaluadora y evaluador (solo admin), con su n° de encuestas. */
+RSCI.filtrosEvaluadorHtml = function () {
+  if (!AT.esAdmin()) return '';
+  var cuenta = function (lista, clave) {
+    var m = {};
+    lista.forEach(function (f) { var k = clave(f); m[k] = m[k] || { n: 0, f: f }; m[k].n++; });
+    return m;
+  };
+  var porArea = cuenta(RSCI.deVista, function (f) { return String(f.area_evaluadora_id); });
+  var ids = Object.keys(porArea).sort(function (a, b) { return porArea[a].f.area_evaluadora < porArea[b].f.area_evaluadora ? -1 : 1; });
+  if (RSCI.evaluadora && ids.indexOf(RSCI.evaluadora) < 0) ids.unshift(RSCI.evaluadora);
+  var base = RSCI.deVista.filter(function (f) { return !RSCI.evaluadora || String(f.area_evaluadora_id) === RSCI.evaluadora; });
+  var porNombre = cuenta(base, RSCI.nombreEvaluador);
+  var nombres = Object.keys(porNombre).sort(function (a, b) { return a.localeCompare(b, 'es'); });
+  if (RSCI.evaluador && nombres.indexOf(RSCI.evaluador) < 0) nombres.unshift(RSCI.evaluador);
+  return '<div class="campo"><label for="fEvaluadora">Área evaluadora</label><select id="fEvaluadora"><option value="">Todas</option>' +
+      ids.map(function (id) {
+        var a = porArea[id] ? porArea[id].f.area_evaluadora : (SCI.area(id) || {}).nombre;
+        return '<option value="' + id + '"' + (id === RSCI.evaluadora ? ' selected' : '') + '>' + DR.esc(a || '#' + id) + ' (' + (porArea[id] ? porArea[id].n : 0) + ')</option>';
+      }).join('') + '</select></div>' +
+    '<div class="campo"><label for="fEvaluador">Evaluador</label><select id="fEvaluador"><option value="">Todos</option>' +
+      nombres.map(function (n) {
+        return '<option value="' + DR.esc(n) + '"' + (n === RSCI.evaluador ? ' selected' : '') + '>' + DR.esc(n) + ' (' + (porNombre[n] ? porNombre[n].n : 0) + ')</option>';
+      }).join('') + '</select></div>';
+};
+
+/** Resumen (admin): encuestas por evaluador y área evaluadora; clic = filtrar por ese evaluador. */
+RSCI.quienesHtml = function (filas) {
+  var grupos = SCI.agrupar(filas, function (f) { return RSCI.nombreEvaluador(f) + '' + f.area_evaluadora; }).map(function (g) {
+    var evaluadas = [];
+    g.filas.forEach(function (f) { if (evaluadas.indexOf(f.area_evaluada) < 0) evaluadas.push(f.area_evaluada); });
+    return { nombre: RSCI.nombreEvaluador(g.filas[0]), area: g.filas[0].area_evaluadora, filas: g.filas, evaluadas: evaluadas,
+      ultima: g.filas.map(function (f) { return f.fecha; }).sort().pop() };
+  }).sort(function (a, b) { return a.nombre.localeCompare(b.nombre, 'es') || (a.area < b.area ? -1 : 1); });
+  return '<div class="tabla-cont"><table><thead><tr><th>Evaluador</th><th>Área evaluadora</th><th class="num">Encuestas</th><th>Áreas que evaluó</th><th>Última</th></tr></thead><tbody>' +
+    grupos.map(function (g) {
+      return '<tr class="clicable" data-evaluador="' + DR.esc(g.nombre) + '"><td><b>' + DR.esc(g.nombre) + '</b></td><td>' + DR.esc(g.area) + '</td><td class="num">' + g.filas.length + '</td>' +
+        '<td>' + DR.esc(g.evaluadas.join(' · ')) + '</td><td>' + DR.esc(SCI.fecha(g.ultima)) + '</td></tr>';
+    }).join('') + '</tbody></table></div>';
 };
 
 /** Aviso para quien no es admin sin área asignada. */
@@ -94,7 +143,7 @@ RSCI.pintar = function (cont) {
   var filtros = '<section class="panel entra"><div class="form">' +
     '<div class="campo"><label for="fVista">Ver</label><select id="fVista">' + vistas.map(function (v) {
       return '<option value="' + v.id + '"' + (v.id === RSCI.vista ? ' selected' : '') + '>' + DR.esc(v.t) + ' (' + RSCI.todas.filter(v.filtro).length + ')</option>';
-    }).join('') + '</select></div>' +
+    }).join('') + '</select></div>' + RSCI.filtrosEvaluadorHtml() +
     '<div class="campo"><label for="fAnio">Año</label><select id="fAnio"><option value="">Todos</option>' +
       anios.map(function (a) { return '<option' + (a === RSCI.anio ? ' selected' : '') + '>' + a + '</option>'; }).join('') + '</select></div>' +
     '<div class="campo"><label for="fCampana">Campaña</label><select id="fCampana"><option value="">Todas</option>' +
@@ -121,6 +170,7 @@ RSCI.pintar = function (cont) {
         '<button type="button" class="btn sec" onclick="DR.ir(\'encuesta\')">Registrar encuesta</button></div>' : ''));
   } else {
     h += RSCI.areaHtml(area) + UI.panel('Resumen por área evaluada', 'Mismo filtro de cultivo, campaña y fechas.', RSCI.resumenAreasHtml(porArea)) +
+      (AT.esAdmin() ? UI.panel('Quién evaluó', 'Encuestas por evaluador y área evaluadora (mismo filtro). Toca una fila para ver solo las de esa persona.', RSCI.quienesHtml(base)) : '') +
       UI.panel('Histórico por campaña', 'Puntaje ponderado de cada área evaluada en cada campaña (sin filtro de campaña ni fechas).', RSCI.historicoHtml());
   }
   cont.innerHTML = h;
@@ -128,7 +178,13 @@ RSCI.pintar = function (cont) {
 
   var recargar = function () { cont.innerHTML = '<div class="vacio">Cargando resultados…</div>'; VISTAS.resultados(cont); };
   SCI.enlazarSelectorCultivo(cont, recargar);
-  DR.$('#fVista').onchange = function () { RSCI.vista = this.value; RSCI.aplicarVista(); RSCI.area = null; RSCI.pintar(cont); };
+  var refiltrar = function () { RSCI.aplicarVista(); RSCI.area = null; RSCI.pintar(cont); };
+  DR.$('#fVista').onchange = function () { RSCI.vista = this.value; refiltrar(); };
+  if (DR.$('#fEvaluadora')) DR.$('#fEvaluadora').onchange = function () { RSCI.evaluadora = this.value; RSCI.evaluador = ''; refiltrar(); };
+  if (DR.$('#fEvaluador')) DR.$('#fEvaluador').onchange = function () { RSCI.evaluador = this.value; refiltrar(); };
+  DR.$$('[data-evaluador]', cont).forEach(function (el) {
+    el.onclick = function () { RSCI.evaluador = this.getAttribute('data-evaluador'); refiltrar(); DR.$('#contenido').scrollTop = 0; };
+  });
   DR.$('#fAnio').onchange = function () { RSCI.anio = this.value; RSCI.pintar(cont); };
   DR.$('#fCampana').onchange = function () { RSCI.campana = this.value; RSCI.pintar(cont); };
   DR.$('#fDesde').onchange = function () { RSCI.desde = this.value; RSCI.pintar(cont); };

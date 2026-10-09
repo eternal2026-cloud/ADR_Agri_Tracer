@@ -521,15 +521,35 @@ AV.leerObservaciones = function (wb, fotosLibro, aud, area, obs, notas, plan, pr
     return S5.fotosDe(o, 'antes').concat(S5.fotosDe(o, 'despues')).map(function (ruta) { return { ruta: ruta, o: o }; });
   };
   var deFaltantes = faltan.reduce(function (t, o) { return t.concat(fotosDeObs(o)); }, []);
-  tareas.forEach(function (t) {
+  // Huellas de las fotos de cada fila del Excel (una sola vez por foto).
+  var huellasFila = function (x) {
+    return Promise.all(x.fAntes.concat(x.fDespues).map(function (f) {
+      f = AV.comoFoto(f);
+      return f._h || (f._h = AV.huella(f.blob));
+    })).then(function (hs) { return hs.filter(Boolean); });
+  };
+  // Fotos «ajenas» de una fila: las de observaciones que faltan en el Excel (fila borrada) y, de las
+  // filas vecinas, solo las que el Excel TAMBIÉN pone en la fila de esa vecina. Si una foto que la app
+  // tiene en la vecina aparece en el Excel solo en esta fila, el Excel manda: es de esta fila (p. ej.
+  // una carga anterior la dejó en la observación equivocada).
+  var ajenasDe = function (t) {
     var vecinas = tareas.filter(function (x) { return x !== t && x.o && x.o !== t.o && x.hoja === t.hoja && Math.abs(x.fila - t.fila) <= 2; });
-    t.ajenas = deFaltantes.concat(vecinas.reduce(function (s, x) { return s.concat(fotosDeObs(x.o)); }, []))
-      .filter(function (a) { return a.o !== t.o; });
-  });
+    return Promise.all(vecinas.map(function (x) {
+      var app = fotosDeObs(x.o);
+      return Promise.all([huellasFila(x), Promise.all(app.map(function (a) { return AV.huellaRuta(a.ruta); }))]).then(function (r) {
+        return app.filter(function (a, i) { return r[1][i] && r[0].some(function (h) { return AV.distancia(h, r[1][i]) <= 6; }); });
+      });
+    })).then(function (listas) {
+      return deFaltantes.concat.apply(deFaltantes, listas).filter(function (a) { return a.o !== t.o; });
+    });
+  };
 
   var hechas = 0;
   return INF.enLotes(tareas, 3, function (t) {
-    return AV.compararObs(t, aud, notas, plan).then(function () {
+    return ajenasDe(t).then(function (aj) {
+      t.ajenas = aj;
+      return AV.compararObs(t, aud, notas, plan);
+    }).then(function () {
       hechas++;
       progreso('Revisando observaciones ' + hechas + ' de ' + tareas.length + '…');
     });

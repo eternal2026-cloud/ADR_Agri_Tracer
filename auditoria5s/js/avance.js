@@ -236,8 +236,10 @@ AV.huellaRuta = function (ruta) {
  *   rutas  → fotos que la observación ya tiene (mismo tipo);
  *   ajenas → [{ ruta, o }] fotos de otras observaciones: si una foto del Excel es una de ellas, quedó
  *            en esta fila por error (p. ej. al borrar la fila de arriba) y NO se agrega.
- * → { nuevas: [Blob], reemplazos: [{ de, blob }], deOtras: [obs], sobran, ilegibles }.
+ * → { nuevas: [Blob], reemplazos: [{ de, blob, cambiada }], deOtras: [obs], sobran, ilegibles }.
  * Una foto que la app ya tiene pero que en el Excel lleva figuras encima (o recorte) la reemplaza.
+ * Una foto de la app que no está en el Excel, cuando la celda trae otra que la app no tiene, se
+ * cambia por esa (cambiada: true): el Excel manda (p. ej. se registró con la foto equivocada).
  */
 AV.fotosNuevas = function (fotos, rutas, ajenas) {
   fotos = (fotos || []).map(AV.comoFoto);
@@ -273,12 +275,15 @@ AV.fotosNuevas = function (fotos, rutas, ajenas) {
       var f = fotos[p.i], x = propias[p.j];
       if (f.editada && hf[p.i] && AV.distancia(x.h, hf[p.i]) > 2) reemplazos.push({ de: x.ruta, blob: f.final });
     });
-    // 3) El resto son nuevas (sin repetir dentro de la celda).
+    // 3) Fotos del Excel sin pareja: primero ocupan el lugar de las fotos de la app que no están en el Excel
+    //    (en orden); el resto son nuevas (sin repetir dentro de la celda).
+    var libres = propias.filter(function (x, j) { return dueno['p' + j] === undefined; });
     quedan.forEach(function (i) {
       if (dueno['f' + i] !== undefined) { vistas.push(hs[i]); return; }
       if (vistas.some(function (v) { return AV.distancia(v, hs[i]) <= 4; })) return;
       vistas.push(hs[i]);
-      nuevas.push(fotos[i].final);
+      if (libres.length) reemplazos.push({ de: libres.shift().ruta, blob: fotos[i].final, cambiada: true });
+      else nuevas.push(fotos[i].final);
     });
     var cupo = Math.max(0, FOTOS.MAX - rutas.length);
     return { nuevas: nuevas.slice(0, cupo), reemplazos: reemplazos, deOtras: deOtras, sobran: Math.max(0, nuevas.length - cupo), ilegibles: ilegibles };
@@ -579,17 +584,21 @@ AV.compararObs = function (t, aud, notas, plan) {
   }
 
   var antesApp = S5.fotosDe(o, 'antes'), despuesApp = S5.fotosDe(o, 'despues');
-  // Se comparan fotos si la celda trae más de las que tiene la app o alguna lleva figuras/recorte.
+  // Siempre se comparan las fotos de la celda con las de la app: aunque haya la misma cantidad,
+  // una puede ser distinta (registrada con la foto equivocada) o traer figuras encima.
   var revisar = function (fotos, app) {
-    return fotos.length > app.length || fotos.some(function (f) { return f.editada; }) ? AV.fotosNuevas(fotos, app, t.ajenas) : { nuevas: [], reemplazos: [], deOtras: [], sobran: 0 };
+    return fotos.length ? AV.fotosNuevas(fotos, app, t.ajenas) : { nuevas: [], reemplazos: [], deOtras: [], sobran: 0 };
   };
   return Promise.all([revisar(t.fAntes, antesApp), revisar(t.fDespues, despuesApp)]).then(function (r) {
     AV.avisoAjenas(plan, t.ref + ' (N° ' + o.numero + ')', r[0]);
     AV.avisoAjenas(plan, t.ref + ' (N° ' + o.numero + ')', r[1]);
     if (r[0].nuevas.length) cambios.push('+' + r[0].nuevas.length + ' foto(s) «Antes»');
     if (r[1].nuevas.length) cambios.push('+' + r[1].nuevas.length + ' foto(s) «Después»');
-    if (r[0].reemplazos.length) cambios.push(r[0].reemplazos.length + ' foto(s) «Antes» con figuras (reemplaza a la original)');
-    if (r[1].reemplazos.length) cambios.push(r[1].reemplazos.length + ' foto(s) «Después» con figuras (reemplaza a la original)');
+    [[r[0], 'Antes'], [r[1], 'Después']].forEach(function (x) {
+      var fig = x[0].reemplazos.filter(function (m) { return !m.cambiada; }).length, dist = x[0].reemplazos.length - fig;
+      if (fig) cambios.push(fig + ' foto(s) «' + x[1] + '» con figuras (reemplaza a la original)');
+      if (dist) cambios.push(dist + ' foto(s) «' + x[1] + '» distinta(s) a la de la app: se cambia por la del Excel');
+    });
     if (r[0].sobran || r[1].sobran) plan.avisos.push(t.ref + ' (N° ' + o.numero + '): hay más fotos de las que caben (máximo ' + FOTOS.MAX + ' por tipo); se agregan las primeras.');
     if (r[0].ilegibles || r[1].ilegibles) plan.avisos.push(t.ref + ' (N° ' + o.numero + '): ' + ((r[0].ilegibles || 0) + (r[1].ilegibles || 0)) + ' imagen(es) en un formato que el navegador no lee (p. ej. EMF). Pégalas como JPG o PNG.');
     if (!cambios.length) return;

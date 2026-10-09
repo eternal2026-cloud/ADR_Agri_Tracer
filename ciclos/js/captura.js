@@ -427,7 +427,9 @@ CAPTURA.campoHtml = function (c) {
       '<div class="hora-info"><label for="' + id + '">' + DR.ICONOS.checkChico + '<span>' + c.label + '</span></label>' +
       '<input id="' + id + '" type="datetime-local" data-campo="' + c.clave + '" value="' + v + '"></div>' +
       '<button type="button" class="hora-ahora" data-ahora="' + c.clave + '" aria-label="Marcar ' + c.label + ' con la hora actual">' + DR.ICONOS.reloj + '<span>Ahora</span></button>' +
-      '<div class="hora-aviso" data-aviso="' + c.clave + '"></div></div>';
+      '<div class="hora-aviso" data-aviso="' + c.clave + '"></div>' +
+      (CAPTURA.esInicioTraslado(c.clave) ? '<button type="button" class="btn sec hora-cerrar oculto" data-cerrar="1">' + DR.ICONOS.checkChico + '<span>Guardar y cerrar</span></button>' : '') +
+      '</div>';
   }
   var clase = 'campo' + (c.medio ? '' : ' ancho');
   var etiqueta = '<label for="' + id + '">' + c.label + (c.requerido ? '<em>obligatorio</em>' : '') + '</label>';
@@ -510,6 +512,7 @@ CAPTURA.enlazarCiclo = function (cont) {
       CAPTURA.irEtapa(i);
     };
   });
+  DR.$$('.hora-cerrar', cont).forEach(function (b) { b.onclick = CAPTURA.guardarYCerrar; });
   DR.$$('.hora-ahora', cont).forEach(function (b) {
     b.onclick = function () { DR.desbloquearAudio(); CAPTURA.marcarAhora(this.getAttribute('data-ahora')); };
   });
@@ -593,8 +596,10 @@ CAPTURA.revisar = function () {
 
   var btn = DR.$('#btnAccion'), sec = DR.$('#btnGuardarSolo');
   if (!btn) return;
-  // Traslado a planta ya iniciado: quien marcó el inicio puede salir con «Guardar y cerrar» y otra persona marca el fin.
-  var salir = e.id === 'traslado_planta' && !!CAPTURA.fila && !!v.inicio_traslado_planta && !v.fin_traslado_planta;
+  // Traslado ya iniciado (a C.A. o a planta): quien marcó el inicio sale con «Guardar y cerrar» y otra persona marca el fin.
+  var tr = CAPTURA.TRASLADOS[e.id];
+  var salir = !!tr && !!CAPTURA.fila && !!v[tr[0]] && !v[tr[1]];
+  DR.$$('#etapaCard .hora-cerrar').forEach(function (b) { b.classList.toggle('oculto', !salir); });
   sec.classList.toggle('oculto', !CAPTURA.sucio && !salir);
   sec.textContent = salir ? 'Guardar y cerrar' : 'Guardar';
   sec.setAttribute('data-salir', salir ? '1' : '');
@@ -630,11 +635,21 @@ CAPTURA.ponerBarra = function () {
   DR.$('#contenido').classList.add('con-barra');
   DR.$('#btnGuardarSolo').onclick = function () {
     if (!this.getAttribute('data-salir')) { CAPTURA.guardar({ avanzar: false }); return; }
-    if (CAPTURA.sucio) CAPTURA.guardar({ avanzar: false, salir: true });
-    else CAPTURA.salirGuardado(CAPTURA.fila);
+    CAPTURA.guardarYCerrar();
   };
   DR.$('#btnAccion').onclick = CAPTURA.accionPrincipal;
   if (nueva && DR.anima) anime({ targets: barra, translateY: [70, 0], opacity: [0, 1], duration: 450, easing: 'easeOutCubic' });
+};
+
+/** Traslados en los que quien marcó el inicio puede «Guardar y cerrar»: [inicio, fin]. */
+CAPTURA.TRASLADOS = { traslado_ca: ['inicio_traslado_ca', 'fin_traslado_ca'], traslado_planta: ['inicio_traslado_planta', 'fin_traslado_planta'] };
+CAPTURA.esInicioTraslado = function (clave) {
+  return Object.keys(CAPTURA.TRASLADOS).some(function (k) { return CAPTURA.TRASLADOS[k][0] === clave; });
+};
+CAPTURA.guardarYCerrar = function () {
+  if (CAPTURA.guardando) return;
+  if (CAPTURA.sucio) CAPTURA.guardar({ avanzar: false, salir: true });
+  else CAPTURA.salirGuardado(CAPTURA.fila);
 };
 
 /** Vuelve a la lista confirmando que todo quedó guardado (el ciclo sigue en curso para que otro lo termine). */

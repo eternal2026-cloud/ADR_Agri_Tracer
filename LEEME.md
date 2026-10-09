@@ -181,8 +181,9 @@ Protecciones en la base de datos (migración 0011):
 - **Comentario en cada etapa y placa del camión en «Carga al camión»** (migración 0033):
   columnas `obs_cosecha`, `obs_moto`, `obs_traslado_ca`, `obs_camion`; en Resumen → muestras
   se ven todos en la columna Comentarios.
-- **Guardar y cerrar** en Traslado a planta (con el inicio marcado): vuelve a la lista y
-  confirma que quedó guardado; el ciclo sigue en curso hasta que otra persona marque el fin.
+- **Guardar y cerrar** en Traslado a C.A. y Traslado a planta (con el inicio marcado; botón bajo la
+  hora de inicio y en la barra inferior): cierra la pantalla del ciclo, vuelve a la lista y confirma
+  que quedó guardado; el ciclo sigue en curso hasta que otra persona marque el fin.
 - **Lista de Captura con filtros de día y fundo** (abre en hoy si hay ciclos con esa fecha).
 - **Resumen por día, semana o todas las semanas** (migración 0034: `fn_dias_disponibles`,
   `fn_resumen_dia`, `fn_resumen_lotes`): encima de «Promedio por fundo» va el panel **Minutos por

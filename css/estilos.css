@@ -266,6 +266,8 @@ tr.fila-cerca td{background:#23170E}
 .hora.llena .hora-ahora{background:transparent;color:var(--c);border:1.5px solid color-mix(in srgb,var(--c) 60%,transparent);box-shadow:none}
 .hora-aviso{grid-column:1/-1;font-size:13.5px;color:#FFB08F;line-height:1.4}
 .hora-aviso:empty{display:none}
+.hora-cerrar{grid-column:1/-1;min-height:48px;font-size:15px}
+.hora-cerrar svg{width:18px;height:18px}
 .datos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .opciones{display:flex;flex-wrap:wrap;gap:8px}
 .opcion{padding:10px 15px;border-radius:999px;border:1px solid #4A3E34;background:#1A1411;color:var(--texto-2);font:500 15px var(--fuente);cursor:pointer;transition:background .15s,border-color .15s,color .15s}

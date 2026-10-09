@@ -103,7 +103,7 @@ INF.radarSvg = function (series, opc) {
     s += '<polygon points="' + poli(v) + '" fill="none" stroke="' + malla + '" stroke-width="1"/>';
   });
   s += '<polygon points="' + poli(0.9) + '" fill="none" stroke="#76B729" stroke-width="1.2" stroke-dasharray="5 4" opacity=".8"/>';
-  s += '<polygon points="' + poli(0.75) + '" fill="none" stroke="#EF7C3B" stroke-width="1.2" stroke-dasharray="5 4" opacity=".8"/>';
+  s += '<polygon points="' + poli(0.77) + '" fill="none" stroke="#EF7C3B" stroke-width="1.2" stroke-dasharray="5 4" opacity=".8"/>';
   [0, 1, 2, 3, 4].forEach(function (i) {
     var p = pt(i, 1);
     s += '<line x1="' + cx + '" y1="' + cy + '" x2="' + p[0].toFixed(1) + '" y2="' + p[1].toFixed(1) + '" stroke="' + malla + '" stroke-width="1"/>';
@@ -138,7 +138,7 @@ INF.radarSvg = function (series, opc) {
       s += '<text x="' + (x + 18) + '" y="' + y + '" font-size="12.5" fill="' + tinta + '">' + esc(se.nombre) + (se.total !== undefined && se.total !== null ? ' · ' + S5.pct(se.total) : '') + '</text>';
     });
   }
-  s += '<text x="' + (W - 12) + '" y="16" text-anchor="end" font-size="10" fill="' + tinta + '" opacity=".75">— — 90% EXCELENTE · — — 75% BIEN</text>';
+  s += '<text x="' + (W - 12) + '" y="16" text-anchor="end" font-size="10" fill="' + tinta + '" opacity=".75">— — 90% EXCELENTE · — — 77% BIEN</text>';
   return s + '</svg>';
 };
 
@@ -317,7 +317,7 @@ INF.pdfResultados = function (opc) {
     tabla(colsS, filasS);
     espacio(8);
     fuente('normal', 7.5, GRIS);
-    doc.text('Escala de madurez: EXCELENTE 90% a 100% · BIEN 75% a 89% · REGULAR 65% a 74% · CRÍTICO menos de 65%. % de cada S = suma de puntajes / (n° de ítems × 2).', M, y, { maxWidth: ANCHO });
+    doc.text('Escala de madurez: EXCELENTE 90% a 100% · BIEN 77% a 89% · REGULAR 65% a 76% · CRÍTICO menos de 65%. % de cada S = suma de puntajes / (n° de ítems × 2).', M, y, { maxWidth: ANCHO });
     y += 9;
 
     /* ---- detalle por fecha */

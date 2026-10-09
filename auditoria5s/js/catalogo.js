@@ -4,7 +4,7 @@
  * por área; los puntajes nunca se mezclan entre cultivos.
  * Fórmulas del CHECK LIST del Excel:
  *   % de una S = SUMA / (n° de ítems × 2) · total de la zona = promedio de las 5 S
- *   madurez: ≥ 90 % EXCELENTE · ≥ 75 % BIEN · ≥ 65 % REGULAR · resto CRÍTICO
+ *   madurez: ≥ 90 % EXCELENTE · ≥ 77 % BIEN · ≥ 65 % REGULAR · resto CRÍTICO
  * ==========================================================================*/
 var VISTAS = {};
 
@@ -136,7 +136,7 @@ S5.promedio = function (valores) {
 S5.madurez = function (p) {
   if (p === null || p === undefined || p === '' || isNaN(p)) return '';
   p = Math.round(Number(p) * 1e6) / 1e6;
-  return p >= 0.9 ? 'EXCELENTE' : (p >= 0.75 ? 'BIEN' : (p >= 0.65 ? 'REGULAR' : 'CRÍTICO'));
+  return p >= 0.9 ? 'EXCELENTE' : (p >= 0.77 ? 'BIEN' : (p >= 0.65 ? 'REGULAR' : 'CRÍTICO'));
 };
 
 /* ------------------------------------------------ formato */

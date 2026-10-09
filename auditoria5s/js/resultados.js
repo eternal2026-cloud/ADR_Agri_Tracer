@@ -96,7 +96,7 @@ RESUL.pintarGeneral = function (cont) {
       UI.kpi('Áreas evaluadas', DR.num(areas.length), 'de ' + S5.areasDe(cul.id).length + ' con zonas', '#EF7C3B') +
     '</div>';
 
-  h += UI.panel('Nivel por S', 'Última auditoría de cada área de ' + cul.nombre + ' · líneas punteadas: 90 % EXCELENTE y 75 % BIEN',
+  h += UI.panel('Nivel por S', 'Última auditoría de cada área de ' + cul.nombre + ' · líneas punteadas: 90 % EXCELENTE y 77 % BIEN',
     '<div class="radar">' + INF.radarSvg([{ nombre: cul.nombre, color: '#0097CE', valores: porSUlt, total: porSUlt.total }], { ancho: 520, alto: 420 }) + '</div>');
 
   h += UI.panel('Madurez por área', 'Última auditoría de cada área · EXCELENTE ≥ 90 % · BIEN ≥ 75 % · REGULAR ≥ 65 % · CRÍTICO < 65 %',

@@ -176,6 +176,26 @@ AV.imagenesFlotantes = function (wb, ws) {
   return salida;
 };
 
+/** Todas las fotos del libro → { 'Hoja': { 'fila|col': [Foto] } } (ver XLD.fotos). Si el dibujo no se
+    puede leer, se usa ExcelJS + imágenes en celda, sin figuras. */
+AV.fotosDelLibro = function (buf, wb) {
+  return XLD.fotos(buf).catch(function () { return null; }).then(function (r) {
+    if (r) return r;
+    return AV.imagenesEnCelda(buf).then(function (enCelda) {
+      var salida = {};
+      wb.eachSheet(function (ws) {
+        var hoja = {}, flot = AV.imagenesFlotantes(wb, ws), cel = enCelda[ws.name] || {};
+        [flot, cel].forEach(function (m) {
+          Object.keys(m).forEach(function (k) { hoja[k] = (hoja[k] || []).concat(m[k].map(AV.comoFoto)); });
+        });
+        salida[ws.name] = hoja;
+      });
+      return salida;
+    });
+  });
+};
+AV.comoFoto = function (f) { return f instanceof Blob ? { blob: f, final: f, editada: false, figuras: 0 } : f; };
+
 /* ------------------------------------------------------------ huella de foto (dHash 9×8) */
 AV.huella = function (blob) {
   var dibujar = function (fuente) {
@@ -203,28 +223,65 @@ AV.distancia = function (a, b) {
   return d;
 };
 AV.huellaRuta = function (ruta) {
-  if (AV.huellas[ruta] !== undefined) return Promise.resolve(AV.huellas[ruta]);
-  return sb.storage.from(FOTOS.BUCKET).download(ruta).then(function (r) {
-    return r.error || !r.data ? null : AV.huella(r.data);
-  }).catch(function () { return null; }).then(function (h) { AV.huellas[ruta] = h; return h; });
+  if (!AV.huellas[ruta]) {
+    AV.huellas[ruta] = sb.storage.from(FOTOS.BUCKET).download(ruta).then(function (r) {
+      return r.error || !r.data ? null : AV.huella(r.data);
+    }).catch(function () { return null; });
+  }
+  return AV.huellas[ruta];
 };
-/** Fotos del Excel que la app aún no tiene (por huella), sin repetir y sin pasar el máximo. */
-AV.fotosNuevas = function (blobs, rutas) {
-  if (!blobs.length) return Promise.resolve({ nuevas: [], sobran: 0, ilegibles: 0 });
+/**
+ * Compara las fotos de una celda del Excel con las de la app.
+ *   fotos  → [Foto] de la celda (o Blobs);
+ *   rutas  → fotos que la observación ya tiene (mismo tipo);
+ *   ajenas → [{ ruta, o }] fotos de otras observaciones: si una foto del Excel es una de ellas, quedó
+ *            en esta fila por error (p. ej. al borrar la fila de arriba) y NO se agrega.
+ * → { nuevas: [Blob], reemplazos: [{ de, blob }], deOtras: [obs], sobran, ilegibles }.
+ * Una foto que la app ya tiene pero que en el Excel lleva figuras encima (o recorte) la reemplaza.
+ */
+AV.fotosNuevas = function (fotos, rutas, ajenas) {
+  fotos = (fotos || []).map(AV.comoFoto);
+  ajenas = ajenas || [];
+  var vacio = { nuevas: [], reemplazos: [], deOtras: [], sobran: 0, ilegibles: 0 };
+  if (!fotos.length) return Promise.resolve(vacio);
   return Promise.all([
-    Promise.all(blobs.map(AV.huella)),
-    Promise.all(rutas.map(AV.huellaRuta))
+    Promise.all(fotos.map(function (f) { return AV.huella(f.blob); })),
+    Promise.all(fotos.map(function (f) { return f.editada ? AV.huella(f.final) : null; })),
+    Promise.all(rutas.map(AV.huellaRuta)),
+    Promise.all(ajenas.map(function (a) { return AV.huellaRuta(a.ruta); }))
   ]).then(function (r) {
-    var vistas = r[1].filter(Boolean), nuevas = [], ilegibles = 0;
-    blobs.forEach(function (b, i) {
-      var h = r[0][i];
-      if (!h) { ilegibles++; return; }
-      if (vistas.some(function (v) { return AV.distancia(v, h) <= 10; })) return;
-      vistas.push(h);
-      nuevas.push(b);
+    var hs = r[0], hf = r[1], ha = r[3], ilegibles = hs.filter(function (h) { return !h; }).length;
+    var propias = rutas.map(function (ruta, i) { return { ruta: ruta, h: r[2][i] }; }).filter(function (x) { return x.h; });
+    var minimo = function (h, lista) {
+      return lista.reduce(function (m, x, j) { var d = x ? AV.distancia(x, h) : 99; return d < m.d ? { d: d, j: j } : m; }, { d: 99, j: -1 });
+    };
+    var deOtras = [], dueno = {}, reemplazos = [], nuevas = [], vistas = [];
+    // 1) Foto de otra observación (más parecida a una ajena que a cualquiera propia): no es de esta fila.
+    var quedan = [];
+    fotos.forEach(function (f, i) {
+      if (!hs[i]) return;
+      var aj = minimo(hs[i], ha), pr = minimo(hs[i], propias.map(function (x) { return x.h; }));
+      if (aj.d <= 6 && aj.d < pr.d) { if (deOtras.indexOf(ajenas[aj.j].o) < 0) deOtras.push(ajenas[aj.j].o); return; }
+      quedan.push(i);
+    });
+    // 2) Fotos que la app ya tiene: se emparejan de la más parecida a la menos, una con una.
+    var pares = [];
+    quedan.forEach(function (i) { propias.forEach(function (x, j) { var d = AV.distancia(x.h, hs[i]); if (d <= 10) pares.push({ i: i, j: j, d: d }); }); });
+    pares.sort(function (a, b) { return a.d - b.d; }).forEach(function (p) {
+      if (dueno['f' + p.i] !== undefined || dueno['p' + p.j] !== undefined) return;
+      dueno['f' + p.i] = p.j; dueno['p' + p.j] = p.i;
+      var f = fotos[p.i], x = propias[p.j];
+      if (f.editada && hf[p.i] && AV.distancia(x.h, hf[p.i]) > 2) reemplazos.push({ de: x.ruta, blob: f.final });
+    });
+    // 3) El resto son nuevas (sin repetir dentro de la celda).
+    quedan.forEach(function (i) {
+      if (dueno['f' + i] !== undefined) { vistas.push(hs[i]); return; }
+      if (vistas.some(function (v) { return AV.distancia(v, hs[i]) <= 4; })) return;
+      vistas.push(hs[i]);
+      nuevas.push(fotos[i].final);
     });
     var cupo = Math.max(0, FOTOS.MAX - rutas.length);
-    return { nuevas: nuevas.slice(0, cupo), sobran: Math.max(0, nuevas.length - cupo), ilegibles: ilegibles };
+    return { nuevas: nuevas.slice(0, cupo), reemplazos: reemplazos, deOtras: deOtras, sobran: Math.max(0, nuevas.length - cupo), ilegibles: ilegibles };
   });
 };
 
@@ -295,12 +352,15 @@ AV.analizar = function (aud, archivo, progreso) {
   var plan = { aud: aud, cabecera: {}, cabTxt: [], zonas: [], obs: [], avisos: [], otras: 0 };
   return archivo.arrayBuffer().then(function (b) {
     buf = b;
-    return Promise.all([INF.excelJS(), AV.imagenesEnCelda(buf)]);
-  }).then(function (r) {
-    enCelda = r[1];
-    wb = new r[0].Workbook();
+    return INF.excelJS();
+  }).then(function (ExcelJS) {
+    wb = new ExcelJS.Workbook();
     return wb.xlsx.load(buf).catch(function () { throw new Error('No se pudo leer el archivo. ¿Es un Excel .xlsx?'); });
   }).then(function () {
+    progreso('Leyendo fotos y figuras…');
+    return AV.fotosDelLibro(buf, wb);
+  }).then(function (f) {
+    enCelda = f;
     progreso('Comparando con la app…');
     return Promise.all([
       AT.rpc('fn_s5_bd', { p_cultivo: aud.cultivo_id, p_area: aud.area_id }),
@@ -403,7 +463,7 @@ AV.leerBD = function (wb, aud, area, bd, plan) {
   });
 };
 
-AV.leerObservaciones = function (wb, enCelda, aud, area, obs, notas, plan, progreso) {
+AV.leerObservaciones = function (wb, fotosLibro, aud, area, obs, notas, plan, progreso) {
   var tareas = [], zonasArea = S5.zonasDe(aud.area_id, true, aud.cultivo_id);
   var buscarZona = function (txt) {
     var n = AV.norm(String(txt || '').replace(/^\s*\d+\s*[.\-)]\s*/, ''));
@@ -421,8 +481,8 @@ AV.leerObservaciones = function (wb, enCelda, aud, area, obs, notas, plan, progr
       if (areaHoja.id !== area.id) { plan.otras++; return; }
     }
     plan.hojasObs++;
-    var flot = AV.imagenesFlotantes(wb, ws), celdaImg = enCelda[ws.name] || {};
-    var fotosDe = function (fila, col) { return col ? (flot[fila + '|' + col] || []).concat(celdaImg[fila + '|' + col] || []) : []; };
+    var fotosHoja = fotosLibro[ws.name] || {};
+    var fotosDe = function (fila, col) { return col ? fotosHoja[fila + '|' + col] || [] : []; };
     var val = function (f, k) { return c[k] ? AV.valor(f.getCell(c[k])) : null; };
 
     for (var n = t.fila + 1; n <= ws.rowCount; n++) {
@@ -433,10 +493,33 @@ AV.leerObservaciones = function (wb, enCelda, aud, area, obs, notas, plan, progr
       var z = buscarZona(zonaTxt), ref = '«' + ws.name + '» fila ' + n;
       if (!z) { plan.avisos.push(ref + ': la zona «' + zonaTxt + '» no existe en ' + area.nombre + '. Se omite.'); continue; }
       var o = num ? obs.filter(function (x) { return x.zona_id === z.id && x.numero === num; })[0] : null;
-      tareas.push({ ref: ref, fila: n, z: z, o: o || null, num: num, desc: desc, accion: AV.texto(val(f, 'accion correctiva')),
+      tareas.push({ ref: ref, hoja: ws.name, fila: n, z: z, o: o || null, num: num, desc: desc, accion: AV.texto(val(f, 'accion correctiva')),
         estadoTxt: AV.texto(val(f, 'estado')), cierre: c['fecha de cierre'] ? AV.iso(val(f, 'fecha de cierre')) : undefined,
         fAntes: fAntes, fDespues: fDespues });
     }
+  });
+
+  // Observaciones de la app que faltan en el Excel entre las que sí están (filas borradas). Sus fotos y
+  // las de las filas vecinas son las que pueden haber quedado sobre otra fila.
+  var enExcel = tareas.filter(function (t) { return t.o; }).map(function (t) { return t.o; });
+  var cerca = function (o, margen) {
+    if (enExcel.indexOf(o) > -1) return false;
+    var nums = enExcel.filter(function (x) { return x.zona_id === o.zona_id; }).map(function (x) { return x.numero; });
+    return nums.length > 0 && o.numero > Math.min.apply(null, nums) - margen && o.numero < Math.max.apply(null, nums) + margen;
+  };
+  var faltan = obs.filter(function (o) { return cerca(o, 3); });
+  faltan.filter(function (o) { return cerca(o, 0); }).forEach(function (o) {
+    plan.avisos.push('N° ' + o.numero + ' · ' + S5.nombreZona(S5.zonas.filter(function (z) { return z.id === o.zona_id; })[0] || {}) +
+      ': no figura en el Excel. Si borraste su fila, en la app sigue igual (el Excel de avance no elimina observaciones) y sus fotos no pasan a otra fila; si ya no corresponde, cámbiale el estado desde la app.');
+  });
+  var fotosDeObs = function (o) {
+    return S5.fotosDe(o, 'antes').concat(S5.fotosDe(o, 'despues')).map(function (ruta) { return { ruta: ruta, o: o }; });
+  };
+  var deFaltantes = faltan.reduce(function (t, o) { return t.concat(fotosDeObs(o)); }, []);
+  tareas.forEach(function (t) {
+    var vecinas = tareas.filter(function (x) { return x !== t && x.o && x.o !== t.o && x.hoja === t.hoja && Math.abs(x.fila - t.fila) <= 2; });
+    t.ajenas = deFaltantes.concat(vecinas.reduce(function (s, x) { return s.concat(fotosDeObs(x.o)); }, []))
+      .filter(function (a) { return a.o !== t.o; });
   });
 
   var hechas = 0;
@@ -464,12 +547,14 @@ AV.compararObs = function (t, aud, notas, plan) {
 
   if (!o) {
     if (!t.desc) { plan.avisos.push(t.ref + ': fila sin texto de observación. Se omite.'); return Promise.resolve(); }
-    return AV.fotosNuevas(t.fAntes, []).then(function (fa) {
+    return AV.fotosNuevas(t.fAntes, [], t.ajenas).then(function (fa) {
+      AV.avisoAjenas(plan, t.ref + (t.num ? ' (N° ' + t.num + ')' : ''), fa);
       if (!fa.nuevas.length) {
-        plan.avisos.push(t.ref + (t.num ? ' (N° ' + t.num + ')' : '') + ': no existe en la app y no tiene foto «Antes» en la celda: no se puede registrar.');
+        plan.avisos.push(t.ref + (t.num ? ' (N° ' + t.num + ')' : '') + ': no existe en la app y no tiene foto «Antes» propia en la celda: no se puede registrar.');
         return;
       }
-      return AV.fotosNuevas(t.fDespues, []).then(function (fd) {
+      return AV.fotosNuevas(t.fDespues, [], t.ajenas).then(function (fd) {
+        AV.avisoAjenas(plan, t.ref, fd);
         plan.obs.push({ tipo: 'nueva', ref: t.ref, z: t.z, num: t.num, desc: t.desc, accion: accion, notas: notasNuevas,
           estado: estado || 'Pendiente', cierre: t.cierre || null, fotosAntes: fa.nuevas, fotosDespues: fd.nuevas });
       });
@@ -494,18 +579,34 @@ AV.compararObs = function (t, aud, notas, plan) {
   }
 
   var antesApp = S5.fotosDe(o, 'antes'), despuesApp = S5.fotosDe(o, 'despues');
-  // Solo se comparan fotos si la celda trae más de las que tiene la app (lo demás ya está).
-  return Promise.all([
-    t.fAntes.length > antesApp.length ? AV.fotosNuevas(t.fAntes, antesApp) : { nuevas: [], sobran: 0 },
-    t.fDespues.length > despuesApp.length ? AV.fotosNuevas(t.fDespues, despuesApp) : { nuevas: [], sobran: 0 }
-  ]).then(function (r) {
+  // Se comparan fotos si la celda trae más de las que tiene la app o alguna lleva figuras/recorte.
+  var revisar = function (fotos, app) {
+    return fotos.length > app.length || fotos.some(function (f) { return f.editada; }) ? AV.fotosNuevas(fotos, app, t.ajenas) : { nuevas: [], reemplazos: [], deOtras: [], sobran: 0 };
+  };
+  return Promise.all([revisar(t.fAntes, antesApp), revisar(t.fDespues, despuesApp)]).then(function (r) {
+    AV.avisoAjenas(plan, t.ref + ' (N° ' + o.numero + ')', r[0]);
+    AV.avisoAjenas(plan, t.ref + ' (N° ' + o.numero + ')', r[1]);
     if (r[0].nuevas.length) cambios.push('+' + r[0].nuevas.length + ' foto(s) «Antes»');
     if (r[1].nuevas.length) cambios.push('+' + r[1].nuevas.length + ' foto(s) «Después»');
+    if (r[0].reemplazos.length) cambios.push(r[0].reemplazos.length + ' foto(s) «Antes» con figuras (reemplaza a la original)');
+    if (r[1].reemplazos.length) cambios.push(r[1].reemplazos.length + ' foto(s) «Después» con figuras (reemplaza a la original)');
     if (r[0].sobran || r[1].sobran) plan.avisos.push(t.ref + ' (N° ' + o.numero + '): hay más fotos de las que caben (máximo ' + FOTOS.MAX + ' por tipo); se agregan las primeras.');
     if (r[0].ilegibles || r[1].ilegibles) plan.avisos.push(t.ref + ' (N° ' + o.numero + '): ' + ((r[0].ilegibles || 0) + (r[1].ilegibles || 0)) + ' imagen(es) en un formato que el navegador no lee (p. ej. EMF). Pégalas como JPG o PNG.');
     if (!cambios.length) return;
-    plan.obs.push({ tipo: 'cambio', ref: t.ref, o: o, z: t.z, p: p, cambios: cambios, fotosAntes: r[0].nuevas, fotosDespues: r[1].nuevas });
+    plan.obs.push({ tipo: 'cambio', ref: t.ref, o: o, z: t.z, p: p, cambios: cambios, fotosAntes: r[0].nuevas, fotosDespues: r[1].nuevas,
+      reemplazosAntes: r[0].reemplazos, reemplazosDespues: r[1].reemplazos });
   });
+};
+
+AV.avisoAjenas = function (plan, ref, r) {
+  (r.deOtras || []).forEach(function (o) {
+    plan.avisos.push(ref + ': una foto de la celda es de la N° ' + o.numero + ' (' + S5.nombreZona(S5.zonas.filter(function (z) { return z.id === o.zona_id; })[0] || {}) +
+      '); quedó en esta fila por error (por ejemplo, al borrar una fila). No se agrega aquí.');
+  });
+};
+/** Todas las fotos que el plan sube: nuevas y las que reemplazan (con figuras). */
+AV.blobsDe = function (x) {
+  return x.fotosAntes.concat(x.fotosDespues, (x.reemplazosAntes || []).concat(x.reemplazosDespues || []).map(function (r) { return r.blob; }));
 };
 
 /* ------------------------------------------------------------ vista previa y aplicación */
@@ -521,7 +622,7 @@ AV.pintarPlan = function () {
   var plan = AV.plan, a = plan.aud, area = S5.area(a.area_id) || {};
   var nPts = plan.zonas.reduce(function (t, z) { return t + z.puntajes.length; }, 0);
   var cambiosObs = plan.obs.filter(function (x) { return x.tipo === 'cambio'; }), nuevas = plan.obs.filter(function (x) { return x.tipo === 'nueva'; });
-  var nFotos = plan.obs.reduce(function (t, x) { return t + x.fotosAntes.length + x.fotosDespues.length; }, 0);
+  var nFotos = plan.obs.reduce(function (t, x) { return t + AV.blobsDe(x).length; }, 0);
   var hay = AV.hayCambios(plan);
   var bloque = function (titulo, resumen, cuerpo) {
     return cuerpo ? '<details class="av-bloque"><summary><b>' + titulo + '</b><span>' + resumen + '</span></summary>' + cuerpo + '</details>'
@@ -535,7 +636,7 @@ AV.pintarPlan = function () {
     '<div class="av-kpis">' +
       '<div><b>' + nPts + '</b><span>puntaje(s)</span></div>' +
       '<div><b>' + (cambiosObs.length + nuevas.length) + '</b><span>observación(es)</span></div>' +
-      '<div><b>' + nFotos + '</b><span>foto(s) nueva(s)</span></div></div>' +
+      '<div><b>' + nFotos + '</b><span>foto(s) a subir</span></div></div>' +
     bloque('Datos de la auditoría', plan.cabTxt.length ? plan.cabTxt.length + ' cambio(s)' : 'sin cambios',
       plan.cabTxt.length ? '<ul>' + plan.cabTxt.map(function (x) { return '<li>' + DR.esc(x) + '</li>'; }).join('') + '</ul>' : '') +
     bloque('Zonas y puntajes', plan.zonas.length ? plan.zonas.length + ' zona(s) · ' + nPts + ' puntaje(s)' : 'sin cambios',
@@ -549,9 +650,9 @@ AV.pintarPlan = function () {
       plan.obs.length ? '<ul>' + plan.obs.map(function (x) {
         return x.tipo === 'nueva'
           ? '<li><b>Nueva · ' + DR.esc(S5.nombreZona(x.z)) + '</b> <span class="pill verde">' + DR.esc(x.estado) + '</span><small>' + DR.esc(DR.recortar(x.desc, 140)) + '</small>' +
-            (x.num ? '<small>En el Excel figura como N° ' + x.num + '; la app le asigna el siguiente N° de la zona.</small>' : '') + AV.miniaturas(x.fotosAntes.concat(x.fotosDespues)) + '</li>'
+            (x.num ? '<small>En el Excel figura como N° ' + x.num + '; la app le asigna el siguiente N° de la zona.</small>' : '') + AV.miniaturas(AV.blobsDe(x)) + '</li>'
           : '<li><b>N° ' + x.o.numero + ' · ' + DR.esc(S5.nombreZona(x.z)) + '</b>' + x.cambios.map(function (t) { return '<small>' + DR.esc(t) + '</small>'; }).join('') +
-            AV.miniaturas(x.fotosAntes.concat(x.fotosDespues)) + '</li>';
+            AV.miniaturas(AV.blobsDe(x)) + '</li>';
       }).join('') + '</ul>' : '') +
     (plan.otras ? '<div class="ayuda-campo" style="margin-top:8px">' + plan.otras + ' fila(s) u hoja(s) de otras áreas no se tocan.</div>' : '') +
     (plan.avisos.length ? '<div class="aviso alerta av-avisos"><b>Revisa</b><ul>' + plan.avisos.map(function (x) { return '<li>' + DR.esc(x) + '</li>'; }).join('') + '</ul></div>' : '') +
@@ -630,10 +731,17 @@ AV.aplicar = function () {
 
 AV.aplicarCambio = function (x) {
   var base = 'obs/' + (S5.cultivoDeObs(x.o) || 0) + '/' + x.o.zona_id + '/' + x.o.id;
-  return Promise.all([AV.subirFotos(x.fotosAntes, base + '-antes-xl'), AV.subirFotos(x.fotosDespues, base + '-despues-xl')]).then(function (r) {
+  var ra = x.reemplazosAntes || [], rd = x.reemplazosDespues || [];
+  var blob = function (r) { return r.blob; };
+  return Promise.all([
+    AV.subirFotos(x.fotosAntes, base + '-antes-xl'), AV.subirFotos(x.fotosDespues, base + '-despues-xl'),
+    AV.subirFotos(ra.map(blob), base + '-antes-fig'), AV.subirFotos(rd.map(blob), base + '-despues-fig')
+  ]).then(function (r) {
     var p = Object.assign({}, x.p);
     if (r[0].length) p.fotos_antes = r[0];
     if (r[1].length) p.fotos_despues = r[1];
+    if (r[2].length) p.reemplazar_antes = r[2].map(function (ruta, i) { return { de: ra[i].de, a: ruta }; });
+    if (r[3].length) p.reemplazar_despues = r[3].map(function (ruta, i) { return { de: rd[i].de, a: ruta }; });
     return AT.rpc('rpc_s5_obs_actualizar', { p: p });
   }).then(function (n) { if (OBS.lista.length) OBS.reemplazar(n); });
 };

@@ -72,12 +72,14 @@ OPAS.analizar = function (archivo, fechaDefecto, progreso) {
 
   return archivo.arrayBuffer().then(function (b) {
     buf = b;
-    return Promise.all([INF.excelJS(), AV.imagenesEnCelda(buf)]);
-  }).then(function (r) {
-    enCelda = r[1];
-    wb = new r[0].Workbook();
+    return INF.excelJS();
+  }).then(function (ExcelJS) {
+    wb = new ExcelJS.Workbook();
     return wb.xlsx.load(buf).catch(function () { throw new Error('No se pudo leer el archivo. ¿Es un Excel .xlsx?'); });
   }).then(function () {
+    return AV.fotosDelLibro(buf, wb);
+  }).then(function (fotosLibro) {
+    enCelda = fotosLibro;
     wb.eachSheet(function (ws) {
       var t = AV.titulos(ws, ['zona', 'observaciones', 'estado']);
       if (!t) return;
@@ -88,8 +90,8 @@ OPAS.analizar = function (archivo, fechaDefecto, progreso) {
         if (otra && otra.id !== area.id) { plan.otras++; return; }
       }
       plan.hojas++;
-      var flot = AV.imagenesFlotantes(wb, ws), celdaImg = enCelda[ws.name] || {};
-      var fotosDe = function (fila, col) { return col ? (flot[fila + '|' + col] || []).concat(celdaImg[fila + '|' + col] || []) : []; };
+      var fotosHoja = enCelda[ws.name] || {};
+      var fotosDe = function (fila, col) { return col ? fotosHoja[fila + '|' + col] || [] : []; };
       var val = function (f, k) { return c[k] ? AV.valor(f.getCell(c[k])) : null; };
 
       for (var n = t.fila + 1; n <= ws.rowCount; n++) {

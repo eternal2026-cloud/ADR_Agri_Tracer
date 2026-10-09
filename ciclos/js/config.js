@@ -302,6 +302,18 @@ CONFIG.todasFunciones = function (grupo) {
   });
   return ids;
 };
+/** Funciones porDefecto del módulo de k, si el usuario aún no tiene ninguna función de ese módulo. */
+CONFIG.funcionesPorDefecto = function (k, lista) {
+  var r = [];
+  AT.ACCESOS.forEach(function (g) {
+    g.modulos.forEach(function (m) {
+      var ids = m.funciones.map(function (f) { return f.id; });
+      if (ids.indexOf(k) < 0 || lista.some(function (x) { return ids.indexOf(x) > -1; })) return;
+      r = m.funciones.filter(function (f) { return f.porDefecto && f.id !== k; }).map(function (f) { return f.id; });
+    });
+  });
+  return r;
+};
 CONFIG.valorAccesos = function (estado) { return estado.completo ? null : estado.lista.slice(); };
 CONFIG.textoAccesos = function (accesos) {
   if (!accesos) return 'Acceso completo';
@@ -357,7 +369,11 @@ CONFIG.enlazarSelectorAccesos = function (id, estado) {
     } else if (b.hasAttribute('data-acceso')) {
       salirDeCompleto();
       var k = b.getAttribute('data-acceso'), i = estado.lista.indexOf(k);
-      if (i > -1) estado.lista.splice(i, 1); else estado.lista.push(k);
+      if (i > -1) estado.lista.splice(i, 1);
+      else {
+        CONFIG.funcionesPorDefecto(k, estado.lista).forEach(function (x) { if (estado.lista.indexOf(x) < 0) estado.lista.push(x); });
+        estado.lista.push(k);
+      }
     } else return;
     if (DR.anima) anime({ targets: b, scale: [0.9, 1], duration: 320, easing: 'easeOutBack' });
     pintar();

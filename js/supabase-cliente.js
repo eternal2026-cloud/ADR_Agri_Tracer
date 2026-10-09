@@ -66,6 +66,7 @@ AT.puedeCapturar = function () { return !!(AT.perfil && (AT.perfil.rol === 'admi
 /**
  * Accesos por usuario (perfiles.accesos, migración 0024): grupos › módulos › funciones.
  * Claves grupo.modulo.funcion. registra: la función guarda datos (necesita rol Captura).
+ * porDefecto: se marca sola al dar cualquier otra función del módulo (el admin puede quitarla).
  * Al agregar un módulo nuevo, sumarlo aquí; quien tiene acceso completo lo ve solo.
  */
 AT.ACCESOS = [
@@ -82,7 +83,8 @@ AT.ACCESOS = [
     { id: 'gestion.5s', t: 'Auditoría 5S', funciones: [
       { id: 'gestion.5s.auditar', t: 'Auditar', registra: true },
       { id: 'gestion.5s.observaciones', t: 'Observaciones' },
-      { id: 'gestion.5s.resultados', t: 'Resultados' }] },  /* Gantt: lo ve todo el que tenga acceso a 5S */
+      { id: 'gestion.5s.resultados', t: 'Resultados' },
+      { id: 'gestion.5s.gantt', t: 'Gantt (solo ver)', porDefecto: true }] },
     { id: 'gestion.mtto', t: 'Revisión plan de mantenimiento', funciones: [
       { id: 'gestion.mtto.revisar', t: 'Revisar' },
       { id: 'gestion.mtto.cargar', t: 'Cargar plan', registra: true },

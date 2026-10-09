@@ -8,7 +8,7 @@
  *   · Recordatorio: correo HTML a los destinatarios que se escriban, enviado
  *     por la Edge Function «recordatorio-5s»; si el envío no está configurado,
  *     se copia el correo con formato y se abre el correo del celular/PC.
- * Lo ve todo el que entra a 5S. Editar, marcar cumplimiento y enviar recordatorios: solo administradores.
+ * Lo ve quien tiene el acceso «Gantt (solo ver)». Editar, marcar cumplimiento y enviar recordatorios: solo administradores.
  * ==========================================================================*/
 var GANTT = {
   grupos: [], areas: {}, programas: [], filas: [], sel: {}, vista: 'cronograma', correoListo: null,

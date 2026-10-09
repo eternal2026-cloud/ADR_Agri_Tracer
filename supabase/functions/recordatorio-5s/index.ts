@@ -1,7 +1,7 @@
 /* ============================================================================
  * recordatorio-5s — Envía por correo el recordatorio HTML de auditorías 5S
  * programadas en el Gantt y anota el envío en s5_gantt_programas y bitacora.
- * Solo admin o captura activos (se valida el JWT de su sesión).
+ * Solo administradores activos (se valida el JWT de su sesión).
  *
  * POST { programas: number[], para: string[], cc?: string[], asunto: string, html: string }
  * POST { accion: 'estado' } → { configurado: boolean, proveedor }
@@ -110,8 +110,8 @@ Deno.serve(async (req) => {
   const { data: u } = await sb.auth.getUser(token);
   if (!u?.user) return responder({ error: 'Tu sesión venció. Vuelve a ingresar.' }, 401);
   const { data: yo } = await sb.from('perfiles').select('id,usuario,nombre,rol,activo,correo').eq('id', u.user.id).maybeSingle();
-  if (!yo || !yo.activo || !['admin', 'captura'].includes(yo.rol)) {
-    return responder({ error: 'Solo administradores o auditores pueden enviar recordatorios.' }, 403);
+  if (!yo || !yo.activo || yo.rol !== 'admin') {
+    return responder({ error: 'Solo los administradores pueden enviar recordatorios.' }, 403);
   }
 
   let b: Record<string, unknown>;

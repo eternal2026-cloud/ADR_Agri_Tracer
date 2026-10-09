@@ -82,8 +82,7 @@ AT.ACCESOS = [
     { id: 'gestion.5s', t: 'Auditoría 5S', funciones: [
       { id: 'gestion.5s.auditar', t: 'Auditar', registra: true },
       { id: 'gestion.5s.observaciones', t: 'Observaciones' },
-      { id: 'gestion.5s.resultados', t: 'Resultados' },
-      { id: 'gestion.5s.gantt', t: 'Gantt' }] },
+      { id: 'gestion.5s.resultados', t: 'Resultados' }] },  /* Gantt: lo ve todo el que tenga acceso a 5S */
     { id: 'gestion.mtto', t: 'Revisión plan de mantenimiento', funciones: [
       { id: 'gestion.mtto.revisar', t: 'Revisar' },
       { id: 'gestion.mtto.cargar', t: 'Cargar plan', registra: true },

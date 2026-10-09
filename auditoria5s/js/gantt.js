@@ -8,7 +8,7 @@
  *   · Recordatorio: correo HTML a los destinatarios que se escriban, enviado
  *     por la Edge Function «recordatorio-5s»; si el envío no está configurado,
  *     se copia el correo con formato y se abre el correo del celular/PC.
- * Editar grupos, áreas y fechas: solo administradores.
+ * Lo ve todo el que entra a 5S. Editar, marcar cumplimiento y enviar recordatorios: solo administradores.
  * ==========================================================================*/
 var GANTT = {
   grupos: [], areas: {}, programas: [], filas: [], sel: {}, vista: 'cronograma', correoListo: null,
@@ -103,7 +103,7 @@ GANTT.nombreProg = function (p) { var g = GANTT.grupo(p.grupo_id); return (g ? g
 /* ------------------------------------------------------------ pantalla */
 GANTT.pintar = function (cont) {
   var admin = AT.esAdmin();
-  var h = UI.encabezado('Auditoría 5S', 'Gantt', 'Cronograma de auditorías por cultivo y semana (el día se coordina dentro de la semana). Toca una barra para marcarla y enviar un recordatorio por correo.') +
+  var h = UI.encabezado('Auditoría 5S', 'Gantt', 'Cronograma de auditorías por cultivo y semana (el día se coordina dentro de la semana).' + (admin ? ' Toca una barra para marcarla y enviar un recordatorio por correo.' : '')) +
     '<div class="opciones gt-vistas entra">' +
       '<button type="button" class="opcion' + (GANTT.vista === 'cronograma' ? ' activa' : '') + '" data-gvista="cronograma" style="--c:#0097CE">Cronograma</button>' +
       '<button type="button" class="opcion' + (GANTT.vista === 'areas' ? ' activa' : '') + '" data-gvista="areas" style="--c:#76B729">Áreas por cultivo</button>' +
@@ -192,17 +192,17 @@ GANTT.cronogramaHtml = function () {
 
   // Lista: la misma información, cómoda en celular, con casilla para marcar.
   var orden = progs.slice().sort(function (a, b) { return a.semana_inicio < b.semana_inicio ? -1 : (a.semana_inicio > b.semana_inicio ? 1 : a.grupo_id - b.grupo_id); });
-  h += UI.panel('Auditorías programadas', 'Marca una o varias y toca «Enviar recordatorio».',
+  h += UI.panel('Auditorías programadas', AT.esAdmin() ? 'Marca una o varias y toca «Enviar recordatorio».' : '',
     '<div class="gt-lista">' + orden.map(function (p) {
       var g = GANTT.grupo(p.grupo_id), d = GANTT.detalle(p), sel = !!GANTT.sel[p.id];
       return '<div class="gt-item' + (sel ? ' sel' : '') + '" style="--c:' + g.color + '">' +
-        '<button type="button" class="gt-check' + (sel ? ' sel' : '') + '" data-gprog="' + p.id + '" aria-pressed="' + sel + '" aria-label="Marcar ' + DR.esc(GANTT.nombreProg(p)) + '">' + DR.ICONOS.checkChico + '</button>' +
+        (AT.esAdmin() ? '<button type="button" class="gt-check' + (sel ? ' sel' : '') + '" data-gprog="' + p.id + '" aria-pressed="' + sel + '" aria-label="Marcar ' + DR.esc(GANTT.nombreProg(p)) + '">' + DR.ICONOS.checkChico + '</button>' : '') +
         '<div class="gt-item-cuerpo" data-gprog="' + p.id + '"><b>' + DR.esc(g.nombre) + ' · ' + p.numero_auditoria + '° auditoría</b>' +
           '<span>' + GANTT.textoSemanas(p) + ' · ' + GANTT.rango(p) + '</span>' +
           '<span>' + d.hechas + ' de ' + d.total + ' áreas cumplidas' + (p.nota ? ' · ' + DR.esc(p.nota) : '') + '</span>' +
           (p.ultimo_recordatorio ? '<span class="gt-recordado">' + GANTT.ICO_CORREO + 'Recordado ' + DR.hace(p.ultimo_recordatorio) + ' · ' + p.recordatorios + ' envío(s)</span>' : '') +
         '</div><div class="gt-item-der">' + GANTT.pillEstado(d.estado) +
-          (AT.puedeCapturar() ? '<button type="button" class="btn sec mini" data-gmarcar="' + p.id + '">Cumplimiento</button>' : '') +
+          (AT.esAdmin() ? '<button type="button" class="btn sec mini" data-gmarcar="' + p.id + '">Cumplimiento</button>' : '') +
           (AT.esAdmin() ? '<button type="button" class="btn sec mini" data-geditar="' + p.id + '">Editar</button>' : '') + '</div></div>';
     }).join('') + '</div>');
   return h;
@@ -239,7 +239,7 @@ GANTT.areasHtml = function () {
           } else if (d.estado === 'Cancelado') c = '<span class="gt-nada">Cancelada</span>';
           else if (d.estado === 'Atrasado') c = '<span class="gt-falta">Pendiente · atrasada</span>';
           else c = '<span class="gt-nada">Por auditar</span>';
-          return '<td>' + (AT.puedeCapturar()
+          return '<td>' + (AT.esAdmin()
             ? '<button type="button" class="gt-marca" data-gmarcar="' + p.id + '" data-garea="' + a.id + '" title="Marcar cumplimiento">' + c + '</button>'
             : c) + '</td>';
         }).join('') + '</tr>';
@@ -259,6 +259,7 @@ GANTT.areasHtml = function () {
 
 /* ------------------------------------------------------------ selección */
 GANTT.alternar = function (id) {
+  if (!AT.esAdmin()) return;
   id = Number(id);
   if (GANTT.sel[id]) delete GANTT.sel[id]; else GANTT.sel[id] = true;
   DR.vibrar(12);
@@ -284,7 +285,7 @@ GANTT.seleccionados = function () {
 GANTT.pintarSeleccion = function () {
   var caja = DR.$('#gtBarraSel'), sel = GANTT.seleccionados();
   if (!caja) return;
-  if (!sel.length || !AT.puedeCapturar()) { caja.innerHTML = ''; caja.className = ''; return; }
+  if (!sel.length || !AT.esAdmin()) { caja.innerHTML = ''; caja.className = ''; return; }
   caja.className = 'gt-barra-sel';
   caja.innerHTML = '<span><b>' + sel.length + '</b> marcada' + (sel.length > 1 ? 's' : '') + '</span>' +
     '<button type="button" class="btn sec chico" id="gtLimpiar">Quitar</button>' +

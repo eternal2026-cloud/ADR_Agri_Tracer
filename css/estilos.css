@@ -1005,9 +1005,11 @@ td.mp-sangria{padding-left:26px}
 .fc-dia .btn{flex:0 0 auto;padding:8px 10px}
 .filtros-captura select{padding:10px 11px}
 #listaCiclos{margin-top:14px}
-.res-captura.clicable{cursor:pointer;border-left:4px solid var(--dr-verde);transition:transform .15s}
-.res-captura.clicable:active{transform:scale(.99)}
-.res-captura .kpis{margin-bottom:4px}
+.res-selectores{display:flex;flex-wrap:wrap;gap:8px}
+.res-selectores select{width:auto;min-width:150px;padding:10px 11px}
+.res-tramos.clicable{cursor:pointer;border-left:4px solid var(--dr-verde);transition:transform .15s}
+.res-tramos.clicable:active{transform:scale(.99)}
+.res-tramos .kpis{margin-bottom:4px}
 .res-ver{display:flex;align-items:center;justify-content:flex-end;gap:4px;margin-top:8px;font-size:14px;font-weight:500;color:#9BDA55}
 .res-ver svg{width:18px;height:18px}
 .lote-card{display:block;width:100%;text-align:left;background:linear-gradient(160deg,var(--panel),var(--panel-2));border:1px solid var(--borde);border-left:4px solid var(--dr-azul);border-radius:16px;padding:13px 14px 11px 16px;margin-bottom:10px;color:var(--texto);font-family:var(--fuente);cursor:pointer;box-shadow:var(--sombra);transition:transform .15s}

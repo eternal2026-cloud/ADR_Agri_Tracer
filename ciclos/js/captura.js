@@ -80,7 +80,7 @@ var CAPTURA = {
   vista: 'lista', fila: null, borrador: null, etapaIdx: 0,
   sucio: false, guardando: false, insistir: false, cambiados: {},
   abiertos: [], cerrados: [], filtro: '', _pct: 0, _timer: null,
-  dia: null, fundoFiltro: '', nivel: 'dia', loteSel: null
+  dia: null, fundoFiltro: ''
 };
 
 /* ------------------------------------------------ fundos asignados al usuario ([] = todos) */
@@ -156,7 +156,7 @@ VISTAS.captura = function (cont) {
     return;
   }
   var listo = CAPTURA.listas.fundo.length ? Promise.resolve() : CAPTURA.cargarListas();
-  listo.then(function () { return Promise.all([RES.cargarUmbral(), RES.cargarMeta(), CAPTURA.diaInicial()]); }).then(function () { CAPTURA.pintarLista(); CAPTURA.iniciarRefresco(); }).catch(function (e) { UI.error(cont, e); });
+  listo.then(function () { return CAPTURA.diaInicial(); }).then(function () { CAPTURA.pintarLista(); CAPTURA.iniciarRefresco(); }).catch(function (e) { UI.error(cont, e); });
 };
 
 /* ------------------------------------------------ refresco automático (otras personas pueden estar marcando) */
@@ -227,7 +227,6 @@ CAPTURA.pintarLista = function () {
   DR.$('#inpFiltroCiclos').oninput = function () { CAPTURA.filtro = this.value; CAPTURA.pintarTarjetas(false); };
   var cambiarDia = function (dia) {
     CAPTURA.dia = dia || '';
-    CAPTURA.nivel = 'dia';
     DR.$('#inpDia').value = CAPTURA.dia;
     DR.$('#listaCiclos').innerHTML = '<div class="vacio">Cargando ciclos…</div>';
     CAPTURA.cargarCiclos().then(function () { CAPTURA.pintarTarjetas(true); }).catch(function (e) { DR.toast(e.message, 'error'); });
@@ -237,7 +236,6 @@ CAPTURA.pintarLista = function () {
   DR.$('#btnDiaTodos').onclick = function () { cambiarDia(''); };
   DR.$('#selFundo').onchange = function () {
     CAPTURA.fundoFiltro = this.value;
-    CAPTURA.nivel = 'dia';
     try { localStorage.setItem(CAPTURA.PREF_FUNDO, this.value); } catch (e) { /* sin almacenamiento */ }
     CAPTURA.pintarTarjetas(true);
   };
@@ -338,74 +336,6 @@ CAPTURA.marcarRapido = function (btn, codigo) {
   });
 };
 
-/* ------------------------------------------------ resumen del día → por lote → ciclos del lote */
-CAPTURA.claveLote = function (f) { return (f.fundo || '') + '|' + (f.lote || ''); };
-CAPTURA.nombreLote = function (f, conFundo) { return (f.lote ? 'Lote ' + f.lote : 'Sin lote') + (conFundo && f.fundo ? ' · ' + f.fundo : ''); };
-
-/** Barras de minutos por tramo (cierre de un ciclo y resúmenes). tramos: [{ t, v }]. */
-CAPTURA.barrasTramosHtml = function (tramos, animar) {
-  var maximo = Math.max.apply(null, tramos.map(function (x) { return Math.abs(Number(x.v)); }).concat([1]));
-  return tramos.map(function (x) {
-    var negativo = Number(x.v) < 0, ancho = Math.round(Math.abs(Number(x.v)) / maximo * 100);
-    return '<div class="barra-fila"><div title="' + DR.esc(x.t) + '">' + DR.esc(x.t) + '</div>' +
-      '<div class="barra-pista"><div class="barra-valor" data-ancho="' + ancho + '" style="' + (animar ? '' : 'width:' + ancho + '%;') + 'background:' +
-      (negativo ? '#E5484D' : 'linear-gradient(90deg,#0097CE,#76B729)') + '"></div></div>' +
-      '<div class="barra-cifra"' + (negativo ? ' style="color:#FF8A8A"' : '') + '>' + DR.num(x.v, 0) + '</div></div>';
-  }).join('');
-};
-
-/** Promedios de un grupo de ciclos cerrados, con la misma regla del Resumen (sin los que superan el umbral). */
-CAPTURA.promedios = function (cerrados) {
-  var umbral = RES.umbral || 480;
-  var conTotal = cerrados.filter(function (f) { return f.t_ciclo_total !== null && f.t_ciclo_total !== undefined; });
-  var validos = conTotal.filter(function (f) { return Number(f.t_ciclo_total) <= umbral; });
-  var prom = function (lista, k) {
-    var v = lista.map(function (f) { return f[k]; }).filter(function (x) { return x !== null && x !== undefined; }).map(Number);
-    return v.length ? v.reduce(function (s, x) { return s + x; }, 0) / v.length : null;
-  };
-  return {
-    n: validos.length, excluidos: conTotal.length - validos.length, total: prom(validos, 't_ciclo_total'),
-    tramos: CAMPOS_RESUMEN.map(function (c) { return { t: c.titulo, v: prom(validos, c.clave) }; }).filter(function (x) { return x.v !== null; })
-  };
-};
-
-CAPTURA.resumenHtml = function (cerrados, titulo, sub, clic) {
-  var p = CAPTURA.promedios(cerrados), meta = RES.meta || 120;
-  var color = p.total === null ? '#B7A99C' : (p.total <= meta ? '#76B729' : '#EF7C3B');
-  var cuerpo = p.n
-    ? '<div class="kpis">' +
-        UI.kpi('Tiempo de ciclo', DR.num(p.total, 0) + '<small>min</small>', DR.num(p.total / 60, 2) + ' horas · meta ' + DR.num(meta, 0) + ' min', color) +
-        UI.kpi('Ciclos cerrados', DR.num(p.n), p.excluidos ? p.excluidos + ' excluido(s): superan ' + DR.num(RES.umbral, 0) + ' min' : 'Promedio de los cerrados', '#0097CE') +
-      '</div><div class="sep-titulo">Minutos por tramo</div>' + CAPTURA.barrasTramosHtml(p.tramos)
-    : '<div class="vacio">Aún no hay ciclos cerrados' + (p.excluidos ? ' bajo el umbral' : '') + ' para promediar.</div>';
-  return '<section class="panel entra res-captura' + (clic ? ' clicable' : '') + '"' + (clic ? ' id="resCaptura" role="button" tabindex="0"' : '') + '>' +
-    '<h2>' + DR.esc(titulo) + '</h2><div class="sub">' + DR.esc(sub) + '</div>' + cuerpo +
-    (clic ? '<div class="res-ver">Ver resumen por lote' + DR.ICONOS.chevron + '</div>' : '') + '</section>';
-};
-
-CAPTURA.lotesHtml = function (abiertos, cerrados) {
-  var grupos = {}, orden = [], meta = RES.meta || 120, conFundo = !CAPTURA.fundoFiltro;
-  abiertos.concat(cerrados).forEach(function (f) {
-    var k = CAPTURA.claveLote(f);
-    if (!grupos[k]) { grupos[k] = { clave: k, muestra: f, abiertos: [], cerrados: [] }; orden.push(k); }
-    grupos[k][f.cerrado ? 'cerrados' : 'abiertos'].push(f);
-  });
-  if (!orden.length) return '<div class="vacio">No hay ciclos con estos filtros.</div>';
-  var lista = orden.map(function (k) { var g = grupos[k]; g.p = CAPTURA.promedios(g.cerrados); return g; })
-    .sort(function (a, b) { return (b.p.total === null ? -1 : b.p.total) - (a.p.total === null ? -1 : a.p.total); });
-  var tope = Math.max.apply(null, lista.map(function (g) { return g.p.total || 0; }).concat([meta])) * 1.05;
-  return lista.map(function (g) {
-    var t = g.p.total, sobre = t !== null && t > meta;
-    return '<button type="button" class="lote-card entra" data-lote="' + DR.esc(g.clave) + '">' +
-      '<div class="lc-top"><b>' + DR.esc(CAPTURA.nombreLote(g.muestra, conFundo)) + '</b><span class="lc-min' + (sobre ? ' sobre' : '') + '">' +
-      (t === null ? '—' : DR.num(t, 0) + ' min') + '</span></div>' +
-      '<div class="lc-pista"><span class="lc-meta" style="left:' + (meta / tope * 100).toFixed(1) + '%"></span>' +
-      '<span class="lc-barra' + (sobre ? ' sobre' : '') + '" style="width:' + (t === null ? 0 : Math.min(100, t / tope * 100)).toFixed(1) + '%"></span></div>' +
-      '<div class="lc-pie"><span>' + g.cerrados.length + ' cerrado(s)' + (g.abiertos.length ? ' · ' + g.abiertos.length + ' en curso' : '') +
-      (g.p.excluidos ? ' · ' + g.p.excluidos + ' excluido(s)' : '') + ' · meta ' + DR.num(meta, 0) + ' min</span>' + DR.ICONOS.chevron + '</div></button>';
-  }).join('');
-};
-
 CAPTURA.pintarTarjetas = function (animar) {
   var cont = DR.$('#listaCiclos');
   if (!cont) return;
@@ -416,60 +346,15 @@ CAPTURA.pintarTarjetas = function (animar) {
     return !q || [f.codigo, f.fundo, f.lote, f.lider].some(function (v) { return String(v || '').toLowerCase().indexOf(q) > -1; });
   };
   var abiertos = CAPTURA.abiertos.filter(coincide), cerrados = CAPTURA.cerrados.filter(coincide);
-  var lote = null;
-  if (CAPTURA.nivel === 'lote') {
-    var enLote = function (f) { return CAPTURA.claveLote(f) === CAPTURA.loteSel; };
-    lote = abiertos.concat(cerrados).filter(enLote)[0];
-    if (lote) { abiertos = abiertos.filter(enLote); cerrados = cerrados.filter(enLote); } else CAPTURA.nivel = 'lotes';
-  }
+  var filtrado = q || CAPTURA.fundoFiltro || CAPTURA.dia;
 
-  var d = CAPTURA.dia;
-  var tituloDia = !d ? 'Resumen · cerrados en las últimas 36 h'
-    : (d === CAPTURA.hoyLocal() ? 'Resumen de hoy' : 'Resumen del ' + d.substring(8, 10) + '/' + d.substring(5, 7) + '/' + d.substring(0, 4));
-  var subDia = (CAPTURA.fundoFiltro || 'Todos los fundos') + ' · promedio de los ciclos cerrados (sin los que superan el umbral)';
-  var h = '';
-  if (CAPTURA.nivel === 'lotes' || CAPTURA.nivel === 'lote') {
-    var migas = [{ texto: tituloDia, accion: true }, { texto: 'Por lote', accion: CAPTURA.nivel === 'lote' }];
-    if (CAPTURA.nivel === 'lote') migas.push({ texto: CAPTURA.nombreLote(lote, !CAPTURA.fundoFiltro) });
-    h += UI.migas(migas);
-  }
-  if (CAPTURA.nivel === 'lotes') {
-    cont.innerHTML = h + '<div class="conteo">Resumen por lote · toca un lote para ver sus ciclos</div>' + CAPTURA.lotesHtml(abiertos, cerrados);
-    CAPTURA.enlazarTarjetas(cont, animar);
-    return;
-  }
-  h += CAPTURA.nivel === 'lote'
-    ? CAPTURA.resumenHtml(cerrados, CAPTURA.nombreLote(lote, true), subDia, false)
-    : CAPTURA.resumenHtml(cerrados, tituloDia, subDia, abiertos.length + cerrados.length > 0);
-
-  h += '<div class="conteo">En curso · ' + abiertos.length + '</div>';
+  var h = '<div class="conteo">En curso · ' + abiertos.length + '</div>';
   h += abiertos.length ? abiertos.map(CAPTURA.tarjetaHtml).join('')
-    : '<div class="vacio">' + (q || CAPTURA.fundoFiltro || CAPTURA.dia ? 'Ningún ciclo en curso con estos filtros.' : 'No hay ciclos en curso. Inicia uno con el botón verde.') + '</div>';
+    : '<div class="vacio">' + (filtrado ? 'Ningún ciclo en curso con estos filtros.' : 'No hay ciclos en curso. Inicia uno con el botón verde.') + '</div>';
   if (cerrados.length) h += '<div class="conteo" style="margin-top:18px">' + (CAPTURA.dia ? 'Cerrados' : 'Cerrados recientemente') + ' · ' + cerrados.length + '</div>' + cerrados.map(CAPTURA.tarjetaHtml).join('');
   h += '<div class="acciones" style="justify-content:center"><button type="button" class="btn sec chico" id="btnRecargarCiclos">Actualizar lista</button></div>';
   cont.innerHTML = h;
-  CAPTURA.enlazarTarjetas(cont, animar);
-};
 
-CAPTURA.enlazarTarjetas = function (cont, animar) {
-  var irNivel = function (nivel, lote) {
-    CAPTURA.nivel = nivel;
-    if (lote !== undefined) CAPTURA.loteSel = lote;
-    CAPTURA.pintarTarjetas(true);
-    var c = DR.$('#contenido'), top = cont.offsetTop - 10;
-    if (c.scrollTop > top) c.scrollTop = top;
-  };
-  var res = DR.$('#resCaptura', cont);
-  if (res) {
-    res.onclick = function () { irNivel('lotes'); };
-    res.onkeydown = function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); irNivel('lotes'); } };
-  }
-  DR.$$('[data-miga]', cont).forEach(function (b) {
-    b.onclick = function () { irNivel(this.getAttribute('data-miga') === '0' ? 'dia' : 'lotes'); };
-  });
-  DR.$$('[data-lote]', cont).forEach(function (b) {
-    b.onclick = function () { irNivel('lote', this.getAttribute('data-lote')); };
-  });
   DR.$$('.ciclo-card', cont).forEach(function (b) {
     b.onclick = function () {
       DR.desbloquearAudio();
@@ -481,8 +366,7 @@ CAPTURA.enlazarTarjetas = function (cont, animar) {
   DR.$$('.cc-rapido', cont).forEach(function (b) {
     b.onclick = function () { DR.desbloquearAudio(); CAPTURA.marcarRapido(this, this.getAttribute('data-rapido')); };
   });
-  var recargar = DR.$('#btnRecargarCiclos', cont);
-  if (recargar) recargar.onclick = function () {
+  DR.$('#btnRecargarCiclos').onclick = function () {
     this.disabled = true;
     CAPTURA.cargarCiclos().then(function () { CAPTURA.pintarTarjetas(true); DR.toast('Lista actualizada.', 'info'); })
       .catch(function (e) { DR.toast(e.message, 'error'); });
@@ -915,7 +799,7 @@ CAPTURA.mostrarFin = function (fila) {
     .filter(function (x) { return x.v !== null && x.v !== undefined; });
   var sub = [fila.fundo, fila.lote ? 'Lote ' + fila.lote : '', fila.lider].filter(Boolean).map(DR.esc).join(' · ');
 
-  var barras = CAPTURA.barrasTramosHtml(tramos, true);
+  var barras = UI.barrasTramos(tramos, true);
   var hayNegativos = tramos.some(function (x) { return Number(x.v) < 0; });
 
   cont.innerHTML =

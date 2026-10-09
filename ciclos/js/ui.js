@@ -107,6 +107,37 @@ UI.error = function (cont, err) {
   cont.innerHTML = '<div class="panel"><div class="aviso alerta"><b>No se pudo cargar la información.</b><br>' + DR.esc(err && err.message ? err.message : err) + '</div></div>';
 };
 
+/** Barras de minutos por tramo (cierre de un ciclo y resumen). tramos: [{ t, v }]. Con animar, crecen con UI.animarBarrasTramos. */
+UI.barrasTramos = function (tramos, animar) {
+  var maximo = Math.max.apply(null, tramos.map(function (x) { return Math.abs(Number(x.v)); }).concat([1]));
+  return tramos.map(function (x) {
+    var negativo = Number(x.v) < 0, ancho = Math.round(Math.abs(Number(x.v)) / maximo * 100);
+    return '<div class="barra-fila"><div title="' + DR.esc(x.t) + '">' + DR.esc(x.t) + '</div>' +
+      '<div class="barra-pista"><div class="barra-valor" data-ancho="' + ancho + '" style="' + (animar ? '' : 'width:' + ancho + '%;') + 'background:' +
+      (negativo ? '#E5484D' : 'linear-gradient(90deg,#0097CE,#76B729)') + '"></div></div>' +
+      '<div class="barra-cifra"' + (negativo ? ' style="color:#FF8A8A"' : '') + '>' + DR.num(x.v, 0) + '</div></div>';
+  }).join('');
+};
+UI.animarBarrasTramos = function (raiz) {
+  if (!DR.anima) return;
+  DR.$$('.res-tramos .barra-valor', raiz).forEach(function (b, i) {
+    anime({ targets: b, width: [0, b.getAttribute('data-ancho') + '%'], duration: 700, delay: 200 + i * 35, easing: 'easeOutCubic' });
+  });
+};
+
+/** Tarjetas de lote con su barra frente a la meta. items: [{ id, nombre, total (min o null), pie }]. */
+UI.lotesHtml = function (items, meta) {
+  var tope = Math.max.apply(null, items.map(function (g) { return g.total || 0; }).concat([meta])) * 1.05;
+  return items.map(function (g) {
+    var t = g.total, sobre = t !== null && t > meta;
+    return '<button type="button" class="lote-card entra" data-lote="' + DR.esc(g.id) + '">' +
+      '<div class="lc-top"><b>' + DR.esc(g.nombre) + '</b><span class="lc-min' + (sobre ? ' sobre' : '') + '">' + (t === null ? '—' : DR.num(t, 0) + ' min') + '</span></div>' +
+      '<div class="lc-pista"><span class="lc-meta" style="left:' + (meta / tope * 100).toFixed(1) + '%"></span>' +
+      '<span class="lc-barra' + (sobre ? ' sobre' : '') + '" style="width:' + (t === null ? 0 : Math.min(100, t / tope * 100)).toFixed(1) + '%"></span></div>' +
+      '<div class="lc-pie"><span>' + DR.esc(g.pie) + '</span>' + DR.ICONOS.chevron + '</div></button>';
+  }).join('');
+};
+
 /* ---- columnas comunes del pivot (Resumen y Muestras las reutilizan) ---- */
 UI.columnasResumen = function () {
   return [{ t: 'Fundo', k: 'fundo' }, { t: 'N° muestras', k: 'n_muestras', num: true }]

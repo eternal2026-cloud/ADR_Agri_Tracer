@@ -182,9 +182,11 @@ Protecciones en la base de datos (migración 0011):
   se ven todos en la columna Comentarios.
 - **Guardar y cerrar** en Traslado a planta (con el inicio marcado): vuelve a la lista y
   confirma que quedó guardado; el ciclo sigue en curso hasta que otra persona marque el fin.
-- **Lista de Captura con filtros de día y fundo** (abre en hoy si hay ciclos con esa fecha) y un
-  **resumen** (promedio y minutos por tramo de los cerrados, sin los que superan el umbral).
-  Al tocarlo se ve el resumen **por lote** y, al tocar un lote, sus ciclos.
+- **Lista de Captura con filtros de día y fundo** (abre en hoy si hay ciclos con esa fecha).
+- **Resumen por día, semana o todas las semanas** (migración 0034: `fn_dias_disponibles`,
+  `fn_resumen_dia`, `fn_resumen_lotes`): encima de «Promedio por fundo» va el panel **Minutos por
+  tramo** (tiempo de ciclo, ciclos válidos y barras por tramo). Al tocarlo se ve el **resumen por
+  lote** y, al tocar un lote, sus muestras. Misma regla del umbral que el resto del resumen.
 - **Meta de tiempo de ciclo** (`META_TIEMPO_CICLO_MIN`, 120 por defecto, Config → Ajustes):
   línea punteada del gráfico de tiempo de ciclo total. Solo se muestra; el umbral (480) sigue
   excluyendo los atípicos de los promedios, pero ya no se dibuja.

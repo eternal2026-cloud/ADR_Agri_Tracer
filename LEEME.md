@@ -166,8 +166,9 @@ Protecciones en la base de datos (migración 0011):
 - Avisa horas en el futuro o fuera de orden antes de avanzar.
 - **Varios ciclos a la vez y entre varias personas**: cualquier usuario de captura
   sigue un ciclo que abrió otro (de sus fundos). Cada ciclo en curso tiene en la
-  lista el botón **Marcar … ahora** para su siguiente hora sin entrar, y dentro de
-  un ciclo la franja **Ir a** salta a otro. Al abrir un ciclo se traen sus datos
+  lista el botón **Marcar … ahora** para su siguiente hora sin entrar. Dentro de un
+  ciclo ya no está la franja «Ir a» (confundía: se marcaban horas en un ciclo ajeno);
+  para cambiar de ciclo se vuelve a la lista. Al abrir un ciclo se traen sus datos
   del momento, al guardar solo se envían los campos que tocó esa persona (no se
   pisa lo que marcó otra) y la pantalla se refresca sola cada 20 s.
 - **Resumen → Evolución semanal por fundo** (`ciclos/js/evolucion.js`, `fn_evolucion_semanal`):

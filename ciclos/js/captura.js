@@ -11,7 +11,8 @@
  * se traen sus datos al momento, cada guardado envía solo los campos que tocó
  * (no borra ni pisa lo que marcó otra persona) y la pantalla se refresca sola.
  * Desde la lista, cada ciclo en curso tiene «Marcar … ahora» para registrar su
- * siguiente hora sin entrar, y dentro de un ciclo se salta a otro con un toque.
+ * siguiente hora sin entrar. Dentro de un ciclo no hay accesos a otros ciclos: se vuelve a la
+ * lista (así nadie marca horas en un ciclo ajeno creyendo que es el suyo).
  * ==========================================================================*/
 
 var ETAPAS = [
@@ -477,7 +478,6 @@ CAPTURA.pintarCiclo = function (direccion) {
     '<div class="wiz-cab">' +
       '<button type="button" class="wiz-volver" id="btnVolverLista">' + DR.ICONOS.atras + '<span>Ciclos</span></button>' +
       '<div class="wiz-id"><b id="wizCodigo">' + (fila ? DR.esc(fila.codigo) : 'Nuevo ciclo') + '</b><span>' + sub + '</span></div></div>' +
-    CAPTURA.otrosHtml() +
     '<div class="pasos"><div class="pasos-pista"><div class="pasos-relleno" id="pasosRelleno" style="width:' + CAPTURA._pct + '%"></div></div>' + CAPTURA.pasosHtml() + '</div>' +
     '<section class="etapa" id="etapaCard" style="--c:' + e.color + '">' +
       '<div class="etapa-cab"><span class="etapa-num">Etapa ' + (CAPTURA.etapaIdx + 1) + ' de ' + ETAPAS.length + '</span>' +
@@ -501,29 +501,8 @@ CAPTURA.pintarCiclo = function (direccion) {
   }
 };
 
-/** Accesos a los otros ciclos en curso, para ir y venir entre varios sin volver a la lista. */
-CAPTURA.otrosHtml = function () {
-  var actual = CAPTURA.fila ? CAPTURA.fila.codigo : null;
-  var otros = CAPTURA.abiertos.filter(function (f) { return f.codigo !== actual; }).slice(0, 12);
-  if (!otros.length) return '';
-  return '<div class="wiz-otros"><span class="etq">Ir a</span>' + otros.map(function (f) {
-    var idx = CAPTURA.proximaIdx(f), et = idx > -1 ? ETAPAS[idx] : null;
-    return '<button type="button" class="wiz-otro" data-otro="' + DR.esc(f.codigo) + '" style="--c:' + (et ? et.color : '#76B729') + '">' +
-      DR.esc(f.codigo) + '<small>' + DR.esc([f.fundo, et ? et.corto : 'Cerrado'].filter(Boolean).join(' · ')) + '</small></button>';
-  }).join('') + '</div>';
-};
-
 CAPTURA.enlazarCiclo = function (cont) {
   DR.$('#btnVolverLista').onclick = function () { if (CAPTURA.puedeSalir()) CAPTURA.pintarLista(); };
-  DR.$$('[data-otro]', cont).forEach(function (b) {
-    b.onclick = function () {
-      var codigo = this.getAttribute('data-otro');
-      var f = CAPTURA.abiertos.filter(function (x) { return x.codigo === codigo; })[0];
-      if (!f || !CAPTURA.puedeSalir()) return;
-      CAPTURA.sucio = false;
-      CAPTURA.abrirCiclo(f);
-    };
-  });
   DR.$$('.paso', cont).forEach(function (p) {
     p.onclick = function () {
       var i = Number(this.getAttribute('data-paso'));

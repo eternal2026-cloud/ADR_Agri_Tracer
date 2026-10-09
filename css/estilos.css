@@ -855,14 +855,14 @@ td.mp-sangria{padding-left:26px}
 /* ==================== TIEMPOS · GRÁFICO POR FUNDO (barras horizontales) ==================== */
 .gf-barras{padding-top:2px}
 .gf-leyenda{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;font-size:12.5px;color:var(--texto-3);margin-bottom:12px}
-.gf-muestra-umbral{width:16px;border-top:2px dashed #E07A3F;margin-left:2px}
+.gf-muestra-meta{width:16px;border-top:2px dashed #76B729;margin-left:2px}
 .gf-muestra-exceso{width:12px;height:10px;border-radius:3px;background:#B94A02;margin-left:10px}
 .gf-fila{display:grid;grid-template-columns:minmax(96px,34%) 1fr 58px;gap:4px 12px;align-items:center;margin-bottom:12px;font-size:13.5px}
 .gf-nombre{color:var(--texto-2);line-height:1.25;overflow-wrap:anywhere}
 .gf-pista{position:relative;height:16px;background:#2A221C;border-radius:4px}
 .gf-barra{position:absolute;left:0;top:0;bottom:0;width:0;background:#0097CE;border-radius:0 4px 4px 0}
 .gf-barra.sobre{background:#B94A02}
-.gf-umbral{position:absolute;top:-4px;bottom:-4px;border-left:2px dashed #E07A3F;z-index:1}
+.gf-meta{position:absolute;top:-4px;bottom:-4px;border-left:2px dashed #76B729;z-index:1}
 .gf-cifra{text-align:right;color:var(--texto);font-variant-numeric:tabular-nums;font-weight:500;white-space:nowrap}
 .gf-alerta{font-size:10px;color:#FFA36B}
 @media (max-width:520px){
@@ -996,3 +996,100 @@ td.mp-sangria{padding-left:26px}
 .gt-marca-fila b{display:block;font-size:15px;font-weight:500}
 .gt-marca-fila small{display:block;font-size:12px;color:var(--texto-3);margin-top:2px}
 .opcion.chica{padding:7px 12px;font-size:13.5px}
+
+/* ==================== CAPTURA · FILTROS Y RESUMEN DEL DÍA / POR LOTE ==================== */
+.filtros-captura{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:10px;margin:2px 0 6px}
+@media (max-width:440px){.filtros-captura{grid-template-columns:1fr}}
+.fc-dia{display:flex;gap:6px}
+.fc-dia input{flex:1;padding:10px 11px}
+.fc-dia .btn{flex:0 0 auto;padding:8px 10px}
+.filtros-captura select{padding:10px 11px}
+#listaCiclos{margin-top:14px}
+.res-captura.clicable{cursor:pointer;border-left:4px solid var(--dr-verde);transition:transform .15s}
+.res-captura.clicable:active{transform:scale(.99)}
+.res-captura .kpis{margin-bottom:4px}
+.res-ver{display:flex;align-items:center;justify-content:flex-end;gap:4px;margin-top:8px;font-size:14px;font-weight:500;color:#9BDA55}
+.res-ver svg{width:18px;height:18px}
+.lote-card{display:block;width:100%;text-align:left;background:linear-gradient(160deg,var(--panel),var(--panel-2));border:1px solid var(--borde);border-left:4px solid var(--dr-azul);border-radius:16px;padding:13px 14px 11px 16px;margin-bottom:10px;color:var(--texto);font-family:var(--fuente);cursor:pointer;box-shadow:var(--sombra);transition:transform .15s}
+.lote-card:active{transform:scale(.985)}
+.lc-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:16px}
+.lc-top b{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lc-min{font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;color:#9BDA55;white-space:nowrap}
+.lc-min.sobre{color:#FFA36B}
+.lc-pista{position:relative;height:10px;margin:10px 0 8px;border-radius:5px;background:#2A221C}
+.lc-barra{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:linear-gradient(90deg,#0097CE,#76B729)}
+.lc-barra.sobre{background:linear-gradient(90deg,#EF7C3B,#B94A02)}
+.lc-meta{position:absolute;top:-4px;bottom:-4px;border-left:2px dashed #76B729;z-index:1}
+.lc-pie{display:flex;align-items:center;gap:6px;font-size:13.5px;color:var(--texto-2)}
+.lc-pie span{flex:1;min-width:0}
+.lc-pie svg{width:18px;height:18px;flex:0 0 18px;color:var(--texto-3)}
+.tema-btn{margin-left:auto;width:40px;height:40px;flex:0 0 40px;border-radius:50%;border:1px solid var(--borde);background:var(--panel);color:var(--texto-2);display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.tema-btn svg{width:20px;height:20px}
+
+/* ==================== MODO CLARO (Tiempo de ciclo: botón ☀ de la barra superior) ==================== */
+:root[data-tema="claro"]{
+  --fondo:#F4EFE8; --panel:#FFFFFF; --panel-2:#FAF6F1; --borde:#D9CFC3; --lateral:#EDE6DD;
+  --texto:#221A13; --texto-2:#4A3E33; --texto-3:#6E6155;
+  --sombra:0 8px 22px -12px rgba(60,40,20,.28);
+}
+:root[data-tema="claro"] a,:root[data-tema="claro"] .migas button{color:#0B79A8}
+:root[data-tema="claro"] .migas button:last-child{color:var(--texto)}
+:root[data-tema="claro"] #barraSup{background:rgba(255,255,255,.97)}
+:root[data-tema="claro"] #slotLogo .logo .texto{color:var(--texto)}
+:root[data-tema="claro"] #navInf{background:rgba(255,255,255,.97)}
+:root[data-tema="claro"] #contenido{background:radial-gradient(80% 40% at 100% 0%, rgba(0,151,206,.08), transparent 60%),radial-gradient(70% 35% at 0% 100%, rgba(118,183,41,.08), transparent 60%),var(--fondo)}
+:root[data-tema="claro"] .panel{background:linear-gradient(180deg,#FFFFFF,#FBF7F2)}
+:root[data-tema="claro"] input,:root[data-tema="claro"] select,:root[data-tema="claro"] textarea{background:#FFFFFF;border-color:#CDBFB1}
+:root[data-tema="claro"] input::placeholder{color:#9A8C7F}
+:root[data-tema="claro"] input[type="datetime-local"],:root[data-tema="claro"] input[type="date"]{color-scheme:light}
+:root[data-tema="claro"] .btn.sec{background:#FFFFFF;border-color:#CDBFB1;color:var(--texto-2)}
+:root[data-tema="claro"] .aviso{background:#E6F4FA}
+:root[data-tema="claro"] .aviso.alerta{background:#FDEEE3;color:#5A2E12}
+:root[data-tema="claro"] .aviso.ok{background:#EDF6E2;color:#2F4A12}
+:root[data-tema="claro"] .avisos{background:#FDEEE3;color:#5A2E12}
+:root[data-tema="claro"] #toast{background:#FFFFFF;border-color:#D9CFC3}
+:root[data-tema="claro"] th{background:#F1EAE2}
+:root[data-tema="claro"] td{border-bottom-color:#EAE2D8}
+:root[data-tema="claro"] tbody tr:hover{background:#F8F3ED}
+:root[data-tema="claro"] tr.fila-total{background:#FBEBDD}
+:root[data-tema="claro"] tr.fila-cerca td{background:#FDF0E5}
+:root[data-tema="claro"] tr.fila-excluida td{color:#B8322B}
+:root[data-tema="claro"] .pill.gris{color:#5A4D41;border-color:#D3C6B8;background:#F1EAE2}
+:root[data-tema="claro"] .pill.azul{color:#0B5F80;border-color:#9CD3EA;background:#E3F3FA}
+:root[data-tema="claro"] .pill.naranja{color:#9A4413;border-color:#F2B98F;background:#FDEBDD}
+:root[data-tema="claro"] .pill.verde{color:#3F6E12;border-color:#B5D98C;background:#ECF6E0}
+:root[data-tema="claro"] .pill.rojo{color:#A52A2A;border-color:#EBA9A9;background:#FCE6E6}
+:root[data-tema="claro"] .barra-pista,:root[data-tema="claro"] .gf-pista,:root[data-tema="claro"] .lc-pista{background:#ECE5DC}
+:root[data-tema="claro"] .gf-meta,:root[data-tema="claro"] .lc-meta{border-left-color:#4E8A16}
+:root[data-tema="claro"] .gf-muestra-meta{border-top-color:#4E8A16}
+:root[data-tema="claro"] .gf-alerta{color:#C2521B}
+:root[data-tema="claro"] .lc-min,:root[data-tema="claro"] .res-ver{color:#4E8A16}
+:root[data-tema="claro"] .lc-min.sobre{color:#C2521B}
+:root[data-tema="claro"] .buscador{background:#FFFFFF;box-shadow:0 6px 16px rgba(60,40,20,.12)}
+:root[data-tema="claro"] .cc-pasos i,:root[data-tema="claro"] .pasos-pista{background:#E2D9CE}
+:root[data-tema="claro"] .cc-pasos i.hecho,:root[data-tema="claro"] .cc-pasos i.actual{background:var(--c)}
+:root[data-tema="claro"] .cc-rapido{background:color-mix(in srgb,var(--c) 12%,#FFFFFF)}
+:root[data-tema="claro"] .paso i{background:#FFFFFF;border-color:#CFC3B6}
+:root[data-tema="claro"] .paso.hecho i{background:var(--c);border-color:var(--c)}
+:root[data-tema="claro"] .paso.actual i{background:#FFFFFF;color:var(--texto)}
+:root[data-tema="claro"] .hora{background:#FFFFFF}
+:root[data-tema="claro"] .hora input{background:#FBF8F4}
+:root[data-tema="claro"] .hora.llena{background:color-mix(in srgb,var(--c) 10%,#FFFFFF)}
+:root[data-tema="claro"] .hora-aviso{color:#B5471E}
+:root[data-tema="claro"] .opcion{background:#FFFFFF;border-color:#CDBFB1}
+:root[data-tema="claro"] #barraAccion{background:rgba(255,255,255,.97);box-shadow:0 -10px 24px rgba(60,40,20,.12)}
+:root[data-tema="claro"] #btnAccion.accion-fundo{background:#E2D9CE}
+:root[data-tema="claro"] #hojaVelo{background:rgba(30,20,10,.45)}
+:root[data-tema="claro"] #hojaTarjeta{background:linear-gradient(180deg,#FFFFFF,#F7F2EC)}
+:root[data-tema="claro"] .asa{background:#CDBFB1}
+:root[data-tema="claro"] .fin-trazo{stroke:#5E9A1C}
+:root[data-tema="claro"] .fin-ciclo .ruta{color:#4E8A16}
+:root[data-tema="claro"] .segmentos{background:rgba(237,230,221,.97)}
+:root[data-tema="claro"] .segmento.activo{background:#FFFFFF}
+:root[data-tema="claro"] .usuario-card,:root[data-tema="claro"] .papelera-item,:root[data-tema="claro"] .cred-fila,:root[data-tema="claro"] .dato-fila{border-bottom-color:#E6DDD2}
+:root[data-tema="claro"] .zona-carga,:root[data-tema="claro"] .check-item,:root[data-tema="claro"] .rol-op,:root[data-tema="claro"] .acc-grupo{background:#FFFFFF;border-color:#CDBFB1}
+:root[data-tema="claro"] .cred,:root[data-tema="claro"] .copiable{background:#FBF8F4}
+:root[data-tema="claro"] .evo-chip{background:#FFFFFF;border-color:#CDBFB1}
+:root[data-tema="claro"] .evo-chip.activo{background:color-mix(in srgb,var(--c) 14%,#FFFFFF)}
+:root[data-tema="claro"] .evo-grid{stroke:#E2D9CE}
+:root[data-tema="claro"] .evo-tip{background:#FFFFFF}

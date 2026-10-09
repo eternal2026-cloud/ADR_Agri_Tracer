@@ -175,6 +175,19 @@ Protecciones en la base de datos (migración 0011):
   cualquier tramo) y los **fundos** (cada uno agrega su línea y su leyenda; «Todos los
   fundos» = promedio ponderado, línea punteada). Misma regla que el resumen: cerrados
   y bajo el umbral. Tocar el gráfico muestra los valores de esa semana; debajo, la tabla.
+- **Modo claro**: botón ☀/☾ de la barra superior; se recuerda en cada celular
+  (`localStorage` `integra.ciclos.tema`, atributo `data-tema="claro"` en `css/estilos.css`).
+- **Comentario en cada etapa y placa del camión en «Carga al camión»** (migración 0033):
+  columnas `obs_cosecha`, `obs_moto`, `obs_traslado_ca`, `obs_camion`; en Resumen → muestras
+  se ven todos en la columna Comentarios.
+- **Guardar y cerrar** en Traslado a planta (con el inicio marcado): vuelve a la lista y
+  confirma que quedó guardado; el ciclo sigue en curso hasta que otra persona marque el fin.
+- **Lista de Captura con filtros de día y fundo** (abre en hoy si hay ciclos con esa fecha) y un
+  **resumen** (promedio y minutos por tramo de los cerrados, sin los que superan el umbral).
+  Al tocarlo se ve el resumen **por lote** y, al tocar un lote, sus ciclos.
+- **Meta de tiempo de ciclo** (`META_TIEMPO_CICLO_MIN`, 120 por defecto, Config → Ajustes):
+  línea punteada del gráfico de tiempo de ciclo total. Solo se muestra; el umbral (480) sigue
+  excluyendo los atípicos de los promedios, pero ya no se dibuja.
 
 ## Auditoría 5S (módulo `auditoria5s/`, migraciones 0012, 0013, 0014 y 0026)
 

@@ -50,10 +50,33 @@ function vistaInicial() {
   return AT.perfil && AT.perfil.rol === 'captura' && DR.puedeVer('captura') ? 'captura' : 'resumen';
 }
 
+/* ------------------------------------------------ modo claro (en campo, a pleno sol) */
+DR.TEMA = 'integra.ciclos.tema';
+DR.ICONO_SOL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>';
+DR.ICONO_LUNA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>';
+DR.esClaro = function () { return document.documentElement.getAttribute('data-tema') === 'claro'; };
+DR.ponerTema = function (claro) {
+  if (claro) document.documentElement.setAttribute('data-tema', 'claro'); else document.documentElement.removeAttribute('data-tema');
+  var meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', claro ? '#FFFFFF' : '#0B0908');
+  try { localStorage.setItem(DR.TEMA, claro ? 'claro' : 'oscuro'); } catch (e) { /* sin almacenamiento */ }
+  var b = DR.$('#btnTema');
+  if (b) {
+    b.innerHTML = claro ? DR.ICONO_LUNA : DR.ICONO_SOL;
+    b.title = claro ? 'Fondo oscuro' : 'Fondo claro (para ver a pleno sol)';
+    b.setAttribute('aria-label', b.title);
+  }
+};
+
 function pintarBarraSup() {
   // Tiempos de ciclo es la Toma de tiempos campo de arándano (portada › Ingeniería · Campo).
   DR.$('#slotLogo').innerHTML = '<a href="../#campo" class="logo" style="display:flex;align-items:center;gap:10px;text-decoration:none">' +
     DR.marcaSvg(42) + '<span class="texto">TIEMPOS · ARÁNDANO</span></a>';
+  var tema = document.createElement('button');
+  tema.type = 'button'; tema.id = 'btnTema'; tema.className = 'tema-btn';
+  DR.$('#barraSup').insertBefore(tema, DR.$('#chipDatos'));
+  tema.onclick = function () { DR.ponerTema(!DR.esClaro()); };
+  DR.ponerTema(DR.esClaro());
   DR.$('#chipDatos').classList.add('ok');
   DR.$('#chipTexto').textContent = (AT.perfil && AT.perfil.nombre) || '—';
 }

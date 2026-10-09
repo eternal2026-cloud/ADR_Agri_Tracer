@@ -875,6 +875,9 @@ CONFIG.tabAjustes = function (c) {
   c.innerHTML = UI.panel('Umbral de calidad de datos', 'Los ciclos que superen estos minutos se excluyen de los promedios (se asume un error de digitación). Se siguen mostrando tachados en el detalle.',
     '<div class="form"><div class="campo"><label for="inpUmbral">Umbral (minutos)</label><input id="inpUmbral" type="number" inputmode="numeric" min="1" value="' + DR.esc(CONFIG.parametros.UMBRAL_TIEMPO_CICLO_MIN || 480) + '"></div></div>' +
     '<div class="acciones"><button type="button" class="btn" id="btnGuardarUmbral">Guardar</button></div>') +
+    UI.panel('Meta de tiempo de ciclo', 'Línea punteada del gráfico «Tiempo de ciclo total por fundo» y referencia del resumen en Captura. Solo se muestra: no excluye datos.',
+    '<div class="form"><div class="campo"><label for="inpMeta">Meta (minutos)</label><input id="inpMeta" type="number" inputmode="numeric" min="1" value="' + DR.esc(CONFIG.parametros.META_TIEMPO_CICLO_MIN || 120) + '"></div></div>' +
+    '<div class="acciones"><button type="button" class="btn" id="btnGuardarMeta">Guardar</button></div>') +
     UI.panel('Importar histórico desde Excel', 'Carga o actualiza los ciclos del archivo «5.1. TIEMPO DE CICLO ACTUALIZADO.xlsx» (hoja BD). Puedes repetirlo cada vez que el Excel tenga filas nuevas: no duplica y nunca modifica ciclos capturados en la app.',
       '<label class="zona-carga" id="zonaExcel"><input type="file" accept=".xlsx,.xls" id="inpExcel">' + DR.ICONOS.subir +
       '<b>Elegir archivo Excel</b><span>Se revisa en este dispositivo y te muestra un resumen antes de importar.</span></label><div id="excelVista"></div>') +
@@ -888,6 +891,15 @@ CONFIG.tabAjustes = function (c) {
     var btn = this; btn.disabled = true;
     CONFIG.guardarParametro('UMBRAL_TIEMPO_CICLO_MIN', Math.round(v)).then(function () {
       DR.toast('Umbral actualizado.');
+      return CONFIG.refrescar();
+    }).catch(function (e) { DR.toast(e.message, 'error'); btn.disabled = false; });
+  };
+  DR.$('#btnGuardarMeta').onclick = function () {
+    var v = Number(DR.$('#inpMeta').value);
+    if (!v || v < 1) { DR.toast('Escribe un número de minutos válido.', 'error'); return; }
+    var btn = this; btn.disabled = true;
+    CONFIG.guardarParametro('META_TIEMPO_CICLO_MIN', Math.round(v)).then(function () {
+      DR.toast('Meta actualizada.');
       return CONFIG.refrescar();
     }).catch(function (e) { DR.toast(e.message, 'error'); btn.disabled = false; });
   };

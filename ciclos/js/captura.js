@@ -24,7 +24,8 @@ var ETAPAS = [
     { clave: 'presentacion', tipo: 'lista', lista: 'presentacion', label: 'Presentación' },
     { clave: 'fecha', tipo: 'fecha', label: 'Fecha', medio: true },
     { clave: 'inicio_cosecha', tipo: 'hora', label: 'Inicio cosecha' },
-    { clave: 'fin_cosecha', tipo: 'hora', label: 'Fin cosecha' }
+    { clave: 'fin_cosecha', tipo: 'hora', label: 'Fin cosecha' },
+    { clave: 'obs_cosecha', tipo: 'texto', label: 'Comentario' }
   ] },
   { id: 'jabero', titulo: 'Jabero', corto: 'Jabero', color: '#EF7C3B', campoCierre: 'fin_jabero', campos: [
     { clave: 'inicio_jabero', tipo: 'hora', label: 'Inicio jabero' },
@@ -36,11 +37,13 @@ var ETAPAS = [
     { clave: 'hora_llegada_moto', tipo: 'hora', label: 'Llegada de motocarga' },
     { clave: 'inicio_carga_moto', tipo: 'hora', label: 'Inicio carga a motocarga' },
     { clave: 'fin_carga_moto', tipo: 'hora', label: 'Fin carga a motocarga' },
-    { clave: 'placa', tipo: 'texto', label: 'Placa motocarga', medio: true, mayusculas: true }
+    { clave: 'placa', tipo: 'texto', label: 'Placa motocarga', medio: true, mayusculas: true },
+    { clave: 'obs_moto', tipo: 'texto', label: 'Comentario' }
   ] },
   { id: 'traslado_ca', titulo: 'Traslado a Centro de Acopio', corto: 'Traslado', color: '#76B729', campoCierre: 'fin_traslado_ca', campos: [
     { clave: 'inicio_traslado_ca', tipo: 'hora', label: 'Inicio traslado a C.A.' },
-    { clave: 'fin_traslado_ca', tipo: 'hora', label: 'Fin traslado a C.A.' }
+    { clave: 'fin_traslado_ca', tipo: 'hora', label: 'Fin traslado a C.A.' },
+    { clave: 'obs_traslado_ca', tipo: 'texto', label: 'Comentario' }
   ] },
   { id: 'descarga_ca', titulo: 'Descarga y armado en C.A.', corto: 'Descarga', color: '#EF7C3B', campoCierre: 'fin_descarga_ca', campos: [
     { clave: 'inicio_descarga_ca', tipo: 'hora', label: 'Inicio descarga y armado' },
@@ -48,12 +51,13 @@ var ETAPAS = [
     { clave: 'num_jabas_2', tipo: 'numero', label: 'N° de jabas', medio: true },
     { clave: 'num_pallets', tipo: 'numero', label: 'N° de pallets', medio: true },
     { clave: 'presentaciones', tipo: 'lista', lista: 'presentacion', label: 'Presentaciones' },
-    { clave: 'placa_camion', tipo: 'texto', label: 'Placa de camión', medio: true, mayusculas: true },
     { clave: 'obs_jabas_2', tipo: 'texto', label: 'Observación de jabas' }
   ] },
   { id: 'carga_camion', titulo: 'Carga al camión', corto: 'Camión', color: '#0097CE', campoCierre: 'fin_carga_camion', campos: [
     { clave: 'inicio_carga_camion', tipo: 'hora', label: 'Inicio carga al camión' },
-    { clave: 'fin_carga_camion', tipo: 'hora', label: 'Fin carga al camión' }
+    { clave: 'fin_carga_camion', tipo: 'hora', label: 'Fin carga al camión' },
+    { clave: 'placa_camion', tipo: 'texto', label: 'Placa de camión', medio: true, mayusculas: true },
+    { clave: 'obs_camion', tipo: 'texto', label: 'Comentario' }
   ] },
   { id: 'traslado_planta', titulo: 'Traslado a planta', corto: 'Planta', color: '#D9622B', campoCierre: 'fin_traslado_planta', campos: [
     { clave: 'inicio_traslado_planta', tipo: 'hora', label: 'Inicio traslado a planta' },
@@ -75,7 +79,8 @@ var CAPTURA = {
   listas: { fundo: [], variedad: [], calibre: [], presentacion: [], tareadora: [] },
   vista: 'lista', fila: null, borrador: null, etapaIdx: 0,
   sucio: false, guardando: false, insistir: false, cambiados: {},
-  abiertos: [], cerrados: [], filtro: '', _pct: 0, _timer: null
+  abiertos: [], cerrados: [], filtro: '', _pct: 0, _timer: null,
+  dia: null, fundoFiltro: '', nivel: 'dia', loteSel: null
 };
 
 /* ------------------------------------------------ fundos asignados al usuario ([] = todos) */
@@ -112,6 +117,7 @@ CAPTURA.horaCorta = function (local) {
 
 /* ------------------------------------------------ preferencias del celular */
 CAPTURA.PREF = 'agritracer.captura.preferencias';
+CAPTURA.PREF_FUNDO = 'agritracer.captura.filtroFundo';
 CAPTURA.leerPrefs = function () { try { return JSON.parse(localStorage.getItem(CAPTURA.PREF) || '{}') || {}; } catch (e) { return {}; } };
 CAPTURA.guardarPrefs = function (v) {
   try { localStorage.setItem(CAPTURA.PREF, JSON.stringify({ fundo: v.fundo, lider: v.lider, variedad: v.variedad, calibre: v.calibre, presentacion: v.presentacion })); } catch (e) { /* sin almacenamiento */ }
@@ -150,7 +156,7 @@ VISTAS.captura = function (cont) {
     return;
   }
   var listo = CAPTURA.listas.fundo.length ? Promise.resolve() : CAPTURA.cargarListas();
-  listo.then(function () { CAPTURA.pintarLista(); CAPTURA.iniciarRefresco(); }).catch(function (e) { UI.error(cont, e); });
+  listo.then(function () { return Promise.all([RES.cargarUmbral(), RES.cargarMeta(), CAPTURA.diaInicial()]); }).then(function () { CAPTURA.pintarLista(); CAPTURA.iniciarRefresco(); }).catch(function (e) { UI.error(cont, e); });
 };
 
 /* ------------------------------------------------ refresco automático (otras personas pueden estar marcando) */
@@ -201,16 +207,40 @@ CAPTURA.pintarLista = function () {
   CAPTURA.vista = 'lista'; CAPTURA.fila = null; CAPTURA.sucio = false; CAPTURA.insistir = false;
   CAPTURA.quitarBarra();
   cont.scrollTop = 0;
+  var fundos = CAPTURA.opciones('fundo');
+  if (CAPTURA.fundoFiltro && fundos.indexOf(CAPTURA.fundoFiltro) < 0) fundos.unshift(CAPTURA.fundoFiltro);
   cont.innerHTML = UI.encabezado('Captura en campo', 'Ciclos de cosecha', 'Inicia un ciclo nuevo o toca uno en curso para registrar su siguiente etapa.') +
     '<button class="btn verde grande entra" id="btnNuevoCiclo" type="button">' + DR.ICONOS.mas + '<span>Iniciar nuevo ciclo</span></button>' +
     '<div class="buscador entra" style="margin-top:16px">' + DR.ICONOS.lupa +
     '<input id="inpFiltroCiclos" type="search" placeholder="Buscar código, fundo, lote o líder…" autocomplete="off" value="' + DR.esc(CAPTURA.filtro) + '"></div>' +
+    '<div class="filtros-captura entra">' +
+      '<div class="campo"><label for="inpDia">Día</label><div class="fc-dia"><input id="inpDia" type="date" value="' + DR.esc(CAPTURA.dia || '') + '">' +
+      '<button type="button" class="btn sec chico" id="btnDiaHoy">Hoy</button><button type="button" class="btn sec chico" id="btnDiaTodos">Todos</button></div></div>' +
+      '<div class="campo"><label for="selFundo">Fundo</label><select id="selFundo"><option value="">Todos los fundos</option>' +
+      fundos.map(function (f) { return '<option value="' + DR.esc(f) + '"' + (f === CAPTURA.fundoFiltro ? ' selected' : '') + '>' + DR.esc(f) + '</option>'; }).join('') + '</select></div>' +
+    '</div>' +
     (CAPTURA.misFundos().length ? '<div class="aviso-fundos entra">Tus fundos: <b>' + CAPTURA.misFundos().map(DR.esc).join(' · ') + '</b></div>' : '') +
-    '<div id="listaCiclos"><div class="vacio">Cargando ciclos en curso…</div></div>';
+    '<div id="listaCiclos"><div class="vacio">Cargando ciclos…</div></div>';
   DR.entrarPaneles('#contenido');
 
   DR.$('#btnNuevoCiclo').onclick = function () { DR.desbloquearAudio(); CAPTURA.nuevoCiclo(); };
   DR.$('#inpFiltroCiclos').oninput = function () { CAPTURA.filtro = this.value; CAPTURA.pintarTarjetas(false); };
+  var cambiarDia = function (dia) {
+    CAPTURA.dia = dia || '';
+    CAPTURA.nivel = 'dia';
+    DR.$('#inpDia').value = CAPTURA.dia;
+    DR.$('#listaCiclos').innerHTML = '<div class="vacio">Cargando ciclos…</div>';
+    CAPTURA.cargarCiclos().then(function () { CAPTURA.pintarTarjetas(true); }).catch(function (e) { DR.toast(e.message, 'error'); });
+  };
+  DR.$('#inpDia').onchange = function () { cambiarDia(this.value); };
+  DR.$('#btnDiaHoy').onclick = function () { cambiarDia(CAPTURA.hoyLocal()); };
+  DR.$('#btnDiaTodos').onclick = function () { cambiarDia(''); };
+  DR.$('#selFundo').onchange = function () {
+    CAPTURA.fundoFiltro = this.value;
+    CAPTURA.nivel = 'dia';
+    try { localStorage.setItem(CAPTURA.PREF_FUNDO, this.value); } catch (e) { /* sin almacenamiento */ }
+    CAPTURA.pintarTarjetas(true);
+  };
 
   CAPTURA.cargarCiclos().then(function () { CAPTURA.pintarTarjetas(true); }).catch(function (e) {
     var l = DR.$('#listaCiclos');
@@ -218,16 +248,29 @@ CAPTURA.pintarLista = function () {
   });
 };
 
+/** Día con que abre la lista: hoy si ya hay ciclos con esa fecha; si no, todos los días. */
+CAPTURA.diaInicial = function () {
+  if (CAPTURA.dia !== null) return Promise.resolve();
+  try { CAPTURA.fundoFiltro = localStorage.getItem(CAPTURA.PREF_FUNDO) || ''; } catch (e) { /* sin almacenamiento */ }
+  if (CAPTURA.fundoFiltro && !CAPTURA.fundoPermitido(CAPTURA.fundoFiltro)) CAPTURA.fundoFiltro = '';
+  var hoy = CAPTURA.hoyLocal(), m = CAPTURA.misFundos();
+  var q = sb.from('ciclos_cosecha').select('id', { count: 'exact', head: true }).eq('origen', 'app').eq('fecha', hoy);
+  if (m.length) q = q.in('fundo', m);
+  return q.then(function (r) { CAPTURA.dia = !r.error && r.count ? hoy : ''; }).catch(function () { CAPTURA.dia = ''; });
+};
+
 CAPTURA.cargarCiclos = function () {
   var desde = new Date(Date.now() - 36 * 3600 * 1000).toISOString(), m = CAPTURA.misFundos();
   // Solo ciclos capturados en la app (los importados del Excel histórico no son "en curso"),
   // de cualquier persona, y solo de los fundos asignados al usuario.
+  // Con un día elegido se traen todos los cerrados de ese día; sin día, los cerrados de las últimas 36 h.
   var q1 = sb.from('ciclos_cosecha').select('*').eq('origen', 'app').eq('cerrado', false);
-  var q2 = sb.from('ciclos_cosecha').select('*').eq('origen', 'app').eq('cerrado', true).gte('actualizado_en', desde);
+  var q2 = sb.from('ciclos_cosecha').select('*').eq('origen', 'app').eq('cerrado', true);
+  q2 = CAPTURA.dia ? q2.eq('fecha', CAPTURA.dia) : q2.gte('actualizado_en', desde);
   if (m.length) { q1 = q1.in('fundo', m); q2 = q2.in('fundo', m); }
   return Promise.all([
     q1.order('actualizado_en', { ascending: false }).limit(200),
-    q2.order('actualizado_en', { ascending: false }).limit(10)
+    q2.order('actualizado_en', { ascending: false }).limit(CAPTURA.dia ? 300 : 10)
   ]).then(function (r) {
     if (r[0].error) throw new Error(r[0].error.message);
     CAPTURA.abiertos = r[0].data || [];
@@ -295,22 +338,138 @@ CAPTURA.marcarRapido = function (btn, codigo) {
   });
 };
 
+/* ------------------------------------------------ resumen del día → por lote → ciclos del lote */
+CAPTURA.claveLote = function (f) { return (f.fundo || '') + '|' + (f.lote || ''); };
+CAPTURA.nombreLote = function (f, conFundo) { return (f.lote ? 'Lote ' + f.lote : 'Sin lote') + (conFundo && f.fundo ? ' · ' + f.fundo : ''); };
+
+/** Barras de minutos por tramo (cierre de un ciclo y resúmenes). tramos: [{ t, v }]. */
+CAPTURA.barrasTramosHtml = function (tramos, animar) {
+  var maximo = Math.max.apply(null, tramos.map(function (x) { return Math.abs(Number(x.v)); }).concat([1]));
+  return tramos.map(function (x) {
+    var negativo = Number(x.v) < 0, ancho = Math.round(Math.abs(Number(x.v)) / maximo * 100);
+    return '<div class="barra-fila"><div title="' + DR.esc(x.t) + '">' + DR.esc(x.t) + '</div>' +
+      '<div class="barra-pista"><div class="barra-valor" data-ancho="' + ancho + '" style="' + (animar ? '' : 'width:' + ancho + '%;') + 'background:' +
+      (negativo ? '#E5484D' : 'linear-gradient(90deg,#0097CE,#76B729)') + '"></div></div>' +
+      '<div class="barra-cifra"' + (negativo ? ' style="color:#FF8A8A"' : '') + '>' + DR.num(x.v, 0) + '</div></div>';
+  }).join('');
+};
+
+/** Promedios de un grupo de ciclos cerrados, con la misma regla del Resumen (sin los que superan el umbral). */
+CAPTURA.promedios = function (cerrados) {
+  var umbral = RES.umbral || 480;
+  var conTotal = cerrados.filter(function (f) { return f.t_ciclo_total !== null && f.t_ciclo_total !== undefined; });
+  var validos = conTotal.filter(function (f) { return Number(f.t_ciclo_total) <= umbral; });
+  var prom = function (lista, k) {
+    var v = lista.map(function (f) { return f[k]; }).filter(function (x) { return x !== null && x !== undefined; }).map(Number);
+    return v.length ? v.reduce(function (s, x) { return s + x; }, 0) / v.length : null;
+  };
+  return {
+    n: validos.length, excluidos: conTotal.length - validos.length, total: prom(validos, 't_ciclo_total'),
+    tramos: CAMPOS_RESUMEN.map(function (c) { return { t: c.titulo, v: prom(validos, c.clave) }; }).filter(function (x) { return x.v !== null; })
+  };
+};
+
+CAPTURA.resumenHtml = function (cerrados, titulo, sub, clic) {
+  var p = CAPTURA.promedios(cerrados), meta = RES.meta || 120;
+  var color = p.total === null ? '#B7A99C' : (p.total <= meta ? '#76B729' : '#EF7C3B');
+  var cuerpo = p.n
+    ? '<div class="kpis">' +
+        UI.kpi('Tiempo de ciclo', DR.num(p.total, 0) + '<small>min</small>', DR.num(p.total / 60, 2) + ' horas · meta ' + DR.num(meta, 0) + ' min', color) +
+        UI.kpi('Ciclos cerrados', DR.num(p.n), p.excluidos ? p.excluidos + ' excluido(s): superan ' + DR.num(RES.umbral, 0) + ' min' : 'Promedio de los cerrados', '#0097CE') +
+      '</div><div class="sep-titulo">Minutos por tramo</div>' + CAPTURA.barrasTramosHtml(p.tramos)
+    : '<div class="vacio">Aún no hay ciclos cerrados' + (p.excluidos ? ' bajo el umbral' : '') + ' para promediar.</div>';
+  return '<section class="panel entra res-captura' + (clic ? ' clicable' : '') + '"' + (clic ? ' id="resCaptura" role="button" tabindex="0"' : '') + '>' +
+    '<h2>' + DR.esc(titulo) + '</h2><div class="sub">' + DR.esc(sub) + '</div>' + cuerpo +
+    (clic ? '<div class="res-ver">Ver resumen por lote' + DR.ICONOS.chevron + '</div>' : '') + '</section>';
+};
+
+CAPTURA.lotesHtml = function (abiertos, cerrados) {
+  var grupos = {}, orden = [], meta = RES.meta || 120, conFundo = !CAPTURA.fundoFiltro;
+  abiertos.concat(cerrados).forEach(function (f) {
+    var k = CAPTURA.claveLote(f);
+    if (!grupos[k]) { grupos[k] = { clave: k, muestra: f, abiertos: [], cerrados: [] }; orden.push(k); }
+    grupos[k][f.cerrado ? 'cerrados' : 'abiertos'].push(f);
+  });
+  if (!orden.length) return '<div class="vacio">No hay ciclos con estos filtros.</div>';
+  var lista = orden.map(function (k) { var g = grupos[k]; g.p = CAPTURA.promedios(g.cerrados); return g; })
+    .sort(function (a, b) { return (b.p.total === null ? -1 : b.p.total) - (a.p.total === null ? -1 : a.p.total); });
+  var tope = Math.max.apply(null, lista.map(function (g) { return g.p.total || 0; }).concat([meta])) * 1.05;
+  return lista.map(function (g) {
+    var t = g.p.total, sobre = t !== null && t > meta;
+    return '<button type="button" class="lote-card entra" data-lote="' + DR.esc(g.clave) + '">' +
+      '<div class="lc-top"><b>' + DR.esc(CAPTURA.nombreLote(g.muestra, conFundo)) + '</b><span class="lc-min' + (sobre ? ' sobre' : '') + '">' +
+      (t === null ? '—' : DR.num(t, 0) + ' min') + '</span></div>' +
+      '<div class="lc-pista"><span class="lc-meta" style="left:' + (meta / tope * 100).toFixed(1) + '%"></span>' +
+      '<span class="lc-barra' + (sobre ? ' sobre' : '') + '" style="width:' + (t === null ? 0 : Math.min(100, t / tope * 100)).toFixed(1) + '%"></span></div>' +
+      '<div class="lc-pie"><span>' + g.cerrados.length + ' cerrado(s)' + (g.abiertos.length ? ' · ' + g.abiertos.length + ' en curso' : '') +
+      (g.p.excluidos ? ' · ' + g.p.excluidos + ' excluido(s)' : '') + ' · meta ' + DR.num(meta, 0) + ' min</span>' + DR.ICONOS.chevron + '</div></button>';
+  }).join('');
+};
+
 CAPTURA.pintarTarjetas = function (animar) {
   var cont = DR.$('#listaCiclos');
   if (!cont) return;
   var q = CAPTURA.filtro.trim().toLowerCase();
   var coincide = function (f) {
+    if (CAPTURA.fundoFiltro && f.fundo !== CAPTURA.fundoFiltro) return false;
+    if (CAPTURA.dia && f.fecha !== CAPTURA.dia) return false;
     return !q || [f.codigo, f.fundo, f.lote, f.lider].some(function (v) { return String(v || '').toLowerCase().indexOf(q) > -1; });
   };
   var abiertos = CAPTURA.abiertos.filter(coincide), cerrados = CAPTURA.cerrados.filter(coincide);
+  var lote = null;
+  if (CAPTURA.nivel === 'lote') {
+    var enLote = function (f) { return CAPTURA.claveLote(f) === CAPTURA.loteSel; };
+    lote = abiertos.concat(cerrados).filter(enLote)[0];
+    if (lote) { abiertos = abiertos.filter(enLote); cerrados = cerrados.filter(enLote); } else CAPTURA.nivel = 'lotes';
+  }
 
-  var h = '<div class="conteo">En curso · ' + abiertos.length + '</div>';
+  var d = CAPTURA.dia;
+  var tituloDia = !d ? 'Resumen · cerrados en las últimas 36 h'
+    : (d === CAPTURA.hoyLocal() ? 'Resumen de hoy' : 'Resumen del ' + d.substring(8, 10) + '/' + d.substring(5, 7) + '/' + d.substring(0, 4));
+  var subDia = (CAPTURA.fundoFiltro || 'Todos los fundos') + ' · promedio de los ciclos cerrados (sin los que superan el umbral)';
+  var h = '';
+  if (CAPTURA.nivel === 'lotes' || CAPTURA.nivel === 'lote') {
+    var migas = [{ texto: tituloDia, accion: true }, { texto: 'Por lote', accion: CAPTURA.nivel === 'lote' }];
+    if (CAPTURA.nivel === 'lote') migas.push({ texto: CAPTURA.nombreLote(lote, !CAPTURA.fundoFiltro) });
+    h += UI.migas(migas);
+  }
+  if (CAPTURA.nivel === 'lotes') {
+    cont.innerHTML = h + '<div class="conteo">Resumen por lote · toca un lote para ver sus ciclos</div>' + CAPTURA.lotesHtml(abiertos, cerrados);
+    CAPTURA.enlazarTarjetas(cont, animar);
+    return;
+  }
+  h += CAPTURA.nivel === 'lote'
+    ? CAPTURA.resumenHtml(cerrados, CAPTURA.nombreLote(lote, true), subDia, false)
+    : CAPTURA.resumenHtml(cerrados, tituloDia, subDia, abiertos.length + cerrados.length > 0);
+
+  h += '<div class="conteo">En curso · ' + abiertos.length + '</div>';
   h += abiertos.length ? abiertos.map(CAPTURA.tarjetaHtml).join('')
-    : '<div class="vacio">' + (q ? 'Ningún ciclo en curso coincide con la búsqueda.' : 'No hay ciclos en curso. Inicia uno con el botón verde.') + '</div>';
-  if (cerrados.length) h += '<div class="conteo" style="margin-top:18px">Cerrados recientemente · ' + cerrados.length + '</div>' + cerrados.map(CAPTURA.tarjetaHtml).join('');
+    : '<div class="vacio">' + (q || CAPTURA.fundoFiltro || CAPTURA.dia ? 'Ningún ciclo en curso con estos filtros.' : 'No hay ciclos en curso. Inicia uno con el botón verde.') + '</div>';
+  if (cerrados.length) h += '<div class="conteo" style="margin-top:18px">' + (CAPTURA.dia ? 'Cerrados' : 'Cerrados recientemente') + ' · ' + cerrados.length + '</div>' + cerrados.map(CAPTURA.tarjetaHtml).join('');
   h += '<div class="acciones" style="justify-content:center"><button type="button" class="btn sec chico" id="btnRecargarCiclos">Actualizar lista</button></div>';
   cont.innerHTML = h;
+  CAPTURA.enlazarTarjetas(cont, animar);
+};
 
+CAPTURA.enlazarTarjetas = function (cont, animar) {
+  var irNivel = function (nivel, lote) {
+    CAPTURA.nivel = nivel;
+    if (lote !== undefined) CAPTURA.loteSel = lote;
+    CAPTURA.pintarTarjetas(true);
+    var c = DR.$('#contenido'), top = cont.offsetTop - 10;
+    if (c.scrollTop > top) c.scrollTop = top;
+  };
+  var res = DR.$('#resCaptura', cont);
+  if (res) {
+    res.onclick = function () { irNivel('lotes'); };
+    res.onkeydown = function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); irNivel('lotes'); } };
+  }
+  DR.$$('[data-miga]', cont).forEach(function (b) {
+    b.onclick = function () { irNivel(this.getAttribute('data-miga') === '0' ? 'dia' : 'lotes'); };
+  });
+  DR.$$('[data-lote]', cont).forEach(function (b) {
+    b.onclick = function () { irNivel('lote', this.getAttribute('data-lote')); };
+  });
   DR.$$('.ciclo-card', cont).forEach(function (b) {
     b.onclick = function () {
       DR.desbloquearAudio();
@@ -322,7 +481,8 @@ CAPTURA.pintarTarjetas = function (animar) {
   DR.$$('.cc-rapido', cont).forEach(function (b) {
     b.onclick = function () { DR.desbloquearAudio(); CAPTURA.marcarRapido(this, this.getAttribute('data-rapido')); };
   });
-  DR.$('#btnRecargarCiclos').onclick = function () {
+  var recargar = DR.$('#btnRecargarCiclos', cont);
+  if (recargar) recargar.onclick = function () {
     this.disabled = true;
     CAPTURA.cargarCiclos().then(function () { CAPTURA.pintarTarjetas(true); DR.toast('Lista actualizada.', 'info'); })
       .catch(function (e) { DR.toast(e.message, 'error'); });
@@ -570,7 +730,11 @@ CAPTURA.revisar = function () {
 
   var btn = DR.$('#btnAccion'), sec = DR.$('#btnGuardarSolo');
   if (!btn) return;
-  sec.classList.toggle('oculto', !CAPTURA.sucio);
+  // Traslado a planta ya iniciado: quien marcó el inicio puede salir con «Guardar y cerrar» y otra persona marca el fin.
+  var salir = e.id === 'traslado_planta' && !!CAPTURA.fila && !!v.inicio_traslado_planta && !v.fin_traslado_planta;
+  sec.classList.toggle('oculto', !CAPTURA.sucio && !salir);
+  sec.textContent = salir ? 'Guardar y cerrar' : 'Guardar';
+  sec.setAttribute('data-salir', salir ? '1' : '');
   var ultima = CAPTURA.etapaIdx === ETAPAS.length - 1;
   var vacia = v[e.campoCierre] ? null : e.campos.filter(function (c) { return c.tipo === 'hora' && !v[c.clave]; })[0];
   var modo, html;
@@ -601,9 +765,20 @@ CAPTURA.ponerBarra = function () {
   barra.innerHTML = '<button type="button" class="btn sec oculto" id="btnGuardarSolo">Guardar</button>' +
     '<button type="button" class="btn grande" id="btnAccion"></button>';
   DR.$('#contenido').classList.add('con-barra');
-  DR.$('#btnGuardarSolo').onclick = function () { CAPTURA.guardar({ avanzar: false }); };
+  DR.$('#btnGuardarSolo').onclick = function () {
+    if (!this.getAttribute('data-salir')) { CAPTURA.guardar({ avanzar: false }); return; }
+    if (CAPTURA.sucio) CAPTURA.guardar({ avanzar: false, salir: true });
+    else CAPTURA.salirGuardado(CAPTURA.fila);
+  };
   DR.$('#btnAccion').onclick = CAPTURA.accionPrincipal;
   if (nueva && DR.anima) anime({ targets: barra, translateY: [70, 0], opacity: [0, 1], duration: 450, easing: 'easeOutCubic' });
+};
+
+/** Vuelve a la lista confirmando que todo quedó guardado (el ciclo sigue en curso para que otro lo termine). */
+CAPTURA.salirGuardado = function (fila) {
+  CAPTURA.sucio = false;
+  CAPTURA.pintarLista();
+  DR.toast((fila ? fila.codigo + ' guardado' : 'Guardado') + '. Queda en curso para que otra persona marque el fin del traslado.');
 };
 
 CAPTURA.quitarBarra = function () {
@@ -681,7 +856,8 @@ CAPTURA.guardar = function (opc) {
     promesa = AT.rpc('rpc_iniciar_ciclo', { p: {
       fecha: v.fecha || CAPTURA.hoyLocal(), fundo: v.fundo, lote: v.lote || null, lider: v.lider || null,
       presentacion: v.presentacion || null, variedad: v.variedad || null, calibre: v.calibre || null,
-      inicio_cosecha: CAPTURA.aIso(v.inicio_cosecha), fin_cosecha: CAPTURA.aIso(v.fin_cosecha)
+      inicio_cosecha: CAPTURA.aIso(v.inicio_cosecha), fin_cosecha: CAPTURA.aIso(v.fin_cosecha),
+      obs_cosecha: v.obs_cosecha || null
     } });
   } else {
     // Solo los campos que tocó esta persona: lo que otra registró en el mismo ciclo no se pisa.
@@ -710,10 +886,12 @@ CAPTURA.guardar = function (opc) {
       if (prox < 0) { CAPTURA.mostrarFin(fila); return; }
       DR.toast(e.titulo + ' guardado' + (eraNuevo ? ' · código ' + fila.codigo : '') + '. Sigue: ' + ETAPAS[prox].titulo + '.');
       CAPTURA.irEtapa(prox);
+    } else if (opc.salir) {
+      CAPTURA.salirGuardado(fila);
     } else {
       DR.toast((eraNuevo ? 'Ciclo ' + fila.codigo + ' creado. ' : '') + (opc.mensaje || 'Cambios guardados.'));
       CAPTURA.pintarCiclo(0);
-      if (eraNuevo && DR.anima) anime({ targets: '#wizCodigo', scale: [1.25, 1], color: ['#B5E07A', '#F7F2EC'], duration: 900, easing: 'easeOutElastic(1, .6)' });
+      if (eraNuevo && DR.anima) anime({ targets: '#wizCodigo', scale: [1.25, 1], color: ['#B5E07A', getComputedStyle(document.body).color], duration: 900, easing: 'easeOutElastic(1, .6)' });
     }
   }).catch(function (err) {
     CAPTURA.guardando = false;
@@ -735,16 +913,9 @@ CAPTURA.mostrarFin = function (fila) {
   var total = fila.t_ciclo_total;
   var tramos = CAMPOS_RESUMEN.map(function (c) { return { t: c.titulo, v: fila[c.clave] }; })
     .filter(function (x) { return x.v !== null && x.v !== undefined; });
-  var maximo = Math.max.apply(null, tramos.map(function (x) { return Math.abs(Number(x.v)); }).concat([1]));
   var sub = [fila.fundo, fila.lote ? 'Lote ' + fila.lote : '', fila.lider].filter(Boolean).map(DR.esc).join(' · ');
 
-  var barras = tramos.map(function (x) {
-    var negativo = Number(x.v) < 0;
-    return '<div class="barra-fila"><div title="' + DR.esc(x.t) + '">' + DR.esc(x.t) + '</div>' +
-      '<div class="barra-pista"><div class="barra-valor" data-ancho="' + Math.round(Math.abs(Number(x.v)) / maximo * 100) + '" style="background:' +
-      (negativo ? '#E5484D' : 'linear-gradient(90deg,#0097CE,#76B729)') + '"></div></div>' +
-      '<div class="barra-cifra"' + (negativo ? ' style="color:#FF8A8A"' : '') + '>' + DR.num(x.v, 0) + '</div></div>';
-  }).join('');
+  var barras = CAPTURA.barrasTramosHtml(tramos, true);
   var hayNegativos = tramos.some(function (x) { return Number(x.v) < 0; });
 
   cont.innerHTML =

@@ -3,7 +3,7 @@
  * ==========================================================================*/
 var VISTAS = window.VISTAS || {};
 
-var RES = { nivel: 'general', semana: null, fundo: null, umbral: 480 };
+var RES = { nivel: 'general', semana: null, fundo: null, umbral: 480, meta: 120 };
 
 RES.cargarUmbral = function () {
   return sb.from('parametros').select('valor').eq('clave', 'UMBRAL_TIEMPO_CICLO_MIN').single().then(function (r) {
@@ -12,8 +12,17 @@ RES.cargarUmbral = function () {
   }).catch(function () { return RES.umbral; });
 };
 
+/** Meta de tiempo de ciclo: solo se dibuja como referencia en los gráficos, no excluye datos. */
+RES.cargarMeta = function () {
+  return sb.from('parametros').select('valor').eq('clave', 'META_TIEMPO_CICLO_MIN').maybeSingle().then(function (r) {
+    var v = r.data ? Number(r.data.valor) : 0;
+    RES.meta = v > 0 ? v : 120;
+    return RES.meta;
+  }).catch(function () { return RES.meta; });
+};
+
 VISTAS.resumen = function (cont) {
-  RES.cargarUmbral().then(function () {
+  Promise.all([RES.cargarUmbral(), RES.cargarMeta()]).then(function () {
     if (RES.nivel === 'semana') return RES.renderSemana(cont);
     if (RES.nivel === 'muestras') return RES.renderMuestras(cont);
     return RES.renderGeneral(cont);
@@ -52,7 +61,7 @@ RES.renderGeneral = function (cont) {
       UI.tabla(UI.columnasResumen(), fundos.concat([total]), function (f) { return f.fundo === 'Total general' ? 'fila-total' : 'clicable'; }));
 
     var barras = fundos.map(function (f) { return { etq: f.fundo, valor: f.t_ciclo_total, dec: 1 }; });
-    h += UI.panel('Tiempo de ciclo total por fundo', 'La línea punteada marca el umbral configurado.', GRAFICO.barrasFundo(barras, RES.umbral));
+    h += UI.panel('Tiempo de ciclo total por fundo', 'La línea punteada marca la meta (' + DR.num(RES.meta) + ' min).', GRAFICO.barrasFundo(barras, RES.meta));
     h += EVO.panelHtml();
 
     cont.innerHTML = h;
@@ -94,7 +103,7 @@ RES.renderSemana = function (cont) {
         UI.tabla(UI.columnasResumen(), fundos.concat([total]), function (f) { return f.fundo === 'Total general' ? 'fila-total' : 'clicable'; }));
 
       var barras = fundos.map(function (f) { return { etq: f.fundo, valor: f.t_ciclo_total, dec: 1 }; });
-      h += UI.panel('Tiempo de ciclo total por fundo', 'La línea punteada marca el umbral configurado (' + DR.num(RES.umbral) + ' min).', GRAFICO.barrasFundo(barras, RES.umbral));
+      h += UI.panel('Tiempo de ciclo total por fundo', 'La línea punteada marca la meta (' + DR.num(RES.meta) + ' min).', GRAFICO.barrasFundo(barras, RES.meta));
 
       cont.innerHTML = h;
       DR.entrarPaneles('#contenido');
@@ -107,6 +116,14 @@ RES.renderSemana = function (cont) {
       });
     });
   }).catch(function (e) { UI.error(cont, e); });
+};
+
+/** Comentarios de todas las etapas de un ciclo, en una sola celda. */
+RES.OBS = [['obs_cosecha', 'Cosecha'], ['obs_jaba', 'Jabero'], ['obs_moto', 'Moto'], ['obs_traslado_ca', 'Traslado C.A.'],
+  ['obs_jabas_2', 'Descarga'], ['obs_camion', 'Camión'], ['obs_cs', 'C. Sombra'], ['obs_ca', 'C. Acopio']];
+RES.comentarios = function (f) {
+  return RES.OBS.filter(function (o) { return f[o[0]] && String(f[o[0]]).trim(); })
+    .map(function (o) { return '<b>' + o[1] + ':</b> ' + DR.esc(f[o[0]]); }).join('<br>');
 };
 
 RES.renderMuestras = function (cont) {
@@ -136,7 +153,8 @@ RES.renderMuestras = function (cont) {
       { t: 'Código', k: 'codigo' }, { t: 'Lote', k: 'lote' }, { t: 'Líder', k: 'lider' },
       { t: 'Variedad', k: 'variedad' }, { t: 'Calibre', k: 'calibre' }
     ].concat(CAMPOS_RESUMEN.map(function (c) { return { t: c.titulo, num: true, r: function (f) { return DR.num(f[c.clave], 1); } }; }))
-      .concat([{ t: 'Total ciclo (min)', num: true, r: function (f) { return '<b>' + DR.num(f.t_ciclo_total, 1) + '</b>'; } }]);
+      .concat([{ t: 'Total ciclo (min)', num: true, r: function (f) { return '<b>' + DR.num(f.t_ciclo_total, 1) + '</b>'; } },
+        { t: 'Comentarios', r: RES.comentarios }]);
 
     h += UI.panel('Muestras', filas.length + ' registro(s) · las tachadas en rojo se excluyeron del promedio por superar el umbral',
       UI.tabla(cols, filas, function (f) {

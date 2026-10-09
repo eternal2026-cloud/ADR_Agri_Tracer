@@ -97,13 +97,44 @@ GANTT.detalle = function (p) {
 };
 /** El cultivo «-» (icono servicios) es «Sin cultivo». */
 GANTT.nombreCultivo = function (c) { return !c ? '—' : (c.icono === 'servicios' || c.nombre === '-' ? 'Sin cultivo' : c.nombre); };
+/** Líneas «Evaluadas» y «Faltan» de una auditoría programada (lista del cronograma). */
+GANTT.resumenAreas = function (d) {
+  if (!d.total || d.estado === 'Cancelado') return '';
+  var nombres = function (ok) { return d.areas.filter(function (x) { return x.hecho === ok; }).map(function (x) { return DR.esc(x.area.nombre); }).join(', '); };
+  var si = nombres(true), no = nombres(false);
+  return (si ? '<span class="gt-res-si">Evaluadas: ' + si + '</span>' : '') +
+    (no ? '<span class="gt-res-no">Faltan: ' + no + '</span>' : '');
+};
+/** Hoja de solo lectura: estado de cada área en una auditoría programada. */
+GANTT.verAreas = function (p) {
+  if (!p) return;
+  var d = GANTT.detalle(p);
+  var fila = function (x) {
+    var est, sub = '';
+    if (x.hecho) {
+      var sem = x.manual ? x.manual.semana : x.fila.fecha;
+      est = '<span class="gt-ok">' + DR.ICONOS.checkChico + 'Evaluada' + (sem ? ' · S' + S5._p(GANTT.semana(sem)) : '') + '</span>';
+      sub = x.manual ? 'Marcado a mano' : 'Integra · ' + DR.esc(x.fila.codigo) + (x.fila.pct !== null && x.fila.pct !== undefined ? ' · ' + S5.pct(x.fila.pct) : '');
+    } else if (x.manual) est = '<span class="gt-falta">No cumplida</span>';
+    else if (d.estado === 'Atrasado') est = '<span class="gt-falta">Falta · atrasada</span>';
+    else est = '<span class="gt-nada">Falta evaluar</span>';
+    return '<div class="gt-marca-fila"><div><b>' + DR.esc(x.area.nombre) + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</div>' + est + '</div>';
+  };
+  UI.abrirHoja('<div class="asa"></div>' +
+    '<div class="res-estado">' + GANTT.pillEstado(d.estado) + '</div>' +
+    '<div class="res-nombre" style="font-size:24px">' + DR.esc(GANTT.nombreProg(p)) + '</div>' +
+    '<div class="res-dni" style="letter-spacing:0">' + GANTT.textoSemanas(p) + ' · ' + GANTT.rango(p) + ' · ' + d.hechas + ' de ' + d.total + ' áreas evaluadas</div>' +
+    (d.areas.length ? '<div class="gt-marca-lista">' + d.areas.map(fila).join('') + '</div>' : '<div class="aviso" style="margin-top:12px">Este grupo aún no tiene áreas a cumplir.</div>') +
+    '<div class="acciones"><button type="button" class="btn sec" id="gvCerrar" style="flex:1">Cerrar</button></div>');
+  DR.$('#gvCerrar').onclick = UI.cerrarHoja;
+};
 GANTT.pillEstado = function (e) { return '<span class="pill ' + GANTT.ESTADOS[e].pill + '">' + e + '</span>'; };
 GANTT.nombreProg = function (p) { var g = GANTT.grupo(p.grupo_id); return (g ? g.nombre : '—') + ' · ' + p.numero_auditoria + '° auditoría'; };
 
 /* ------------------------------------------------------------ pantalla */
 GANTT.pintar = function (cont) {
   var admin = AT.esAdmin();
-  var h = UI.encabezado('Auditoría 5S', 'Gantt', 'Cronograma de auditorías por cultivo y semana (el día se coordina dentro de la semana).' + (admin ? ' Toca una barra para marcarla y enviar un recordatorio por correo.' : '')) +
+  var h = UI.encabezado('Auditoría 5S', 'Gantt', 'Cronograma de auditorías por cultivo y semana (el día se coordina dentro de la semana).' + (admin ? ' Toca una barra para marcarla y enviar un recordatorio por correo.' : ' Toca una barra para ver qué áreas ya se evaluaron y cuáles faltan.')) +
     '<div class="opciones gt-vistas entra">' +
       '<button type="button" class="opcion' + (GANTT.vista === 'cronograma' ? ' activa' : '') + '" data-gvista="cronograma" style="--c:#0097CE">Cronograma</button>' +
       '<button type="button" class="opcion' + (GANTT.vista === 'areas' ? ' activa' : '') + '" data-gvista="areas" style="--c:#76B729">Áreas por cultivo</button>' +
@@ -200,6 +231,7 @@ GANTT.cronogramaHtml = function () {
         '<div class="gt-item-cuerpo" data-gprog="' + p.id + '"><b>' + DR.esc(g.nombre) + ' · ' + p.numero_auditoria + '° auditoría</b>' +
           '<span>' + GANTT.textoSemanas(p) + ' · ' + GANTT.rango(p) + '</span>' +
           '<span>' + d.hechas + ' de ' + d.total + ' áreas cumplidas' + (p.nota ? ' · ' + DR.esc(p.nota) : '') + '</span>' +
+          GANTT.resumenAreas(d) +
           (p.ultimo_recordatorio ? '<span class="gt-recordado">' + GANTT.ICO_CORREO + 'Recordado ' + DR.hace(p.ultimo_recordatorio) + ' · ' + p.recordatorios + ' envío(s)</span>' : '') +
         '</div><div class="gt-item-der">' + GANTT.pillEstado(d.estado) +
           (AT.esAdmin() ? '<button type="button" class="btn sec mini" data-gmarcar="' + p.id + '">Cumplimiento</button>' : '') +
@@ -259,7 +291,7 @@ GANTT.areasHtml = function () {
 
 /* ------------------------------------------------------------ selección */
 GANTT.alternar = function (id) {
-  if (!AT.esAdmin()) return;
+  if (!AT.esAdmin()) { GANTT.verAreas(GANTT.prog(id)); return; }
   id = Number(id);
   if (GANTT.sel[id]) delete GANTT.sel[id]; else GANTT.sel[id] = true;
   DR.vibrar(12);

@@ -972,6 +972,8 @@ td.mp-sangria{padding-left:26px}
 .gt-item-cuerpo{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px;cursor:pointer}
 .gt-item-cuerpo b{font-size:14.5px;font-weight:500}
 .gt-item-cuerpo span{font-size:12.5px;color:var(--texto-3);line-height:1.4}
+.gt-item-cuerpo .gt-res-si{color:#B7E27C}
+.gt-item-cuerpo .gt-res-no{color:#FFC48A}
 .gt-recordado{display:inline-flex;align-items:center;gap:5px;color:#7FD3F2!important}
 .gt-recordado svg{width:14px;height:14px}
 .gt-item-der{display:flex;flex-direction:column;align-items:flex-end;gap:6px}

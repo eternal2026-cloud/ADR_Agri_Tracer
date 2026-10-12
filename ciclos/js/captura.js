@@ -25,26 +25,28 @@ var ETAPAS = [
     { clave: 'presentacion', tipo: 'lista', lista: 'presentacion', label: 'Presentación' },
     { clave: 'fecha', tipo: 'fecha', label: 'Fecha', medio: true },
     { clave: 'inicio_cosecha', tipo: 'hora', label: 'Inicio cosecha' },
-    { clave: 'fin_cosecha', tipo: 'hora', label: 'Fin cosecha' },
-    { clave: 'obs_cosecha', tipo: 'texto', label: 'Comentario' }
+    { clave: 'fin_cosecha', tipo: 'hora', label: 'Fin cosecha' }
   ] },
   { id: 'jabero', titulo: 'Jabero', corto: 'Jabero', color: '#EF7C3B', campoCierre: 'fin_jabero', campos: [
     { clave: 'inicio_jabero', tipo: 'hora', label: 'Inicio jabero' },
-    { clave: 'fin_jabero', tipo: 'hora', label: 'Fin jabero' },
-    { clave: 'num_jabas', tipo: 'numero', label: 'N° de jabas', medio: true },
-    { clave: 'obs_jaba', tipo: 'texto', label: 'Observación de jaba' }
+    { clave: 'fin_jabero', tipo: 'hora', label: 'Fin jabero' }
   ] },
   { id: 'motocarga', titulo: 'Motocarga', corto: 'Moto', color: '#0097CE', campoCierre: 'fin_carga_moto', campos: [
     { clave: 'hora_llegada_moto', tipo: 'hora', label: 'Llegada de motocarga' },
     { clave: 'inicio_carga_moto', tipo: 'hora', label: 'Inicio carga a motocarga' },
     { clave: 'fin_carga_moto', tipo: 'hora', label: 'Fin carga a motocarga' },
+    { clave: 'num_jabas', tipo: 'numero', label: 'N° de jabas', medio: true },
     { clave: 'placa', tipo: 'texto', label: 'Placa motocarga', medio: true, mayusculas: true },
-    { clave: 'obs_moto', tipo: 'texto', label: 'Comentario' }
+    // La observación se arma sola con las cantidades por presentación (como en la app anterior).
+    { clave: 'obs_jaba', tipo: 'texto', label: 'Observaciones de jaba', auto: true },
+    { clave: 'jabas_bandeja', tipo: 'numero', label: 'Bandeja', desglose: 'BANDEJA' },
+    { clave: 'jabas_jarra', tipo: 'numero', label: 'Jarra 0.5 kg', desglose: 'JARRA 0.5 KG' },
+    { clave: 'jabas_bulk', tipo: 'numero', label: 'Bulk 3.5', desglose: 'BULK 3.5' }
   ] },
   { id: 'traslado_ca', titulo: 'Traslado a Centro de Acopio', corto: 'Traslado', color: '#76B729', campoCierre: 'fin_traslado_ca', campos: [
     { clave: 'inicio_traslado_ca', tipo: 'hora', label: 'Inicio traslado a C.A.' },
-    { clave: 'fin_traslado_ca', tipo: 'hora', label: 'Fin traslado a C.A.' },
-    { clave: 'obs_traslado_ca', tipo: 'texto', label: 'Comentario' }
+    { clave: 'obs_traslado_ca', tipo: 'texto', label: 'Comentario', trasHora: 'inicio_traslado_ca' },
+    { clave: 'fin_traslado_ca', tipo: 'hora', label: 'Fin traslado a C.A.' }
   ] },
   { id: 'descarga_ca', titulo: 'Descarga y armado en C.A.', corto: 'Descarga', color: '#EF7C3B', campoCierre: 'fin_descarga_ca', campos: [
     { clave: 'inicio_descarga_ca', tipo: 'hora', label: 'Inicio descarga y armado' },
@@ -62,9 +64,9 @@ var ETAPAS = [
   ] },
   { id: 'traslado_planta', titulo: 'Traslado a planta', corto: 'Planta', color: '#D9622B', campoCierre: 'fin_traslado_planta', campos: [
     { clave: 'inicio_traslado_planta', tipo: 'hora', label: 'Inicio traslado a planta' },
+    { clave: 'obs_traslado_planta', tipo: 'texto', label: 'Comentario', trasHora: 'inicio_traslado_planta' },
     { clave: 'fin_traslado_planta', tipo: 'hora', label: 'Fin traslado a planta' },
     { clave: 'tareadora', tipo: 'lista', lista: 'tareadora', label: 'Tareadora' },
-    { clave: 'obs_cs', tipo: 'texto', label: 'Observación Casa Sombra' },
     { clave: 'obs_ca', tipo: 'texto', label: 'Observación C. Acopio' }
   ] }
 ];
@@ -446,6 +448,8 @@ CAPTURA.campoHtml = function (c) {
         : '<span class="nota-vacia">Sin opciones. Un administrador puede agregarlas en Config → Listas.</span>') + '</div></div>';
   }
   if (c.tipo === 'fecha') return '<div class="' + clase + '">' + etiqueta + '<input id="' + id + '" type="date" data-campo="' + c.clave + '" value="' + v + '"></div>';
+  if (c.desglose) return '<div class="campo desglose"><label for="' + id + '">' + c.label + '</label><input id="' + id + '" type="number" inputmode="numeric" min="0" step="1" data-campo="' + c.clave + '" value="' + DR.esc(v) + '"></div>';
+  if (c.auto) return '<div class="' + clase + '">' + etiqueta + '<input id="' + id + '" class="auto" data-campo="' + c.clave + '" value="' + DR.esc(v) + '" readonly tabindex="-1" placeholder="Se llena con las cantidades de abajo"></div>';
   if (c.tipo === 'numero') return '<div class="' + clase + '">' + etiqueta + '<input id="' + id + '" type="number" inputmode="numeric" min="0" step="1" data-campo="' + c.clave + '" value="' + DR.esc(v) + '"></div>';
   return '<div class="' + clase + '">' + etiqueta + '<input id="' + id + '" data-campo="' + c.clave + '" value="' + DR.esc(v) + '"' +
     (c.mayusculas ? ' autocapitalize="characters" style="text-transform:uppercase"' : '') + ' autocomplete="off"></div>';
@@ -467,8 +471,9 @@ CAPTURA.pintarCiclo = function (direccion) {
   var pct = !fila ? 0 : (prox < 0 ? 100 : Math.round(prox / (ETAPAS.length - 1) * 100));
   var sub = fila ? [fila.fundo, fila.lote ? 'Lote ' + fila.lote : '', fila.lider].filter(Boolean).map(DR.esc).join(' · ') : 'El código se asigna al guardar';
 
-  var horas = e.campos.filter(function (c) { return c.tipo === 'hora'; });
-  var otros = e.campos.filter(function (c) { return c.tipo !== 'hora'; });
+  // Un comentario con «trasHora» va justo debajo de esa hora; los demás datos, en su bloque.
+  var horas = e.campos.filter(function (c) { return c.tipo === 'hora' || c.trasHora; });
+  var otros = e.campos.filter(function (c) { return c.tipo !== 'hora' && !c.trasHora; });
   var bloqueHoras = '<div class="horas">' + horas.map(CAPTURA.campoHtml).join('') + '</div>';
   var bloqueDatos = otros.length ? '<div class="datos">' + otros.map(CAPTURA.campoHtml).join('') + '</div>' : '';
   var cuerpo = e.id === 'cosecha'
@@ -539,9 +544,22 @@ CAPTURA.enlazarCiclo = function (cont) {
 CAPTURA.alEditar = function (ev) {
   var campo = ev && ev.target && ev.target.getAttribute && ev.target.getAttribute('data-campo');
   if (campo) CAPTURA.cambiados[campo] = true;
+  if (campo && /^jabas_/.test(campo)) CAPTURA.armarObservacion();
   CAPTURA.sucio = true;
   CAPTURA.insistir = false;
   CAPTURA.revisar();
+};
+
+/** Arma «Observaciones de jaba» con las cantidades por presentación: «BANDEJA 3   JARRA 0.5 KG 4 …». */
+CAPTURA.armarObservacion = function () {
+  var e = ETAPAS[CAPTURA.etapaIdx], obs = e.campos.filter(function (c) { return c.auto; })[0];
+  var inp = obs && DR.$('#cp_' + obs.clave);
+  if (!inp) return;
+  inp.value = e.campos.filter(function (c) { return c.desglose; }).map(function (c) {
+    var n = DR.$('#cp_' + c.clave).value;
+    return n === '' ? '' : c.desglose + ' ' + n;
+  }).filter(Boolean).join('   ');
+  CAPTURA.cambiados[obs.clave] = true;
 };
 
 CAPTURA.irEtapa = function (i) {
@@ -734,8 +752,7 @@ CAPTURA.guardar = function (opc) {
     promesa = AT.rpc('rpc_iniciar_ciclo', { p: {
       fecha: v.fecha || CAPTURA.hoyLocal(), fundo: v.fundo, lote: v.lote || null, lider: v.lider || null,
       presentacion: v.presentacion || null, variedad: v.variedad || null, calibre: v.calibre || null,
-      inicio_cosecha: CAPTURA.aIso(v.inicio_cosecha), fin_cosecha: CAPTURA.aIso(v.fin_cosecha),
-      obs_cosecha: v.obs_cosecha || null
+      inicio_cosecha: CAPTURA.aIso(v.inicio_cosecha), fin_cosecha: CAPTURA.aIso(v.fin_cosecha)
     } });
   } else {
     // Solo los campos que tocó esta persona: lo que otra registró en el mismo ciclo no se pisa.

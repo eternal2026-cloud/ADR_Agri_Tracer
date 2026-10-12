@@ -199,7 +199,7 @@ RES.renderLotes = function (cont) {
 /* ============================================================ MUESTRAS (detalle) */
 /** Comentarios de todas las etapas de un ciclo, en una sola celda. */
 RES.OBS = [['obs_cosecha', 'Cosecha'], ['obs_jaba', 'Jabero'], ['obs_moto', 'Moto'], ['obs_traslado_ca', 'Traslado C.A.'],
-  ['obs_jabas_2', 'Descarga'], ['obs_camion', 'Camión'], ['obs_cs', 'C. Sombra'], ['obs_ca', 'C. Acopio']];
+  ['obs_jabas_2', 'Descarga'], ['obs_camion', 'Camión'], ['obs_traslado_planta', 'Traslado planta'], ['obs_cs', 'C. Sombra'], ['obs_ca', 'C. Acopio']];
 RES.comentarios = function (f) {
   return RES.OBS.filter(function (o) { return f[o[0]] && String(f[o[0]]).trim(); })
     .map(function (o) { return '<b>' + o[1] + ':</b> ' + DR.esc(f[o[0]]); }).join('<br>');

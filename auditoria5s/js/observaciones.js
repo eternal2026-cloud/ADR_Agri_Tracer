@@ -258,14 +258,15 @@ OBS.pintarDetalle = function (o, a, segs, opc) {
   var figura = function (titulo, tipo) {
     var fotos = S5.fotosDe(o, tipo);
     return fotos.length
-      ? '<figure>' + FOTOS.galeriaHtml(fotos, 'foto-grupo') + '<figcaption>' + titulo + (fotos.length > 1 ? ' (' + fotos.length + ')' : '') + '</figcaption></figure>'
+      ? '<figure>' + FOTOS.galeriaHtml(fotos, 'foto-grupo', puede) + '<figcaption>' + titulo + (fotos.length > 1 ? ' (' + fotos.length + ')' : '') + '</figcaption></figure>'
       : '<figure class="sin-foto"><span>' + FOTOS.ICONO + 'Sin foto</span><figcaption>' + titulo + '</figcaption></figure>';
   };
   var linea = segs.map(function (sg) {
     var cambios = (sg.cambios_puntaje || []).map(function (c) {
       return c.s + 'S-' + c.numero + ': ' + S5.numPuntaje(c.antes) + ' → ' + S5.numPuntaje(c.despues);
     }).join(' · ');
-    var suyas = (sg.fotos && sg.fotos.length ? sg.fotos : [sg.foto]).filter(function (r) { return r && S5.fotosDe(o, 'antes').indexOf(r) < 0; });
+    // Solo las «Después» que la observación aún tiene: las «Antes» ya se ven arriba y las borradas no se muestran.
+    var suyas = (sg.fotos && sg.fotos.length ? sg.fotos : [sg.foto]).filter(function (r) { return r && S5.fotosDe(o, 'despues').indexOf(r) > -1; });
     var foto = suyas.length ? FOTOS.galeriaHtml(suyas, 'foto-grupo chico') : '';
     return '<li style="--c:' + (S5.COLOR_ESTADO[sg.estado_nuevo] || '#A89A8C') + '">' +
       '<span class="lt-fecha">' + DR.fechaHora(sg.fecha) + (sg.usuario_nombre ? ' · ' + DR.esc(sg.usuario_nombre) : '') + '</span>' +
@@ -291,6 +292,12 @@ OBS.pintarDetalle = function (o, a, segs, opc) {
       (editable ? '<button type="button" class="btn sec" id="btnEditarObs">Editar</button>' : '') + '</div>' +
     '<button type="button" class="res-cerrar-sec" id="btnCerrarObs">Cerrar</button>');
   FOTOS.pintar('#hojaTarjeta');
+  FOTOS.enlazarBorrar('#hojaTarjeta', function (ruta) {
+    return OBS.borrarFoto(o, ruta).then(function (n) {
+      if (opc.alCambiar) opc.alCambiar(n);
+      OBS.abrirDetalle(n, opc);
+    });
+  });
   DR.$('#btnCerrarObs').onclick = UI.cerrarHoja;
   if (DR.$('#btnSeguimiento')) DR.$('#btnSeguimiento').onclick = function () { OBS.abrirSeguimiento(o, a, opc); };
   if (DR.$('#btnEditarObs')) DR.$('#btnEditarObs').onclick = function () {
@@ -299,6 +306,16 @@ OBS.pintarDetalle = function (o, a, segs, opc) {
       OBS.abrirDetalle(n, opc);
     } });
   };
+};
+
+/** Borra una foto «Antes» o «Después» (sin plazo; queda en bitácora) → la observación actualizada. */
+OBS.borrarFoto = function (o, ruta) {
+  return AT.rpc('rpc_s5_obs_quitar_foto', { p_observacion: o.id, p_ruta: ruta }).then(function (n) {
+    DR.vibrar(30);
+    DR.toast('Foto borrada de la observación N° ' + n.numero + '.');
+    if (OBS.lista.length) OBS.reemplazar(n);
+    return n;
+  });
 };
 
 /* ============================================================ REGISTRO / EDICIÓN */

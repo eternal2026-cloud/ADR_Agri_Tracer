@@ -5,6 +5,7 @@
  * área y sus fotos Antes / Después, para puntuar con la evidencia a la vista.
  * Desde el panel se agregan fotos «Antes» a una observación ya registrada
  * (rpc_s5_obs_actualizar, sin plazo: solo suma evidencia) o se registra una nueva.
+ * La ✕ de cada foto la borra (rpc_s5_obs_quitar_foto, sin plazo).
  * «Cargar pendientes de una auditoría pasada» (obs-pasadas.js) sube el Excel manual.
  * En pantallas anchas el panel no tapa el checklist: se puede puntuar con él abierto.
  * ==========================================================================*/
@@ -113,6 +114,10 @@ PFOT.pintar = function () {
       if (o && archivos.length) PFOT.subir(o, archivos);
     };
   });
+  FOTOS.enlazarBorrar(c, function (ruta) {
+    var o = AUD.obsArea.filter(function (x) { return S5.fotosDe(x, 'antes').concat(S5.fotosDe(x, 'despues')).indexOf(ruta) > -1; })[0];
+    return o ? OBS.borrarFoto(o, ruta).then(PFOT.alCambiar) : null;
+  });
   DR.$$('[data-detalle]', c).forEach(function (b) {
     b.onclick = function () {
       var id = this.getAttribute('data-detalle'), o = AUD.obsArea.filter(function (x) { return x.id === id; })[0];
@@ -128,8 +133,8 @@ PFOT.tarjeta = function (o, puede) {
     '<div class="obs-top"><b>N° ' + o.numero + (PFOT.deZona(o) ? '' : ' · ' + DR.esc(S5.nombreZona(z))) +
       (o.s_referencia ? ' · ' + o.s_referencia + 'S' : '') + (o.importada ? ' · auditoría pasada' : '') + '</b>' + S5.pillEstado(o.estado) + '</div>' +
     '<button type="button" class="pf-texto" data-detalle="' + o.id + '">' + DR.esc(DR.recortar(o.descripcion, 200)) + '</button>' +
-    '<div class="pf-fotos"><span class="pf-etq">Antes · ' + antes.length + '</span>' + (FOTOS.galeriaHtml(antes, 'foto-grupo pf') || '<em>Sin fotos</em>') + '</div>' +
-    (despues.length ? '<div class="pf-fotos"><span class="pf-etq">Después · ' + despues.length + '</span>' + FOTOS.galeriaHtml(despues, 'foto-grupo pf') + '</div>' : '') +
+    '<div class="pf-fotos"><span class="pf-etq">Antes · ' + antes.length + '</span>' + (FOTOS.galeriaHtml(antes, 'foto-grupo pf', puede) || '<em>Sin fotos</em>') + '</div>' +
+    (despues.length ? '<div class="pf-fotos"><span class="pf-etq">Después · ' + despues.length + '</span>' + FOTOS.galeriaHtml(despues, 'foto-grupo pf', puede) + '</div>' : '') +
     (puede ? (lleno ? '<div class="ayuda-campo">Ya tiene ' + FOTOS.MAX + ' fotos «Antes» (el máximo).</div>'
       : '<label class="btn sec chico pf-subir' + (subiendo ? ' cargando' : '') + '" data-subir="' + o.id + '">' +
         '<input type="file" accept="image/*" capture="environment" multiple>' + FOTOS.ICONO +

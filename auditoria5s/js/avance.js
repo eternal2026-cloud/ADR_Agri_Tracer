@@ -236,7 +236,8 @@ AV.huellaRuta = function (ruta) {
  *   rutas  → fotos que la observación ya tiene (mismo tipo);
  *   ajenas → [{ ruta, o }] fotos de otras observaciones: si una foto del Excel es una de ellas, quedó
  *            en esta fila por error (p. ej. al borrar la fila de arriba) y NO se agrega.
- * → { nuevas: [Blob], reemplazos: [{ de, blob, cambiada }], deOtras: [obs], sobran, ilegibles }.
+ *            Con quitada: true es una foto que se borró en la app: tampoco se vuelve a subir.
+ * → { nuevas: [Blob], reemplazos: [{ de, blob, cambiada }], deOtras: [obs], sobran, ilegibles, quitadas }.
  * Una foto que la app ya tiene pero que en el Excel lleva figuras encima (o recorte) la reemplaza.
  * Una foto de la app que no está en el Excel, cuando la celda trae otra que la app no tiene, se
  * cambia por esa (cambiada: true): el Excel manda (p. ej. se registró con la foto equivocada).
@@ -244,7 +245,7 @@ AV.huellaRuta = function (ruta) {
 AV.fotosNuevas = function (fotos, rutas, ajenas) {
   fotos = (fotos || []).map(AV.comoFoto);
   ajenas = ajenas || [];
-  var vacio = { nuevas: [], reemplazos: [], deOtras: [], sobran: 0, ilegibles: 0 };
+  var vacio = { nuevas: [], reemplazos: [], deOtras: [], sobran: 0, ilegibles: 0, quitadas: 0 };
   if (!fotos.length) return Promise.resolve(vacio);
   return Promise.all([
     Promise.all(fotos.map(function (f) { return AV.huella(f.blob); })),
@@ -257,13 +258,18 @@ AV.fotosNuevas = function (fotos, rutas, ajenas) {
     var minimo = function (h, lista) {
       return lista.reduce(function (m, x, j) { var d = x ? AV.distancia(x, h) : 99; return d < m.d ? { d: d, j: j } : m; }, { d: 99, j: -1 });
     };
-    var deOtras = [], dueno = {}, reemplazos = [], nuevas = [], vistas = [];
+    var deOtras = [], dueno = {}, reemplazos = [], nuevas = [], vistas = [], quitadas = 0;
     // 1) Foto de otra observación (más parecida a una ajena que a cualquiera propia): no es de esta fila.
+    //    Foto borrada en la app (y sin otra parecida que la app conserve): no se vuelve a subir.
     var quedan = [];
     fotos.forEach(function (f, i) {
       if (!hs[i]) return;
       var aj = minimo(hs[i], ha), pr = minimo(hs[i], propias.map(function (x) { return x.h; }));
-      if (aj.d <= 6 && aj.d < pr.d) { if (deOtras.indexOf(ajenas[aj.j].o) < 0) deOtras.push(ajenas[aj.j].o); return; }
+      if (aj.d <= 6 && aj.d < pr.d) {
+        var x = ajenas[aj.j];
+        if (!x.quitada) { if (deOtras.indexOf(x.o) < 0) deOtras.push(x.o); return; }
+        if (pr.d > 10) { quitadas++; return; }
+      }
       quedan.push(i);
     });
     // 2) Fotos que la app ya tiene: se emparejan de la más parecida a la menos, una con una.
@@ -286,7 +292,7 @@ AV.fotosNuevas = function (fotos, rutas, ajenas) {
       else nuevas.push(fotos[i].final);
     });
     var cupo = Math.max(0, FOTOS.MAX - rutas.length);
-    return { nuevas: nuevas.slice(0, cupo), reemplazos: reemplazos, deOtras: deOtras, sobran: Math.max(0, nuevas.length - cupo), ilegibles: ilegibles };
+    return { nuevas: nuevas.slice(0, cupo), reemplazos: reemplazos, deOtras: deOtras, sobran: Math.max(0, nuevas.length - cupo), ilegibles: ilegibles, quitadas: quitadas };
   });
 };
 
@@ -606,8 +612,9 @@ AV.compararObs = function (t, aud, notas, plan) {
   var antesApp = S5.fotosDe(o, 'antes'), despuesApp = S5.fotosDe(o, 'despues');
   // Siempre se comparan las fotos de la celda con las de la app: aunque haya la misma cantidad,
   // una puede ser distinta (registrada con la foto equivocada) o traer figuras encima.
+  var ajenas = (t.ajenas || []).concat((o.fotos_quitadas || []).map(function (ruta) { return { ruta: ruta, o: o, quitada: true }; }));
   var revisar = function (fotos, app) {
-    return fotos.length ? AV.fotosNuevas(fotos, app, t.ajenas) : { nuevas: [], reemplazos: [], deOtras: [], sobran: 0 };
+    return fotos.length ? AV.fotosNuevas(fotos, app, ajenas) : { nuevas: [], reemplazos: [], deOtras: [], sobran: 0 };
   };
   return Promise.all([revisar(t.fAntes, antesApp), revisar(t.fDespues, despuesApp)]).then(function (r) {
     AV.avisoAjenas(plan, t.ref + ' (N° ' + o.numero + ')', r[0]);
@@ -619,6 +626,8 @@ AV.compararObs = function (t, aud, notas, plan) {
       if (fig) cambios.push(fig + ' foto(s) «' + x[1] + '» con figuras (reemplaza a la original)');
       if (dist) cambios.push(dist + ' foto(s) «' + x[1] + '» distinta(s) a la de la app: se cambia por la del Excel');
     });
+    if (r[0].quitadas || r[1].quitadas) plan.avisos.push(t.ref + ' (N° ' + o.numero + '): ' + ((r[0].quitadas || 0) + (r[1].quitadas || 0)) +
+      ' foto(s) de la celda ya se borraron en la app: no se vuelven a subir. Si sí van, agrégalas desde la app.');
     if (r[0].sobran || r[1].sobran) plan.avisos.push(t.ref + ' (N° ' + o.numero + '): hay más fotos de las que caben (máximo ' + FOTOS.MAX + ' por tipo); se agregan las primeras.');
     if (r[0].ilegibles || r[1].ilegibles) plan.avisos.push(t.ref + ' (N° ' + o.numero + '): ' + ((r[0].ilegibles || 0) + (r[1].ilegibles || 0)) + ' imagen(es) en un formato que el navegador no lee (p. ej. EMF). Pégalas como JPG o PNG.');
     if (!cambios.length) return;

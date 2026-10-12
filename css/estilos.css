@@ -594,6 +594,11 @@ tr.fila-cerca td{background:#23170E}
 .foto-grupo img{flex:1 1 44%;aspect-ratio:1;border-radius:14px;object-fit:cover;background:#130F0C;border:1px solid var(--borde);cursor:zoom-in}
 .foto-grupo.chico img{flex:0 0 56px;width:56px;height:56px;border-radius:9px;aspect-ratio:auto}
 .foto-con-n{position:relative;display:block}
+.foto-borrable{position:relative;display:block}
+.foto-borrable img,.foto-grupo .foto-borrable img,.foto-grupo.pf .foto-borrable img{display:block;width:100%;flex:none}
+.foto-grupo .foto-borrable{flex:1 1 44%}
+.foto-grupo.pf .foto-borrable{flex:0 0 calc(33.333% - 3px);width:calc(33.333% - 3px)}
+.foto-quitar.confirmar{width:auto;padding:0 10px;border-radius:13px;background:#C0392B;font:600 12.5px/1 var(--fuente)}
 .foto-con-n i{position:absolute;right:-4px;top:-4px;z-index:2;min-width:19px;height:19px;padding:0 4px;border-radius:10px;background:var(--dr-naranja);color:#14100C;font-size:11px;font-weight:700;font-style:normal;display:flex;align-items:center;justify-content:center}
 .visor-paso{position:absolute;top:50%;transform:translateY(-50%);width:46px;height:46px;border:0;border-radius:50%;background:rgba(255,255,255,.14);color:#fff;font-size:26px;line-height:1;cursor:pointer}
 .visor-paso.izq{left:10px}

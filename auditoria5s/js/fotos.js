@@ -77,14 +77,48 @@ FOTOS.subirLista = function (lista, base) {
   })).then(function (rutas) { return rutas.filter(Boolean); });
 };
 
-/** Miniaturas de varias rutas; al tocarlas se abre el visor con navegación. */
-FOTOS.galeriaHtml = function (rutas, clase) {
+/** Miniaturas de varias rutas; al tocarlas se abre el visor con navegación.
+    Con `borrar`, cada foto lleva ✕ (ver FOTOS.enlazarBorrar). */
+FOTOS.galeriaHtml = function (rutas, clase, borrar) {
   var lista = (rutas || []).filter(Boolean);
   if (!lista.length) return '';
   var todas = lista.join('|');
-  return '<span class="' + (clase || 'foto-galeria') + '">' + lista.map(function (r) {
-    return '<img alt="" data-foto="' + DR.esc(r) + '" data-ver="' + DR.esc(r) + '" data-galeria="' + DR.esc(todas) + '">';
+  return '<span class="' + (clase || 'foto-galeria') + '">' + lista.map(function (r, i) {
+    var img = '<img alt="" data-foto="' + DR.esc(r) + '" data-ver="' + DR.esc(r) + '" data-galeria="' + DR.esc(todas) + '">';
+    return borrar ? '<span class="foto-borrable">' + img + '<button type="button" class="foto-quitar" data-borrar-foto="' + DR.esc(r) +
+      '" aria-label="Borrar foto ' + (i + 1) + '">✕</button></span>' : img;
   }).join('') + '</span>';
+};
+
+/** ✕ de las galerías con `borrar`: el primer toque pide confirmar («¿Borrar?») y el segundo llama
+    alBorrar(ruta, boton), que devuelve una promesa. */
+FOTOS.enlazarBorrar = function (raiz, alBorrar) {
+  var cont = typeof raiz === 'string' ? DR.$(raiz) : raiz;
+  if (!cont) return;
+  DR.$$('[data-borrar-foto]', cont).forEach(function (b) {
+    b.onclick = function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      var btn = this;
+      if (btn.disabled) return;
+      if (!btn.classList.contains('confirmar')) {
+        btn.classList.add('confirmar');
+        btn.textContent = '¿Borrar?';
+        clearTimeout(btn._t);
+        btn._t = setTimeout(function () { btn.classList.remove('confirmar'); btn.textContent = '✕'; }, 3500);
+        return;
+      }
+      clearTimeout(btn._t);
+      btn.disabled = true;
+      btn.textContent = '…';
+      Promise.resolve(alBorrar(btn.getAttribute('data-borrar-foto'), btn)).catch(function (e) {
+        btn.disabled = false;
+        btn.classList.remove('confirmar');
+        btn.textContent = '✕';
+        DR.toast('No se borró la foto: ' + e.message, 'error');
+      });
+    };
+  });
 };
 
 /** Enlaza un campo de foto: al elegir, comprime y guarda el Blob en estado.blob (y olvida la ruta ya subida). */

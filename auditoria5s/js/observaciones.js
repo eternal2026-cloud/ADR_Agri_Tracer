@@ -260,9 +260,15 @@ OBS.pintarDetalle = function (o, a, segs, opc) {
   var editable = puede && (AT.esAdmin() || S5.enPlazoObs(o));
   var figura = function (titulo, tipo) {
     var fotos = S5.fotosDe(o, tipo);
-    return fotos.length
-      ? '<figure>' + FOTOS.galeriaHtml(fotos, 'foto-grupo', puede) + '<figcaption>' + titulo + (fotos.length > 1 ? ' (' + fotos.length + ')' : '') + '</figcaption></figure>'
-      : '<figure class="sin-foto"><span>' + FOTOS.ICONO + 'Sin foto</span><figcaption>' + titulo + '</figcaption></figure>';
+    // «Después» se agrega aquí mismo, sin abrir «Registrar seguimiento» (queda como un seguimiento con foto).
+    var agregar = tipo === 'despues' && puede
+      ? '<label class="foto-carga chica obs-agregar-despues" id="detFotoZona"><input type="file" accept="image/*" capture="environment" multiple id="detFoto">' +
+        '<span class="foto-prev">' + FOTOS.ICONO + '</span><span class="foto-txt"><b>Agregar foto</b><span>' +
+        (fotos.length ? fotos.length + ' de ' + FOTOS.MAX : 'Evidencia del levantamiento') + '</span></span></label>'
+      : '';
+    return (fotos.length
+      ? '<figure>' + FOTOS.galeriaHtml(fotos, 'foto-grupo', puede) + '<figcaption>' + titulo + (fotos.length > 1 ? ' (' + fotos.length + ')' : '') + '</figcaption>'
+      : '<figure class="sin-foto"><span>' + FOTOS.ICONO + 'Sin foto</span><figcaption>' + titulo + '</figcaption>') + agregar + '</figure>';
   };
   var linea = segs.map(function (sg) {
     var cambios = (sg.cambios_puntaje || []).map(function (c) {
@@ -274,7 +280,8 @@ OBS.pintarDetalle = function (o, a, segs, opc) {
     return '<li style="--c:' + (S5.COLOR_ESTADO[sg.estado_nuevo] || '#A89A8C') + '">' +
       '<span class="lt-fecha">' + DR.fechaHora(sg.fecha) + (sg.usuario_nombre ? ' · ' + DR.esc(sg.usuario_nombre) : '') + '</span>' +
       '<b>' + (sg.estado_anterior && sg.estado_anterior !== sg.estado_nuevo ? DR.esc(sg.estado_anterior) + ' → ' : '') + DR.esc(sg.estado_nuevo) + '</b>' +
-      (sg.nota ? '<span>' + DR.esc(sg.nota) + '</span>' : '') +
+      (sg.nota ? '<span class="lt-nota" id="ltNota' + sg.id + '">' + DR.esc(sg.nota) + '</span>' : '') +
+      (editable && sg.nota && OBS.notaEditable(sg) ? '<button type="button" class="lt-editar" data-editar-nota="' + sg.id + '">Editar nota</button>' : '') +
       (cambios ? '<span class="lt-cambio">Puntaje corregido · ' + DR.esc(cambios) + '</span>' : '') + foto + '</li>';
   }).join('');
 
@@ -302,12 +309,86 @@ OBS.pintarDetalle = function (o, a, segs, opc) {
     });
   });
   DR.$('#btnCerrarObs').onclick = UI.cerrarHoja;
+  OBS.enlazarFotoDespues(o, opc);
+  DR.$$('[data-editar-nota]', DR.$('#hojaTarjeta')).forEach(function (b) {
+    b.onclick = function () {
+      var id = Number(this.getAttribute('data-editar-nota'));
+      OBS.editarNota(o, segs.filter(function (sg) { return Number(sg.id) === id; })[0], this, opc);
+    };
+  });
   if (DR.$('#btnSeguimiento')) DR.$('#btnSeguimiento').onclick = function () { OBS.abrirSeguimiento(o, a, opc); };
   if (DR.$('#btnEditarObs')) DR.$('#btnEditarObs').onclick = function () {
-    OBS.abrirFormulario({ auditoria: a.id ? a : null, zona: z, observacion: o, detalle: opc, alGuardar: function (n) {
+    OBS.abrirFormulario({ auditoria: a.id ? a : null, zona: z, observacion: o, detalle: opc, notas: segs.filter(function (sg) { return sg.nota && OBS.notaEditable(sg); }).map(function (sg) { return sg.nota; }), alGuardar: function (n) {
       if (opc.alCambiar) opc.alCambiar(n);
       OBS.abrirDetalle(n, opc);
     } });
+  };
+};
+
+/** «Registro inicial» lo crea el sistema; las demás notas se corrigen (la tabla y el Excel las muestran tras la acción). */
+OBS.notaEditable = function (sg) { return !(sg.nota === 'Registro inicial' && !sg.estado_anterior); };
+
+/** Edición en línea de la nota de un seguimiento; vacía, la quita. */
+OBS.editarNota = function (o, sg, boton, opc) {
+  if (!sg) return;
+  var span = DR.$('#ltNota' + sg.id), caja = document.createElement('div');
+  caja.className = 'lt-edicion';
+  caja.innerHTML = '<textarea rows="3" aria-label="Nota del seguimiento">' + DR.esc(sg.nota || '') + '</textarea>' +
+    '<div class="ayuda-campo">Déjala vacía para quitarla. En la tabla y el Excel va después de la acción correctiva.</div>' +
+    '<div class="acciones"><button type="button" class="btn sec chico" data-nota-cancelar>Cancelar</button>' +
+    '<button type="button" class="btn verde chico" data-nota-guardar style="flex:1">Guardar nota</button></div>';
+  span.style.display = 'none';
+  boton.style.display = 'none';
+  boton.parentNode.insertBefore(caja, boton.nextSibling);
+  var txt = DR.$('textarea', caja);
+  txt.focus();
+  DR.$('[data-nota-cancelar]', caja).onclick = function () { caja.remove(); span.style.display = ''; boton.style.display = ''; };
+  DR.$('[data-nota-guardar]', caja).onclick = function () {
+    var btn = this;
+    btn.disabled = true;
+    btn.textContent = 'Guardando…';
+    AT.rpc('rpc_s5_editar_nota_seguimiento', { p_seguimiento: sg.id, p_nota: txt.value.trim() }).then(function () {
+      DR.vibrar(30);
+      DR.toast('Nota actualizada.');
+      // La nota forma parte de «Acción correctiva» en la tabla: se vuelve a pedir.
+      delete OBS.notas[o.id];
+      if (OBS.lista.length) OBS.reemplazar(OBS.buscar(o.id) || o);
+      if (opc.alCambiar) opc.alCambiar(o);
+      OBS.abrirDetalle(o, opc);
+    }).catch(function (e) {
+      btn.disabled = false;
+      btn.textContent = 'Reintentar';
+      DR.toast('No se guardó la nota: ' + e.message, 'error');
+    });
+  };
+};
+
+/** Fotos «Después» desde el detalle: se suben y quedan como un seguimiento sin cambio de estado. */
+OBS.enlazarFotoDespues = function (o, opc) {
+  var inp = DR.$('#detFoto'), zona = DR.$('#detFotoZona');
+  if (!inp) return;
+  inp.onchange = function () {
+    var archivos = Array.prototype.slice.call(this.files || []).slice(0, FOTOS.MAX);
+    this.value = '';
+    if (!archivos.length) return;
+    zona.classList.add('cargando');
+    DR.$('.foto-txt span', zona).textContent = 'Subiendo ' + archivos.length + ' foto(s)…';
+    var base = 'obs/' + (S5.cultivoDeObs(o) || 0) + '/' + o.zona_id + '/' + o.id + '-despues';
+    Promise.all(archivos.map(function (a) { return FOTOS.comprimir(a); })).then(function (blobs) {
+      return FOTOS.subirLista(blobs.map(function (b) { return { blob: b, ruta: null }; }), base);
+    }).then(function (rutas) {
+      return AT.rpc('rpc_s5_seguimiento', { p_observacion: o.id, p_estado: o.estado, p_nota: null, p_foto: null, p_cambios: [], p_fotos: rutas });
+    }).then(function (res) {
+      DR.vibrar(40);
+      DR.toast('Foto «Después» agregada a la observación N° ' + res.observacion.numero + '.');
+      if (OBS.lista.length) OBS.reemplazar(res.observacion);
+      if (opc.alCambiar) opc.alCambiar(res.observacion, res);
+      OBS.abrirDetalle(res.observacion, opc);
+    }).catch(function (e) {
+      zona.classList.remove('cargando');
+      DR.$('.foto-txt span', zona).textContent = 'No se subió · toca para reintentar';
+      DR.toast('No se agregó la foto: ' + e.message, 'error');
+    });
   };
 };
 
@@ -334,6 +415,7 @@ OBS.abrirFormulario = function (opc) {
     areaId: (z ? z.area_id : null) || opc.areaId || '', zonaId: z ? z.id : ''
   };
   if (o) st.fotos = S5.fotosDe(o, 'antes').map(function (r) { return { ruta: r }; });
+  var notas = o ? (opc.notas || OBS.notas[o.id] || []) : [];
   var chipsS = [{ v: '', t: 'Ninguna' }].concat([1, 2, 3, 4, 5].map(function (s) { return { v: s, t: s + 'S' }; }));
   var op = function (valor, texto, actual) {
     return '<option value="' + DR.esc(valor) + '"' + (String(valor) === String(actual) ? ' selected' : '') + '>' + DR.esc(texto) + '</option>';
@@ -354,7 +436,9 @@ OBS.abrirFormulario = function (opc) {
       '<div class="campo ancho"><label for="obsDesc">Observación<em>obligatorio</em></label>' +
         '<textarea id="obsDesc" rows="3" placeholder="Ej. Jabas con precintos sin identificar ni delimitar.">' + DR.esc(o ? o.descripcion : '') + '</textarea></div>' +
       '<div class="campo ancho"><label for="obsAccion">Acción correctiva</label>' +
-        '<textarea id="obsAccion" rows="2" placeholder="Ej. Rotular la jaba con el formato estandarizado.">' + DR.esc(o ? (o.accion_correctiva || '') : '') + '</textarea></div>' +
+        '<textarea id="obsAccion" rows="2" placeholder="Ej. Rotular la jaba con el formato estandarizado.">' + DR.esc(o ? (o.accion_correctiva || '') : '') + '</textarea>' +
+        (notas.length ? '<div class="ayuda-campo">En la tabla y el Excel se agregan también las notas de seguimiento: «' +
+          DR.esc(notas.join(' // ')) + '». Corrígelas con «Editar nota» en el seguimiento del detalle.</div>' : '') + '</div>' +
       (o ? '' : '<div class="campo ancho"><label>Estado inicial</label><div class="opciones" id="obsEstado">' +
         ['Pendiente', 'Recomendación'].map(function (e) {
           return '<button type="button" class="opcion' + (e === st.estado ? ' activa' : '') + '" data-valor="' + e + '" style="--c:' + S5.COLOR_ESTADO[e] + '">' + e + '</button>';

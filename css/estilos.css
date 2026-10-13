@@ -566,8 +566,8 @@ tr.fila-cerca td{background:#23170E}
 .fotos-par figure{margin:0}
 .fotos-par img{display:block;width:100%;aspect-ratio:1;object-fit:cover;border-radius:14px;border:1px solid var(--borde);background:#130F0C;cursor:zoom-in}
 .fotos-par figcaption{font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--texto-3);margin-top:5px;font-weight:500}
-.fotos-par .sin-foto span{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;aspect-ratio:1;border-radius:14px;border:1.5px dashed #4A3E34;color:var(--texto-3);font-size:13px}
-.fotos-par .sin-foto svg{width:28px;height:28px}
+.fotos-par .sin-foto > span{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;aspect-ratio:1;border-radius:14px;border:1.5px dashed #4A3E34;color:var(--texto-3);font-size:13px}
+.fotos-par .sin-foto > span svg{width:28px;height:28px}
 #visorFoto{position:fixed;inset:0;z-index:90;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:16px;background:rgba(5,4,3,.94);cursor:zoom-out}
 #visorFoto img{max-width:100%;max-height:86vh;border-radius:12px;object-fit:contain}
 #visorFoto span{font-size:13px;color:var(--texto-3)}
@@ -579,6 +579,13 @@ tr.fila-cerca td{background:#23170E}
 .lt-fecha{font-size:12px;color:var(--texto-3)}
 .lt-cambio{color:#FBE3A6}
 .linea-tiempo .foto-mini{width:64px;height:64px;cursor:zoom-in}
+.lt-editar{align-self:flex-start;background:none;border:1px solid var(--borde);border-radius:8px;color:var(--texto-2);font:inherit;font-size:12px;padding:3px 9px;margin-top:2px;cursor:pointer}
+.lt-editar:hover{border-color:#F8B68A;color:#F8B68A}
+.lt-edicion{display:grid;gap:6px;margin-top:4px}
+.lt-edicion textarea{width:100%;box-sizing:border-box}
+.lt-edicion .acciones{margin-top:2px}
+.fotos-par .obs-agregar-despues{margin-top:8px;padding:7px 10px;font-size:13px}
+.fotos-par .obs-agregar-despues .foto-prev svg{width:20px;height:20px}
 
 /* ---- varias fotos por observación (hasta 6) */
 .foto-multi{display:flex;flex-direction:column;gap:8px}

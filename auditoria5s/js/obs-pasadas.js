@@ -64,11 +64,6 @@ OPAS.analizar = function (archivo, fechaDefecto, progreso) {
   var a = AUD.aud, area = S5.area(a.area_id) || {}, buf, wb, enCelda, filas = [];
   var plan = { filas: [], avisos: [], otras: 0, hojas: 0 };
   var zonasArea = S5.zonasDe(a.area_id, true, a.cultivo_id);
-  var buscarZona = function (txt) {
-    var t = String(txt || '').trim(), num = t.match(/^(\d+)\s*(?:[.\-)]|$)/), n = AV.norm(t.replace(/^\s*\d+\s*[.\-)]?\s*/, ''));
-    return (n && zonasArea.filter(function (z) { return AV.norm(z.nombre) === n; })[0]) ||
-      (num && zonasArea.filter(function (z) { return z.numero === Number(num[1]); })[0]) || null;
-  };
 
   return archivo.arrayBuffer().then(function (b) {
     buf = b;
@@ -100,16 +95,16 @@ OPAS.analizar = function (archivo, fechaDefecto, progreso) {
         if (c.area && AV.norm(val(f, 'area')) && AV.norm(val(f, 'area')) !== AV.norm(area.nombre)) { plan.otras++; continue; }
         var ref = '«' + ws.name + '» fila ' + n;
         if (!desc) { plan.avisos.push(ref + ': sin texto de observación. Se omite.'); continue; }
-        var z = buscarZona(zonaTxt);
+        var hallada = AV.buscarZona(zonaTxt, zonasArea, area), z = hallada && hallada.z;
         if (!z) { plan.avisos.push(ref + ': la zona «' + zonaTxt + '» no existe en ' + area.nombre + '. Agrégala o corrige el nombre.'); continue; }
+        if (hallada.aprox) plan.avisos.push(ref + ': zona «' + zonaTxt + '» tomada como ' + S5.nombreZona(z) + ' (coincidencia aproximada).');
         if (!z.activo) { plan.avisos.push(ref + ': la zona ' + S5.nombreZona(z) + ' está desactivada. Se omite.'); continue; }
         var estadoTxt = AV.texto(val(f, 'estado')), estado = AV.estado(estadoTxt);
         if (estado === undefined) { plan.avisos.push(ref + ': estado «' + estadoTxt + '» no reconocido; se carga como Pendiente.'); estado = null; }
         var fecha = AV.iso(val(f, 'fecha de registro'));
         if (fecha && fecha > S5.hoy()) { plan.avisos.push(ref + ': la fecha ' + S5.fecha(fecha) + ' está en el futuro. Se omite.'); continue; }
-        // «Acción // nota // nota»: la primera parte es la acción y el resto, notas de seguimiento.
-        var partes = AV.texto(val(f, 'accion correctiva')).split(/\s*\/\/\s*/).map(function (x) { return x.trim(); }).filter(Boolean);
-        filas.push({ ref: ref, z: z, num: AV.numero(val(f, 'n')), desc: desc, accion: partes[0] || '', notas: partes.slice(1),
+        // La celda completa es la acción correctiva (ya no hay notas de seguimiento).
+        filas.push({ ref: ref, z: z, num: AV.numero(val(f, 'n')), desc: desc, accion: AV.texto(val(f, 'accion correctiva')),
           estado: estado || 'Pendiente', fecha: fecha, sinFecha: !fecha, cierre: AV.iso(val(f, 'fecha de cierre')),
           fAntes: fotosDe(n, c.antes), fDespues: fotosDe(n, c.despues) });
       }
@@ -179,7 +174,7 @@ OPAS.pintarPlan = function () {
         '<span class="op-cuerpo"><span class="obs-top"><b>' + DR.esc(S5.nombreZona(x.z)) + (x.num ? ' · N° ' + x.num : '') + '</b>' + S5.pillEstado(x.estado) + '</span>' +
         '<span class="op-desc">' + DR.esc(DR.recortar(x.desc, 180)) + '</span>' +
         '<small>' + S5.fecha(x.fecha) + (x.sinFecha ? ' (sin fecha en el Excel)' : '') + (x.accion ? ' · Acción: ' + DR.esc(DR.recortar(x.accion, 70)) : '') +
-          (x.notas.length ? ' · ' + x.notas.length + ' nota(s)' : '') + (fotos.length ? '' : ' · sin fotos') + '</small>' +
+          (fotos.length ? '' : ' · sin fotos') + '</small>' +
         AV.miniaturas(fotos) + '</span></label>';
     }).join('') + '</div>' : '<div class="aviso ok" style="margin-top:12px">No hay observaciones nuevas para cargar' + (yaEstan.length ? ': las del Excel ya están en la app.' : '.') + '</div>') +
     (plan.otras ? '<div class="ayuda-campo" style="margin-top:8px">' + plan.otras + ' fila(s) u hoja(s) de otras áreas no se cargan.</div>' : '') +
@@ -222,7 +217,7 @@ OPAS.aplicar = function () {
         return AT.rpc('rpc_s5_importar_obs_pasada', { p: {
           id: id, zona_id: x.z.id, numero: x.num && x.num > 0 ? Math.round(x.num) : null, fecha_registro: x.fecha,
           descripcion: x.desc, accion_correctiva: x.accion, estado: x.estado, fecha_cierre: x.cierre || null,
-          fotos_antes: rutas[0], fotos_despues: rutas[1], notas: x.notas
+          fotos_antes: rutas[0], fotos_despues: rutas[1]
         } });
       }).then(function (o) { nuevas.push(o); }).catch(function (e) { errores.push(x.ref + ': ' + e.message); });
     });

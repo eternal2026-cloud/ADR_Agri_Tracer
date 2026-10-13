@@ -5,8 +5,8 @@
  * muestra todo lo que cambia:
  *   · Hoja BD → fecha, tipo, campaña y planta de la auditoría; nombre de cada
  *     zona (SUB ÁREA) y puntajes de cada ítem (rpc_s5_importar_avance).
- *   · Hojas de observaciones del área → texto, acción correctiva, notas « // »
- *     (cada nota nueva es un seguimiento), estado, fecha de cierre y fotos
+ *   · Hojas de observaciones del área → texto, acción correctiva (la celda
+ *     completa, sin notas de seguimiento), estado, fecha de cierre y fotos
  *     nuevas en las celdas Antes / Después (rpc_s5_obs_actualizar). Una fila sin
  *     N° conocido y con foto «Antes» se registra como observación nueva.
  * Fotos: lee las que flotan sobre la celda (ExcelJS) y las «imagen en celda» de
@@ -39,6 +39,63 @@ AV.norm = function (v) {
 };
 /** Para comparar textos largos: espacios y saltos de línea no cuentan como cambio. */
 AV.blando = function (t) { return String(t || '').replace(/\s+/g, ' ').trim(); };
+
+/* ------------------------------------------------------------ zona por aproximación */
+AV.RELLENO = ['zona', 'zonas', 'sub', 'subzona', 'area', 'de', 'del', 'la', 'las', 'el', 'los', 'y', 'e', 'en'];
+
+/** Palabras que distinguen una zona: sin relleno («zona de…») ni el nombre del área. */
+AV.claveZona = function (txt, area) {
+  var deArea = AV.norm(area && area.nombre).split(' ');
+  var todas = AV.norm(txt).split(' ').filter(function (w) { return w && AV.RELLENO.indexOf(w) < 0; });
+  var sinArea = todas.filter(function (w) { return deArea.indexOf(w) < 0; });
+  return sinArea.length ? sinArea : todas;
+};
+
+/** Distancia de edición entre dos palabras (errores de tipeo). */
+AV.levenshtein = function (a, b) {
+  var prev = [], i, j;
+  for (j = 0; j <= b.length; j++) prev[j] = j;
+  for (i = 1; i <= a.length; i++) {
+    var act = [i];
+    for (j = 1; j <= b.length; j++) act[j] = Math.min(prev[j] + 1, act[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = act;
+  }
+  return prev[b.length];
+};
+AV.parecido = function (a, b) { return a === b ? 1 : 1 - AV.levenshtein(a, b) / Math.max(a.length, b.length, 1); };
+
+/** 0–1: palabras en común (tolera tipeo) o el texto completo sin espacios («Preenfriado» = «pre enfriado»). */
+AV.puntajeZona = function (a, b) {
+  if (!a.length || !b.length) return 0;
+  var usadas = [], comunes = 0;
+  a.forEach(function (w) {
+    var mejor = -1, p = 0;
+    b.forEach(function (x, i) { var s = AV.parecido(w, x); if (usadas.indexOf(i) < 0 && s > p) { p = s; mejor = i; } });
+    if (mejor > -1 && p >= 0.8) { comunes++; usadas.push(mejor); }
+  });
+  var dice = 2 * comunes / (a.length + b.length), juntas = AV.parecido(a.join(''), b.join(''));
+  return Math.max(dice, juntas >= 0.85 ? juntas : 0);
+};
+
+/** Zona del Excel → { z, aprox } en este orden: número («1. …»), nombre exacto, palabras que la
+    distinguen y parecido. La aproximada solo se acepta si gana con claridad; si no, null. */
+AV.buscarZona = function (txt, zonas, area) {
+  var t = String(txt || '').trim(), m = t.match(/^(\d+)\s*(?:[.\-)]\s*|\s+|$)/);
+  var resto = m ? t.substring(m[0].length) : t, n = AV.norm(resto), clave = AV.claveZona(resto, area);
+  if (m) {
+    var zn = zonas.filter(function (z) { return z.numero === Number(m[1]); })[0];
+    if (zn && (!n || AV.norm(zn.nombre) === n || AV.puntajeZona(clave, AV.claveZona(zn.nombre, area)) >= 0.5)) {
+      return { z: zn, aprox: !!n && AV.norm(zn.nombre) !== n };
+    }
+  }
+  if (!n) return null;
+  var exacta = zonas.filter(function (z) { return AV.norm(z.nombre) === n; })[0];
+  if (exacta) return { z: exacta, aprox: false };
+  var orden = zonas.map(function (z) { return { z: z, p: AV.puntajeZona(clave, AV.claveZona(z.nombre, area)) }; })
+    .sort(function (x, y) { return y.p - x.p; });
+  if (!orden.length || orden[0].p < 0.6 || (orden[1] && orden[1].p > orden[0].p - 0.1)) return null;
+  return { z: orden[0].z, aprox: true };
+};
 AV.iso = function (v) {
   var d = null, m;
   if (v instanceof Date) d = v;
@@ -313,7 +370,7 @@ AV.abrir = function (opc) {
         '<div class="res-estado" style="color:#7FD3F2">' + DR.ICONOS.subir + '<span>Excel de avance</span></div>' +
         '<div class="res-nombre">' + S5.iconoCultivo(cul, 26) + ' ' + DR.esc(cul ? cul.nombre : '') + '</div>' +
         '<div class="res-dni" style="letter-spacing:0">Sube el Excel con la misma estructura que «Descargar Excel» de Observaciones (hojas del área + hoja BD). ' +
-          'Antes de aplicar verás qué cambia: puntajes, nombres de zona, datos de la auditoría y observaciones (textos, estado, notas y fotos nuevas).</div>' +
+          'Antes de aplicar verás qué cambia: puntajes, nombres de zona, datos de la auditoría y observaciones (textos, estado y fotos nuevas).</div>' +
         '<div class="form" style="margin-top:14px">' +
           '<div class="campo ancho"><label for="avAud">Auditoría a actualizar<em>obligatorio</em></label><select id="avAud">' +
             '<option value="">Elige la auditoría</option>' + AV.auds.map(function (a) {
@@ -382,9 +439,7 @@ AV.analizar = function (aud, archivo, progreso) {
     var bd = (r[0] || []).filter(function (f) { return f.auditoria_id === aud.id; });
     var obs = (r[1].data || []).filter(function (o) { return !o.s5_auditorias || o.s5_auditorias.estado !== 'anulada'; });
     AV.leerBD(wb, aud, area, bd, plan);
-    return INF.notasDe(obs.map(function (o) { return o.id; })).then(function (notas) {
-      return AV.leerObservaciones(wb, enCelda, aud, area, obs, notas, plan, progreso);
-    });
+    return AV.leerObservaciones(wb, enCelda, aud, area, obs, plan, progreso);
   }).then(function () {
     if (!plan.hojaBD && !plan.hojasObs) throw new Error('El Excel no tiene la hoja BD ni hojas de Observaciones con la estructura de la descarga.');
     return plan;
@@ -474,12 +529,8 @@ AV.leerBD = function (wb, aud, area, bd, plan) {
   });
 };
 
-AV.leerObservaciones = function (wb, fotosLibro, aud, area, obs, notas, plan, progreso) {
+AV.leerObservaciones = function (wb, fotosLibro, aud, area, obs, plan, progreso) {
   var tareas = [], zonasArea = S5.zonasDe(aud.area_id, true, aud.cultivo_id);
-  var buscarZona = function (txt) {
-    var n = AV.norm(String(txt || '').replace(/^\s*\d+\s*[.\-)]\s*/, ''));
-    return zonasArea.filter(function (z) { return AV.norm(z.nombre) === n; })[0] || null;
-  };
   plan.hojasObs = 0;
   wb.eachSheet(function (ws) {
     var t = AV.titulos(ws, ['zona', 'observaciones', 'estado']);
@@ -501,8 +552,9 @@ AV.leerObservaciones = function (wb, fotosLibro, aud, area, obs, notas, plan, pr
       var fAntes = fotosDe(n, c.antes), fDespues = fotosDe(n, c.despues);
       if (!desc && !zonaTxt && !fAntes.length) continue;
       if (c.area && AV.norm(val(f, 'area')) && AV.norm(val(f, 'area')) !== AV.norm(area.nombre)) { plan.otras++; continue; }
-      var z = buscarZona(zonaTxt), ref = '«' + ws.name + '» fila ' + n;
+      var hallada = AV.buscarZona(zonaTxt, zonasArea, area), z = hallada && hallada.z, ref = '«' + ws.name + '» fila ' + n;
       if (!z) { plan.avisos.push(ref + ': la zona «' + zonaTxt + '» no existe en ' + area.nombre + '. Se omite.'); continue; }
+      if (hallada.aprox) plan.avisos.push(ref + ': zona «' + zonaTxt + '» tomada como ' + S5.nombreZona(z) + ' (coincidencia aproximada).');
       var o = num ? obs.filter(function (x) { return x.zona_id === z.id && x.numero === num; })[0] : null;
       tareas.push({ ref: ref, hoja: ws.name, fila: n, z: z, o: o || null, num: num, desc: desc, accion: AV.texto(val(f, 'accion correctiva')),
         estadoTxt: AV.texto(val(f, 'estado')), cierre: c['fecha de cierre'] ? AV.iso(val(f, 'fecha de cierre')) : undefined,
@@ -554,7 +606,7 @@ AV.leerObservaciones = function (wb, fotosLibro, aud, area, obs, notas, plan, pr
   return INF.enLotes(tareas, 3, function (t) {
     return ajenasDe(t).then(function (aj) {
       t.ajenas = aj;
-      return AV.compararObs(t, aud, notas, plan);
+      return AV.compararObs(t, aud, plan);
     }).then(function () {
       hechas++;
       progreso('Revisando observaciones ' + hechas + ' de ' + tareas.length + '…');
@@ -563,18 +615,12 @@ AV.leerObservaciones = function (wb, fotosLibro, aud, area, obs, notas, plan, pr
 };
 
 /** Arma el cambio de una fila de observaciones (o el alta, si es nueva). */
-AV.compararObs = function (t, aud, notas, plan) {
+AV.compararObs = function (t, aud, plan) {
   var o = t.o, estado = AV.estado(t.estadoTxt);
   if (estado === undefined) plan.avisos.push(t.ref + ': estado «' + t.estadoTxt + '» no reconocido (' + S5.ESTADOS.join(', ') + '). No se cambia.');
 
-  // «Acción // nota // nota»: la primera parte es la acción y el resto, notas de seguimiento.
-  var partes = t.accion.split(/\s*\/\/\s*/).map(function (x) { return x.trim(); }).filter(Boolean);
-  var previas = o ? (notas[o.id] || []) : [];
-  var esNota = function (x) { return previas.some(function (p) { return AV.blando(p) === AV.blando(x); }); };
-  var accion, notasExcel;
-  if (o && !o.accion_correctiva && partes.length && esNota(partes[0])) { accion = ''; notasExcel = partes; }
-  else { accion = partes[0] || ''; notasExcel = partes.slice(1); }
-  var notasNuevas = notasExcel.filter(function (x) { return !esNota(x); });
+  // La celda completa es la acción correctiva (ya no hay notas de seguimiento).
+  var accion = t.accion;
 
   if (!o) {
     if (!t.desc) { plan.avisos.push(t.ref + ': fila sin texto de observación. Se omite.'); return Promise.resolve(); }
@@ -586,7 +632,7 @@ AV.compararObs = function (t, aud, notas, plan) {
       }
       return AV.fotosNuevas(t.fDespues, [], t.ajenas).then(function (fd) {
         AV.avisoAjenas(plan, t.ref, fd);
-        plan.obs.push({ tipo: 'nueva', ref: t.ref, z: t.z, num: t.num, desc: t.desc, accion: accion, notas: notasNuevas,
+        plan.obs.push({ tipo: 'nueva', ref: t.ref, z: t.z, num: t.num, desc: t.desc, accion: accion,
           estado: estado || 'Pendiente', cierre: t.cierre || null, fotosAntes: fa.nuevas, fotosDespues: fd.nuevas });
       });
     });
@@ -601,7 +647,6 @@ AV.compararObs = function (t, aud, notas, plan) {
     if (plazo) { p.accion_correctiva = accion; cambios.push('Acción correctiva: ' + (accion ? '«' + DR.recortar(accion, 90) + '»' : '(vacía)')); } else bloqueados.push('acción correctiva');
   }
   if (bloqueados.length) plan.avisos.push(t.ref + ' (N° ' + o.numero + '): cambió ' + bloqueados.join(' y ') + ', pero el plazo para editar textos venció el ' + S5.fecha(S5.limiteObs(o)) + '. Solo un administrador puede hacerlo.');
-  if (notasNuevas.length) { p.notas = notasNuevas; cambios.push(notasNuevas.length + ' nota(s) de seguimiento: ' + notasNuevas.map(function (x) { return '«' + DR.recortar(x, 60) + '»'; }).join(', ')); }
   if (estado && estado !== o.estado) { p.estado = estado; cambios.push('Estado: ' + o.estado + ' → ' + estado); }
   var estadoFinal = p.estado || o.estado;
   if (t.cierre !== undefined && (t.cierre || null) !== (o.fecha_cierre || null) && !(!t.cierre && estadoFinal === 'Cerrado')) {
@@ -794,7 +839,6 @@ AV.aplicarNueva = function (x, a) {
   }).then(function (o) {
     var resto = { id: o.id, origen: 'excel' };
     if (x.estado !== inicial) resto.estado = x.estado;
-    if (x.notas.length) resto.notas = x.notas;
     if (x.cierre) resto.fecha_cierre = x.cierre;
     return AV.subirFotos(x.fotosDespues, base + '-despues').then(function (rutas) {
       if (rutas.length) resto.fotos_despues = rutas;

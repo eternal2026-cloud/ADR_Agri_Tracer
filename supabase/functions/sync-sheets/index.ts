@@ -293,13 +293,13 @@ function pestanasS5(d: S5Datos | null): Pestana[] {
     ['ESTADO ZONA', (f) => f.estado_zona === 'completa' ? 'Completa' : 'En curso'], TX('cultivo', 'CULTIVO'),
   ];
 
-  // Formato de la hoja Observaciones; los seguimientos se concatenan con « // » como en el Excel.
+  // Formato de la hoja Observaciones: solo Observación y Acción correctiva (sin notas de seguimiento).
   const colsObs: Col[] = [
     ['N°', (f) => f.numero], ['Semana', (f) => f.semana ?? ''], ['Fecha de Registro', (f) => txt(f.fecha_registro)],
     ['Cultivo', (f) => seguro((d.cultivos.get(f.cultivo_id ?? aud(f).cultivo_id) || {}).nombre)],
     ['Área', (f) => seguro((d.areas.get(f.area_id ?? aud(f).area_id) || {}).nombre)], ['Zona', (f) => seguro((d.zonas.get(f.zona_id) || {}).nombre)],
     ['Observaciones', (f) => seguro(f.descripcion)],
-    ['Acción correctiva', (f) => seguro([f.accion_correctiva, ...segsDe(f).map((s) => s.nota).filter((n) => n && n !== 'Registro inicial')].filter(Boolean).join(' // '))],
+    ['Acción correctiva', (f) => seguro(f.accion_correctiva || '')],
     ['Estado', (f) => txt(f.estado)], ['Fecha de cierre', (f) => txt(f.fecha_cierre)],
     ...fotoCols('Antes', 'fotos_antes', 'foto_antes'), ...fotoCols('Después', 'fotos_despues', 'foto_despues'),
     ['Código auditoría', (f) => txt(aud(f).codigo)], ['N° auditoría', (f) => aud(f).numero_auditoria ?? ''],

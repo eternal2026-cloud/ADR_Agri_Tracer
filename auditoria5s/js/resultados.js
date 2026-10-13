@@ -209,10 +209,8 @@ RESUL.generarPdf = function () {
     [r[1], r[2]].forEach(function (x) {
       (x.error ? [] : (x.data || [])).forEach(function (o) { if (!vistos[o.id]) { vistos[o.id] = true; detalle.push(o); } });
     });
-    return INF.notasDe(detalle.map(function (o) { return o.id; })).catch(function () { return {}; }).then(function (notas) {
-      return INF.pdfResultados({ cultivo: cul, area: f.area ? S5.area(f.area) : null, grupos: grupos,
-        obs: r[0].error ? [] : (r[0].data || []), obsDetalle: detalle, notas: notas });
-    });
+    return INF.pdfResultados({ cultivo: cul, area: f.area ? S5.area(f.area) : null, grupos: grupos,
+      obs: r[0].error ? [] : (r[0].data || []), obsDetalle: detalle });
   }).then(function (blob) {
     var area = f.area ? (S5.area(f.area) || {}).nombre : 'Todas las áreas';
     INF.descargar(blob, INF.nombreArchivo(['Informe 5S', cul.nombre, area, grupos.map(function (g) { return S5.fecha(g.fecha).replace(/\//g, '-'); }).join(' y ')], 'pdf'));

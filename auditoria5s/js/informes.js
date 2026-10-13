@@ -429,13 +429,13 @@ INF.anexoObservaciones = function (ctx, lista, imgs, opc) {
 
   ctx.titulo('Observaciones · sustento de los puntajes');
   fuente('normal', 7.8, ctx.GRIS);
-  doc.text('Abiertas del área y registradas en las fechas del informe. Las notas de seguimiento se añaden a la acción correctiva con « // ».', M, y, { maxWidth: ANCHO });
+  doc.text('Abiertas del área y registradas en las fechas del informe.', M, y, { maxWidth: ANCHO });
   y += 6;
   cabecera();
 
   lista.forEach(function (o, k) {
     var zona = S5.zona(o.zona_id) || {}, area = S5.area(S5.areaDeObs(o)) || {};
-    var accion = [o.accion_correctiva].concat((opc.notas || {})[o.id] || []).filter(Boolean).join(' // ');
+    var accion = o.accion_correctiva || '';
     var valores = [o.numero, o.semana, S5.fecha(o.fecha_registro)]
       .concat(conArea ? [area.nombre || ''] : [])
       .concat([S5.nombreZona(zona), o.descripcion || '', accion, o.estado, o.fecha_cierre ? S5.fecha(o.fecha_cierre) : '—', '', '']);
@@ -499,21 +499,6 @@ INF.fotosEnCelda = function (doc, imgs, rutas, x, y, w, h) {
 };
 
 /* ------------------------------------------------------------ Excel de observaciones (formato manual) */
-/** Notas de seguimiento por observación (el Excel manual las concatenaba con « // »). */
-INF.notasDe = function (ids) {
-  var mapa = {}, lotes = [];
-  for (var i = 0; i < ids.length; i += 100) lotes.push(ids.slice(i, i + 100));
-  return Promise.all(lotes.map(function (lote) {
-    return sb.from('s5_seguimientos').select('observacion_id,nota,fecha').in('observacion_id', lote).order('fecha').then(function (r) {
-      if (r.error) throw new Error(r.error.message);
-      (r.data || []).forEach(function (s) {
-        if (!s.nota || s.nota === 'Registro inicial') return;
-        (mapa[s.observacion_id] = mapa[s.observacion_id] || []).push(s.nota);
-      });
-    });
-  })).then(function () { return mapa; });
-};
-
 /** Descarga una foto del bucket privado y la reduce para incrustarla en el Excel. */
 INF.fotoParaExcel = function (ruta) { return INF.fotoEscalada(ruta, 640, 0.72); };
 /** Versión para el PDF: una foto sola ocupa hasta ~45 × 44 mm (≈ 640 px se ven nítidos al imprimir). */
@@ -549,17 +534,13 @@ INF.nombreHoja = function (texto, usados) {
 /** opc: { cultivo, obs (ya filtradas), auds: {id: auditoría}, areaId, alProgreso(texto) } → Blob .xlsx */
 INF.excelObservaciones = function (opc) {
   var progreso = opc.alProgreso || function () {};
-  var ExcelJS, notas, bd;
+  var ExcelJS, bd;
   progreso('Preparando Excel…');
   return INF.excelJS().then(function (lib) {
     ExcelJS = lib;
-    return Promise.all([
-      INF.notasDe(opc.obs.map(function (o) { return o.id; })),
-      AT.rpc('fn_s5_bd', { p_cultivo: opc.cultivo.id, p_area: opc.areaId ? Number(opc.areaId) : null })
-    ]);
+    return AT.rpc('fn_s5_bd', { p_cultivo: opc.cultivo.id, p_area: opc.areaId ? Number(opc.areaId) : null });
   }).then(function (r) {
-    notas = r[0];
-    bd = r[1] || [];
+    bd = r || [];
     var wb = new ExcelJS.Workbook();
     wb.creator = 'Integra Operaciones · Ingeniería de Procesos · Don Ricardo';
     wb.created = new Date();
@@ -603,7 +584,7 @@ INF.excelObservaciones = function (opc) {
 
       lista.forEach(function (o, k) {
         var fila = ws.getRow(3 + k), zona = S5.zona(o.zona_id) || {};
-        var accion = [o.accion_correctiva].concat(notas[o.id] || []).filter(Boolean).join(' // ');
+        var accion = o.accion_correctiva || '';
         var valores = [o.numero, o.semana, INF.fechaExcel(o.fecha_registro), zona.nombre || '', o.descripcion, accion, o.estado, INF.fechaExcel(o.fecha_cierre), null, null];
         valores.forEach(function (v, i) {
           var c = fila.getCell(i + 1), al = { vertical: 'middle' }, b = {};

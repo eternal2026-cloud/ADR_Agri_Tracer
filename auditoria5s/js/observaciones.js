@@ -26,6 +26,9 @@ OBS.cargar = function () {
     if (r[0].error) throw new Error(r[0].error.message);
     if (r[1].error) throw new Error(r[1].error.message);
     OBS.auds = {};
+    // Las notas de seguimiento pueden haber cambiado desde otra vista u otro equipo: se vuelven a pedir.
+    OBS.notas = {};
+    OBS.notasPedidas = {};
     (r[0].data || []).forEach(function (a) { OBS.auds[a.id] = a; });
     // La observación vive en la zona: sin auditoría de origen también cuenta; con una anulada, no.
     OBS.lista = (r[1].data || []).filter(function (o) {
@@ -301,7 +304,7 @@ OBS.pintarDetalle = function (o, a, segs, opc) {
   DR.$('#btnCerrarObs').onclick = UI.cerrarHoja;
   if (DR.$('#btnSeguimiento')) DR.$('#btnSeguimiento').onclick = function () { OBS.abrirSeguimiento(o, a, opc); };
   if (DR.$('#btnEditarObs')) DR.$('#btnEditarObs').onclick = function () {
-    OBS.abrirFormulario({ auditoria: a, zona: z, observacion: o, alGuardar: function (n) {
+    OBS.abrirFormulario({ auditoria: a.id ? a : null, zona: z, observacion: o, detalle: opc, alGuardar: function (n) {
       if (opc.alCambiar) opc.alCambiar(n);
       OBS.abrirDetalle(n, opc);
     } });
@@ -380,7 +383,7 @@ OBS.abrirFormulario = function (opc) {
   OBS.chips('#obsEstado', function (v) { st.estado = v; });
   OBS.chips('#obsS', function (v) { st.s = v ? Number(v) : null; });
   DR.$('#obsCancelar').onclick = function () {
-    if (o) OBS.abrirDetalle(o); else UI.cerrarHoja();
+    if (o) OBS.abrirDetalle(o, opc.detalle); else UI.cerrarHoja();
   };
   DR.$('#obsGuardar').onclick = function () {
     var btn = this, desc = DR.$('#obsDesc').value.trim();

@@ -54,7 +54,11 @@ var ETAPAS = [
     { clave: 'num_jabas_2', tipo: 'numero', label: 'N° de jabas', medio: true },
     { clave: 'num_pallets', tipo: 'numero', label: 'N° de pallets', medio: true },
     { clave: 'presentaciones', tipo: 'lista', lista: 'presentacion', label: 'Presentaciones' },
-    { clave: 'obs_jabas_2', tipo: 'texto', label: 'Observación de jabas' }
+    // Igual que en Motocarga: la observación se arma sola con las cantidades por presentación.
+    { clave: 'obs_jabas_2', tipo: 'texto', label: 'Observación de jabas', auto: true },
+    { clave: 'jabas2_bandeja', tipo: 'numero', label: 'Bandeja', desglose: 'BANDEJA' },
+    { clave: 'jabas2_jarra', tipo: 'numero', label: 'Jarra 0.5 kg', desglose: 'JARRA 0.5 KG' },
+    { clave: 'jabas2_bulk', tipo: 'numero', label: 'Bulk 3.5', desglose: 'BULK 3.5' }
   ] },
   { id: 'carga_camion', titulo: 'Carga al camión', corto: 'Camión', color: '#0097CE', campoCierre: 'fin_carga_camion', campos: [
     { clave: 'inicio_carga_camion', tipo: 'hora', label: 'Inicio carga al camión' },
@@ -547,7 +551,7 @@ CAPTURA.enlazarCiclo = function (cont) {
 CAPTURA.alEditar = function (ev) {
   var campo = ev && ev.target && ev.target.getAttribute && ev.target.getAttribute('data-campo');
   if (campo) CAPTURA.cambiados[campo] = true;
-  if (campo && /^jabas_/.test(campo)) CAPTURA.armarObservacion();
+  if (campo && /^jabas2?_/.test(campo)) CAPTURA.armarObservacion();
   CAPTURA.sucio = true;
   CAPTURA.insistir = false;
   CAPTURA.revisar();

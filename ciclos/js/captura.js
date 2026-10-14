@@ -215,7 +215,7 @@ CAPTURA.pintarLista = function () {
   cont.innerHTML = UI.encabezado('Captura en campo', 'Ciclos de cosecha', 'Inicia un ciclo nuevo o toca uno en curso para registrar su siguiente etapa.') +
     '<button class="btn verde grande entra" id="btnNuevoCiclo" type="button">' + DR.ICONOS.mas + '<span>Iniciar nuevo ciclo</span></button>' +
     '<div class="buscador entra" style="margin-top:16px">' + DR.ICONOS.lupa +
-    '<input id="inpFiltroCiclos" type="search" placeholder="Buscar código, fundo, lote o líder…" autocomplete="off" value="' + DR.esc(CAPTURA.filtro) + '"></div>' +
+    '<input id="inpFiltroCiclos" type="search" placeholder="Buscar código, placa, fundo, lote o líder…" autocomplete="off" value="' + DR.esc(CAPTURA.filtro) + '"></div>' +
     '<div class="filtros-captura entra">' +
       '<div class="campo"><label for="inpDia">Día</label><div class="fc-dia"><input id="inpDia" type="date" value="' + DR.esc(CAPTURA.dia || '') + '">' +
       '<button type="button" class="btn sec chico" id="btnDiaHoy">Hoy</button><button type="button" class="btn sec chico" id="btnDiaTodos">Todos</button></div></div>' +
@@ -289,9 +289,12 @@ CAPTURA.tarjetaHtml = function (f) {
     ? '<span>Etapa ' + (idx + 1) + ' de ' + ETAPAS.length + ' · Siguiente: <b>' + et.titulo + '</b></span>'
     : '<span><b>Cerrado</b> · ' + (f.t_ciclo_total !== null ? DR.num(f.t_ciclo_total, 0) + ' min de ciclo' : 'ver detalle') + '</span>';
   var sig = CAPTURA.siguienteHora(f), color = et ? et.color : '#76B729';
+  var placa = String(f.placa || '').trim();
   return '<div class="ciclo-item entra' + (sig ? ' con-rapido' : '') + '" style="--c:' + color + '">' +
     '<button type="button" class="ciclo-card" data-codigo="' + DR.esc(f.codigo) + '">' +
-    '<div class="cc-top"><span class="cc-codigo">' + DR.esc(f.codigo) + '</span><span class="cc-hace">' + DR.hace(f.actualizado_en) + '</span></div>' +
+    // Con placa de motocarga, la placa va primero (lo que se ve en campo) y el código se corre a la derecha.
+    '<div class="cc-top' + (placa ? ' con-placa' : '') + '"><span class="cc-id">' + (placa ? '<span class="cc-placa">' + DR.esc(placa) + '</span>' : '') +
+      '<span class="cc-codigo">' + DR.esc(f.codigo) + '</span></span><span class="cc-hace">' + DR.hace(f.actualizado_en) + '</span></div>' +
     '<div class="cc-sub">' + (sub || '&nbsp;') + '</div>' +
     '<div class="cc-pasos">' + segmentos + '</div>' +
     '<div class="cc-sig">' + pie + DR.ICONOS.chevron + '</div></button>' +
@@ -346,7 +349,7 @@ CAPTURA.pintarTarjetas = function (animar) {
   var coincide = function (f) {
     if (CAPTURA.fundoFiltro && f.fundo !== CAPTURA.fundoFiltro) return false;
     if (CAPTURA.dia && f.fecha !== CAPTURA.dia) return false;
-    return !q || [f.codigo, f.fundo, f.lote, f.lider].some(function (v) { return String(v || '').toLowerCase().indexOf(q) > -1; });
+    return !q || [f.codigo, f.placa, f.fundo, f.lote, f.lider].some(function (v) { return String(v || '').toLowerCase().indexOf(q) > -1; });
   };
   var abiertos = CAPTURA.abiertos.filter(coincide), cerrados = CAPTURA.cerrados.filter(coincide);
   var filtrado = q || CAPTURA.fundoFiltro || CAPTURA.dia;

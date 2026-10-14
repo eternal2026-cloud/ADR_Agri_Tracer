@@ -211,7 +211,15 @@ tr.fila-cerca td{background:#23170E}
 .cc-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
 .cc-codigo{font-size:19px;font-weight:600;letter-spacing:.04em;font-variant-numeric:tabular-nums}
 .cc-hace{font-size:13px;color:var(--texto-3);white-space:nowrap}
-.cc-sub{font-size:14.5px;color:var(--texto-2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cc-id{display:flex;align-items:baseline;gap:12px;min-width:0}
+.cc-placa{font-size:19px;font-weight:700;letter-spacing:.06em;padding:1px 8px;border:1.5px solid var(--c);border-radius:7px;white-space:nowrap}
+.cc-top.con-placa .cc-codigo{font-size:15.5px;color:var(--texto-2)}
+.cc-sub{font-size:16.5px;font-weight:500;color:var(--texto);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.en-vivo{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:#9BDA55;letter-spacing:.04em}
+.en-vivo::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor;animation:latido 1.6s ease-in-out infinite}
+@keyframes latido{50%{opacity:.25}}
+.nota-vivo{font-size:13px;color:var(--texto-3)}
+:root[data-tema="claro"] .en-vivo{color:#4E8A16}
 .cc-pasos{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin:11px 0 9px}
 .cc-pasos i{height:7px;border-radius:4px;background:#3A3029}
 .cc-pasos i.hecho{background:var(--c)}
@@ -1088,6 +1096,8 @@ td.mp-sangria{padding-left:26px}
 :root[data-tema="claro"] .hora.llena{background:color-mix(in srgb,var(--c) 10%,#FFFFFF)}
 :root[data-tema="claro"] .hora-aviso{color:#B5471E}
 :root[data-tema="claro"] .opcion{background:#FFFFFF;border-color:#CDBFB1}
+:root[data-tema="claro"] .opcion.activa{background:var(--c,var(--dr-azul));border-color:var(--c,var(--dr-azul));color:#14100C;font-weight:600;box-shadow:0 2px 8px color-mix(in srgb,var(--c,var(--dr-azul)) 35%,transparent)}
+:root[data-tema="claro"] .opcion.agregar{background:transparent;border-color:#4C7A20;color:#4E8A16}
 :root[data-tema="claro"] #barraAccion{background:rgba(255,255,255,.97);box-shadow:0 -10px 24px rgba(60,40,20,.12)}
 :root[data-tema="claro"] #btnAccion.accion-fundo{background:#E2D9CE}
 :root[data-tema="claro"] #hojaVelo{background:rgba(30,20,10,.45)}
@@ -1101,6 +1111,7 @@ td.mp-sangria{padding-left:26px}
 :root[data-tema="claro"] .zona-carga,:root[data-tema="claro"] .check-item,:root[data-tema="claro"] .rol-op,:root[data-tema="claro"] .acc-grupo{background:#FFFFFF;border-color:#CDBFB1}
 :root[data-tema="claro"] .cred,:root[data-tema="claro"] .copiable{background:#FBF8F4}
 :root[data-tema="claro"] .evo-chip{background:#FFFFFF;border-color:#CDBFB1}
+:root[data-tema="claro"] .rol-op.activo{border-color:var(--c);background:color-mix(in srgb,var(--c) 12%,#FFFFFF)}
 :root[data-tema="claro"] .evo-chip.activo{background:color-mix(in srgb,var(--c) 14%,#FFFFFF)}
 :root[data-tema="claro"] .evo-grid{stroke:#E2D9CE}
 :root[data-tema="claro"] .evo-tip{background:#FFFFFF}

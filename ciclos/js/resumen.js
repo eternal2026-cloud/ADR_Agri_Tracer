@@ -26,11 +26,45 @@ RES.cargarMeta = function () {
 };
 
 VISTAS.resumen = function (cont) {
-  Promise.all([RES.cargarUmbral(), RES.cargarMeta()]).then(function () {
-    if (RES.nivel === 'lotes') return RES.renderLotes(cont);
-    if (RES.nivel === 'muestras') return RES.renderMuestras(cont);
-    return RES.renderPivot(cont);
+  RES.iniciarVivo();
+  return Promise.all([RES.cargarUmbral(), RES.cargarMeta()]).then(function () {
+    return RES.repintar(cont);
   }).catch(function (e) { UI.error(cont, e); });
+};
+
+/* ------------------------------------------------ EN VIVO
+ * Los ciclos en curso cuentan junto con los cerrados (sus tramos ya completados). Cada 20 s se
+ * revisa si hubo cambios en ciclos_cosecha y, si los hubo, se vuelve a pintar la vista actual
+ * sin animaciones y en la misma posición. Google Sheets no cambia: sigue su propia configuración. */
+RES.firma = function () {
+  return sb.from('ciclos_cosecha').select('actualizado_en', { count: 'exact' }).order('actualizado_en', { ascending: false }).limit(1)
+    .then(function (r) { if (r.error) throw new Error(r.error.message); return r.count + '|' + (r.data && r.data[0] ? r.data[0].actualizado_en : ''); });
+};
+RES.iniciarVivo = function () {
+  RES.firma().then(function (f) { RES._firma = f; }).catch(function () { /* sin señal */ });
+  if (RES._timer) return;
+  var ocupado = false;
+  var tic = function () {
+    if (ocupado || DR.vista !== 'resumen' || document.visibilityState !== 'visible' || !RES._firma) return;
+    ocupado = true;
+    RES.firma().then(function (f) {
+      if (f === RES._firma || DR.vista !== 'resumen') return;
+      RES._firma = f;
+      var cont = DR.$('#contenido'), y = cont.scrollTop, anima = DR.anima;
+      DR.anima = false;
+      return RES.repintar(cont).then(function () { DR.anima = anima; cont.scrollTop = y; }, function () { DR.anima = anima; });
+    }).catch(function () { /* sin señal: se reintenta */ }).then(function () { ocupado = false; });
+  };
+  RES._timer = setInterval(tic, 20000);
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') tic(); });
+};
+RES.repintar = function (cont) {
+  if (RES.nivel === 'lotes') return RES.renderLotes(cont);
+  if (RES.nivel === 'muestras') return RES.renderMuestras(cont);
+  return RES.renderPivot(cont);
+};
+RES.vivoTxt = function (n) {
+  return '<span class="en-vivo">EN VIVO</span>' + (n ? ' <span class="nota-vivo">incluye ' + n + ' ciclo(s) en curso</span>' : '');
 };
 
 RES.ir = function (nivel, cambios) {
@@ -90,17 +124,17 @@ RES.tramosHtml = function (total) {
   var meta = RES.meta, t = total.t_ciclo_total;
   return '<section class="panel entra res-tramos clicable" id="resTramos" role="button" tabindex="0">' +
     '<h2>Minutos por tramo · ' + DR.esc(RES.ambitoTxt()) + '</h2>' +
-    '<div class="sub">Promedio de cada tramo de los ciclos cerrados (sin los que superan el umbral). Toca para ver el resumen por lote.</div>' +
+    '<div class="sub">' + RES.vivoTxt(total.n_en_curso) + '<br>Promedio de cada tramo de los ciclos cerrados y de los tramos ya completados de los ciclos en curso (sin los que superan el umbral). Toca para ver el resumen por lote.</div>' +
     '<div class="kpis">' +
-      UI.kpi('Tiempo de ciclo', DR.num(t, 0) + '<small>min</small>', DR.num(total.tiempo_horas, 2) + ' horas · meta ' + DR.num(meta, 0) + ' min', t <= meta ? '#76B729' : '#EF7C3B') +
-      UI.kpi('Ciclos válidos', DR.num(total.n_muestras), 'Umbral: ' + DR.num(RES.umbral) + ' min', '#0097CE') +
+      UI.kpi('Tiempo de ciclo', t === null ? '—' : DR.num(t, 0) + '<small>min</small>', (t === null ? 'Aún sin ciclos cerrados' : DR.num(total.tiempo_horas, 2) + ' horas') + ' · meta ' + DR.num(meta, 0) + ' min', t !== null && t <= meta ? '#76B729' : '#EF7C3B') +
+      UI.kpi('Ciclos válidos', DR.num(total.n_muestras), (total.n_en_curso ? '+ ' + total.n_en_curso + ' en curso · ' : '') + 'Umbral: ' + DR.num(RES.umbral) + ' min', '#0097CE') +
     '</div>' + UI.barrasTramos(tramos) +
     '<div class="res-ver">Ver resumen por lote' + DR.ICONOS.chevron + '</div></section>';
 };
 
 /* ============================================================ PROMEDIO POR FUNDO (todas / semana / día) */
 RES.renderPivot = function (cont) {
-  Promise.all([AT.rpc('fn_semanas_disponibles'), AT.rpc('fn_dias_disponibles').catch(function () { return []; })]).then(function (r) {
+  return Promise.all([AT.rpc('fn_semanas_disponibles'), AT.rpc('fn_dias_disponibles').catch(function () { return []; })]).then(function (r) {
     var semanas = r[0] || [], dias = r[1] || [];
     if (RES.nivel === 'semana') {
       if (!semanas.length) { RES.irGeneral(); return; }
@@ -108,8 +142,7 @@ RES.renderPivot = function (cont) {
     }
     if (RES.nivel === 'dia' && !RES.dia) { RES.irGeneral(); return; }
     if (RES.nivel === 'dia' && dias.indexOf(RES.dia) < 0) dias = [RES.dia].concat(dias);
-    var datos = RES.nivel === 'dia' ? AT.rpc('fn_resumen_dia', { p_fecha: RES.dia })
-      : RES.nivel === 'semana' ? AT.rpc('fn_resumen_semana', { p_semana: RES.semana }) : AT.rpc('fn_resumen_general');
+    var datos = AT.rpc('fn_resumen_vivo', { p_semana: RES.nivel === 'semana' ? RES.semana : null, p_fecha: RES.nivel === 'dia' ? RES.dia : null });
     return datos.then(function (filas) { RES.pintarPivot(cont, filas || [], semanas, dias); });
   }).catch(function (e) { UI.error(cont, e); });
 };
@@ -121,8 +154,8 @@ RES.pintarPivot = function (cont, filas, semanas, dias) {
       UI.panel('Sin datos', '', '<div class="aviso">Registra el primer ciclo desde la pestaña <b>Captura</b>, o importa la hoja BD del Excel a la tabla <code>ciclos_cosecha</code>.</div>');
     DR.entrarPaneles('#contenido'); return;
   }
-  var total = filas.filter(function (f) { return f.fundo === 'Total general'; })[0] || { fundo: 'Total general', n_muestras: 0, t_ciclo_total: null, tiempo_horas: null };
-  var fundos = filas.filter(function (f) { return f.fundo !== 'Total general'; }).sort(function (a, b) { return b.t_ciclo_total - a.t_ciclo_total; });
+  var total = filas.filter(function (f) { return f.fundo === 'Total general'; })[0] || { fundo: 'Total general', n_muestras: 0, n_en_curso: 0, t_ciclo_total: null, tiempo_horas: null };
+  var fundos = filas.filter(function (f) { return f.fundo !== 'Total general'; }).sort(function (a, b) { return (b.t_ciclo_total || 0) - (a.t_ciclo_total || 0); });
   var titulo = general ? 'Promedio general' : RES.ambitoTxt();
   var texto = general ? 'Todas las semanas registradas, agrupado por fundo.'
     : 'Promedio de cada tramo agrupado por fundo. Los registros que superan el umbral se excluyen del cálculo.';
@@ -136,14 +169,14 @@ RES.pintarPivot = function (cont, filas, semanas, dias) {
       '</div>';
   }
 
-  if (!total.n_muestras) {
-    h += UI.panel('Sin ciclos cerrados', '', '<div class="vacio">No hay ciclos cerrados bajo el umbral en ' + DR.esc(RES.ambitoTxt().toLowerCase()) + '.</div>');
+  if (!total.n_muestras && !total.n_en_curso) {
+    h += UI.panel('Sin ciclos', '', '<div class="vacio">No hay ciclos (cerrados ni en curso) bajo el umbral en ' + DR.esc(RES.ambitoTxt().toLowerCase()) + '.</div>');
   } else {
     h += RES.tramosHtml(total);
     fundos.forEach(function (f, i) { f._idx = i; f._clic = true; });
     h += UI.panel(general ? 'Promedio por fundo (todas las semanas)' : 'Promedio por fundo · ' + RES.ambitoTxt(), fundos.length + ' fundo(s) · toca una fila para ver sus muestras',
       UI.tabla(UI.columnasResumen(), fundos.concat([total]), function (f) { return f.fundo === 'Total general' ? 'fila-total' : 'clicable'; }));
-    var barras = fundos.map(function (f) { return { etq: f.fundo, valor: f.t_ciclo_total, dec: 1 }; });
+    var barras = fundos.filter(function (f) { return f.t_ciclo_total !== null; }).map(function (f) { return { etq: f.fundo, valor: f.t_ciclo_total, dec: 1 }; });
     h += UI.panel('Tiempo de ciclo total por fundo', 'La línea punteada marca la meta (' + DR.num(RES.meta) + ' min).', GRAFICO.barrasFundo(barras, RES.meta));
   }
   if (general) h += EVO.panelHtml();
@@ -168,7 +201,7 @@ RES.pintarPivot = function (cont, filas, semanas, dias) {
 
 /* ============================================================ RESUMEN POR LOTE */
 RES.renderLotes = function (cont) {
-  AT.rpc('fn_resumen_lotes', { p_semana: RES.semana, p_fecha: RES.dia }).then(function (filas) {
+  return AT.rpc('fn_resumen_lotes_vivo', { p_semana: RES.semana, p_fecha: RES.dia }).then(function (filas) {
     filas = filas || [];
     var fundos = filas.map(function (f) { return f.fundo; }).filter(function (f, i, a) { return f && a.indexOf(f) === i; }).sort();
     if (RES.fundoLotes && fundos.indexOf(RES.fundoLotes) < 0) RES.fundoLotes = '';
@@ -178,13 +211,14 @@ RES.renderLotes = function (cont) {
     }).join('') + '</select>';
 
     var h = RES.migas(RES.pasosAmbito(false).concat([{ texto: 'Por lote' }])) +
-      UI.encabezado('Toma de tiempos · Arándano', 'Resumen por lote', RES.ambitoTxt() + ' · promedio de los ciclos cerrados (sin los que superan el umbral). Toca un lote para ver sus muestras.', sel);
+      UI.encabezado('Toma de tiempos · Arándano', 'Resumen por lote', RES.ambitoTxt() + ' · promedio de los ciclos cerrados y de los tramos ya completados de los en curso (sin los que superan el umbral). Toca un lote para ver sus muestras.', sel);
     lista.forEach(function (f, i) { f._i = i; });
-    h += '<div class="conteo">' + lista.length + ' lote(s) · meta ' + DR.num(RES.meta, 0) + ' min</div>' +
+    var nVivo = lista.reduce(function (a, f) { return a + Number(f.n_en_curso || 0); }, 0);
+    h += '<div class="conteo">' + RES.vivoTxt(nVivo) + ' · ' + lista.length + ' lote(s) · meta ' + DR.num(RES.meta, 0) + ' min</div>' +
       (lista.length ? UI.lotesHtml(lista.map(function (f) {
         return { id: f._i, nombre: RES.nombreLote(f.lote) + (RES.fundoLotes ? '' : ' · ' + f.fundo), total: f.n_muestras ? Number(f.t_ciclo_total) : null,
-          pie: f.n_muestras + ' ciclo(s)' + (f.n_excluidos ? ' · ' + f.n_excluidos + ' excluido(s)' : '') };
-      }), RES.meta) : '<div class="vacio">No hay ciclos cerrados en ' + DR.esc(RES.ambitoTxt().toLowerCase()) + '.</div>');
+          pie: f.n_muestras + ' ciclo(s)' + (f.n_en_curso ? ' · ' + f.n_en_curso + ' en curso' : '') + (f.n_excluidos ? ' · ' + f.n_excluidos + ' excluido(s)' : '') };
+      }), RES.meta) : '<div class="vacio">No hay ciclos en ' + DR.esc(RES.ambitoTxt().toLowerCase()) + '.</div>');
 
     cont.innerHTML = h;
     DR.entrarPaneles('#contenido');
@@ -206,15 +240,16 @@ RES.comentarios = function (f) {
 };
 
 RES.renderMuestras = function (cont) {
-  var q = sb.from('ciclos_cosecha').select('*').eq('fundo', RES.fundo).eq('cerrado', true).order('fecha', { ascending: false });
+  var q = sb.from('ciclos_cosecha').select('*').eq('fundo', RES.fundo).or('cerrado.eq.true,origen.eq.app')
+    .order('cerrado', { ascending: true }).order('fecha', { ascending: false });
   if (RES.semana) q = q.eq('semana', RES.semana);
   if (RES.dia) q = q.eq('fecha', RES.dia);
   if (RES.lote === null) q = q.or('lote.is.null,lote.eq.');
   else if (RES.lote !== undefined) q = q.eq('lote', RES.lote);
 
-  q.then(function (r) {
+  return q.then(function (r) {
     if (r.error) throw new Error(r.error.message);
-    var filas = r.data || [];
+    var filas = r.data || [], nVivo = filas.filter(function (f) { return !f.cerrado; }).length;
     var porLote = RES.lote !== undefined;
     var nombre = RES.fundo + (porLote ? ' · ' + RES.nombreLote(RES.lote) : '');
     var pasos = RES.pasosAmbito(false);
@@ -225,7 +260,8 @@ RES.renderMuestras = function (cont) {
     var excluidas = filas.filter(function (f) { return f.t_ciclo_total !== null && f.t_ciclo_total > RES.umbral; });
     var promedio = validas.length ? validas.reduce(function (s, f) { return s + Number(f.t_ciclo_total); }, 0) / validas.length : 0;
 
-    var h = RES.migas(pasos) + UI.encabezado('Toma de tiempos · Arándano', nombre, RES.ambitoTxt() + ' · ' + filas.length + ' registro(s)');
+    var h = RES.migas(pasos) + UI.encabezado('Toma de tiempos · Arándano', nombre, RES.ambitoTxt() + ' · ' + filas.length + ' registro(s)') +
+      '<div class="conteo">' + RES.vivoTxt(nVivo) + '</div>';
 
     h += '<div class="kpis">' +
       UI.kpi('Promedio válido', DR.num(promedio, 1) + ' min', validas.length + ' muestra(s) · meta ' + DR.num(RES.meta) + ' min', '#0097CE') +
@@ -234,10 +270,11 @@ RES.renderMuestras = function (cont) {
 
     var cols = [
       { t: 'Fecha', r: function (f) { return DR.fechaHora(f.fecha).split(' ')[0]; } },
-      { t: 'Código', k: 'codigo' }, { t: 'Lote', k: 'lote' }, { t: 'Líder', k: 'lider' },
+      { t: 'Código', r: function (f) { return DR.esc(f.codigo) + (f.cerrado ? '' : ' <span class="pill verde">en curso</span>'); } },
+      { t: 'Placa', k: 'placa' }, { t: 'Lote', k: 'lote' }, { t: 'Líder', k: 'lider' },
       { t: 'Variedad', k: 'variedad' }, { t: 'Calibre', k: 'calibre' }
     ].concat(CAMPOS_RESUMEN.map(function (c) { return { t: c.titulo, num: true, r: function (f) { return DR.num(f[c.clave], 1); } }; }))
-      .concat([{ t: 'Total ciclo (min)', num: true, r: function (f) { return '<b>' + DR.num(f.t_ciclo_total, 1) + '</b>'; } },
+      .concat([{ t: 'Total ciclo (min)', num: true, r: function (f) { return f.cerrado ? '<b>' + DR.num(f.t_ciclo_total, 1) + '</b>' : 'en curso'; } },
         { t: 'Comentarios', r: RES.comentarios }]);
 
     h += UI.panel('Muestras', filas.length + ' registro(s) · las tachadas en rojo se excluyeron del promedio por superar el umbral',

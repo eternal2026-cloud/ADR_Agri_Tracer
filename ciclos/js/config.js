@@ -4,7 +4,7 @@
  * (admin-usuarios, sync-sheets): no dependen de variables en Vercel.
  * ==========================================================================*/
 
-var CONFIG = { tab: 'usuarios', parametros: {}, listas: [], usuarios: [], areas: [], sync: null, rolNuevo: 'captura', usuarioEditado: false, fundosNuevo: [], accesosNuevo: { completo: false, lista: [] } };
+var CONFIG = { tab: 'usuarios', parametros: {}, listas: [], usuarios: [], areas: [], sync: null, rolNuevo: 'captura', usuarioEditado: false, fundosNuevo: [], soloPropiosNuevo: false, accesosNuevo: { completo: false, lista: [] } };
 
 CONFIG.TABS = [
   { id: 'usuarios', t: 'Usuarios', ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.8-3.2 3-5 5.5-5s4.7 1.8 5.5 5"/><path d="M17 8v6M14 11h6"/></svg>' },
@@ -124,6 +124,8 @@ CONFIG.tabUsuarios = function (c) {
     '<div class="campo ancho' + (CONFIG.rolNuevo === 'admin' ? ' oculto' : '') + '" id="nuAccesosCampo"><label>¿Qué podrá ver?</label>' + CONFIG.selectorAccesos('nuAccesos', CONFIG.accesosNuevo) + '</div>' +
     '<div class="campo ancho"><label>Fundos donde registra ciclos</label>' + CONFIG.selectorFundos('nuFundos', CONFIG.fundosNuevo) +
       '<div class="ayuda-campo">Marca uno o más para que solo pueda elegir esos. Sin marcar = todos los fundos.</div></div>' +
+    '<div class="campo ancho' + (CONFIG.rolNuevo === 'admin' ? ' oculto' : '') + '" id="nuCiclosCampo"><label>Ciclos que ve</label>' + CONFIG.selectorVerCiclos('nuVerCiclos', CONFIG.soloPropiosNuevo) +
+      '<div class="ayuda-campo">«Solo los suyos»: en Captura y Resumen solo ve los ciclos que él creó (dentro de sus fundos).</div></div>' +
     '<div class="campo ancho"><label for="nuClave">Contraseña (opcional)</label><input id="nuClave" placeholder="Déjalo vacío y se genera una temporal" autocomplete="off"></div>' +
     '</div><div class="acciones"><button type="button" class="btn verde grande" id="btnCrearUsuario">' + DR.ICONOS.mas + '<span>Crear usuario</span></button></div>';
 
@@ -134,7 +136,8 @@ CONFIG.tabUsuarios = function (c) {
       (u.activo && u.debe_cambiar_password ? ' <span class="pill gris">Aún no crea su contraseña</span>' : '') +
       (u.id === yo ? ' <span class="pill gris">Tú</span>' : '') +
       (u.rol === 'admin' ? '' : ' <span class="pill ' + (u.accesos ? 'azul' : 'gris') + '">' + DR.esc(CONFIG.textoAccesos(u.accesos)) + '</span>') +
-      (u.rol === 'admin' ? '' : ' <span class="pill ' + ((u.fundos || []).length ? 'azul' : 'gris') + '">' + DR.esc(CONFIG.textoFundos(u.fundos)) + '</span>');
+      (u.rol === 'admin' ? '' : ' <span class="pill ' + ((u.fundos || []).length ? 'azul' : 'gris') + '">' + DR.esc(CONFIG.textoFundos(u.fundos)) + '</span>') +
+      (u.rol === 'admin' ? '' : ' <span class="pill ' + (u.ciclos_solo_propios ? 'azul' : 'gris') + '">' + CONFIG.textoVerCiclos(u.ciclos_solo_propios) + '</span>');
     var selector = '<select data-rol-de="' + u.id + '"' + (u.id === yo ? ' disabled' : '') + ' aria-label="Rol de ' + DR.esc(u.nombre) + '">' +
       CONFIG.ROLES.map(function (r) { return '<option value="' + r.id + '"' + (r.id === u.rol ? ' selected' : '') + '>' + r.t + '</option>'; }).join('') + '</select>';
     return '<div class="usuario-card' + (u.activo ? '' : ' inactivo') + '"><div class="ini">' + CONFIG.iniciales(u.nombre || u.usuario) + '</div>' +
@@ -143,6 +146,7 @@ CONFIG.tabUsuarios = function (c) {
       '<div class="u-acciones">' + selector +
         (u.rol === 'admin' ? '' : '<button type="button" class="btn sec chico" data-accesos-de="' + u.id + '">Accesos</button>') +
         (u.rol === 'admin' ? '' : '<button type="button" class="btn sec chico" data-fundos-de="' + u.id + '">Fundos</button>') +
+        (u.rol === 'admin' ? '' : '<button type="button" class="btn sec chico" data-ciclos-de="' + u.id + '">Ciclos que ve</button>') +
         '<button type="button" class="btn sec chico" data-usuario-de="' + u.id + '">Cambiar usuario</button>' +
         '<button type="button" class="btn sec chico" data-reset="' + u.id + '">Nueva contraseña</button>' +
         (u.id === yo ? '' : '<button type="button" class="btn sec chico" data-activo-de="' + u.id + '" data-activo="' + u.activo + '">' + (u.activo ? 'Desactivar' : 'Reactivar') + '</button>') +
@@ -163,12 +167,17 @@ CONFIG.tabUsuarios = function (c) {
       CONFIG.rolNuevo = yo2.getAttribute('data-rol');
       DR.$$('.rol-op', c).forEach(function (x) { x.classList.toggle('activo', x === yo2); });
       DR.$('#nuAccesosCampo').classList.toggle('oculto', CONFIG.rolNuevo === 'admin');
+      DR.$('#nuCiclosCampo').classList.toggle('oculto', CONFIG.rolNuevo === 'admin');
       if (DR.anima) anime({ targets: yo2, scale: [0.97, 1], duration: 300, easing: 'easeOutBack' });
     };
   });
   DR.$('#btnCrearUsuario').onclick = CONFIG.crearUsuario;
   CONFIG.enlazarSelectorFundos('nuFundos', function (lista) { CONFIG.fundosNuevo = lista; });
   CONFIG.enlazarSelectorAccesos('nuAccesos', CONFIG.accesosNuevo);
+  CONFIG.enlazarSelectorVerCiclos('nuVerCiclos', function (v) { CONFIG.soloPropiosNuevo = v; });
+  DR.$$('[data-ciclos-de]', c).forEach(function (b) {
+    b.onclick = function () { CONFIG.editarVerCiclos(CONFIG.buscarUsuario(this.getAttribute('data-ciclos-de'))); };
+  });
   DR.$$('[data-accesos-de]', c).forEach(function (b) {
     b.onclick = function () { CONFIG.editarAccesos(CONFIG.buscarUsuario(this.getAttribute('data-accesos-de'))); };
   });
@@ -288,6 +297,48 @@ CONFIG.editarFundos = function (u) {
     AT.llamarFuncion('admin-usuarios', { accion: 'actualizar', id: u.id, fundos: elegidos }).then(function () {
       UI.cerrarHoja();
       DR.toast(u.nombre + ': ' + CONFIG.textoFundos(elegidos) + '.');
+      return CONFIG.refrescar();
+    }).catch(function (e) { btn.disabled = false; DR.toast(e.message, 'error'); });
+  };
+};
+
+/* ---- ciclos que ve: todos (de sus fundos) o solo los que él creó (perfiles.ciclos_solo_propios, 0042) ---- */
+CONFIG.textoVerCiclos = function (soloPropios) { return soloPropios ? 'Solo sus ciclos' : 'Todos los ciclos'; };
+CONFIG.selectorVerCiclos = function (id, soloPropios) {
+  return '<div class="opciones" id="' + id + '">' + [[false, 'Todos los ciclos'], [true, 'Solo los suyos']].map(function (o) {
+    return '<button type="button" class="opcion' + (o[0] === !!soloPropios ? ' activa' : '') + '" data-solo="' + o[0] + '">' + o[1] + '</button>';
+  }).join('') + '</div>';
+};
+CONFIG.enlazarSelectorVerCiclos = function (id, alCambiar) {
+  var grupo = DR.$('#' + id);
+  if (!grupo) return;
+  grupo.onclick = function (ev) {
+    var op = ev.target.closest('.opcion');
+    if (!op) return;
+    DR.$$('.opcion', grupo).forEach(function (o) { o.classList.toggle('activa', o === op); });
+    if (DR.anima) anime({ targets: op, scale: [0.9, 1], duration: 320, easing: 'easeOutBack' });
+    alCambiar(op.getAttribute('data-solo') === 'true');
+  };
+};
+CONFIG.editarVerCiclos = function (u) {
+  if (!u) return;
+  var solo = !!u.ciclos_solo_propios;
+  UI.abrirHoja('<div class="asa"></div>' +
+    '<div class="res-nombre">' + DR.esc(u.nombre) + '</div>' +
+    '<div class="res-dni">Ciclos que puede ver en Tiempos de ciclo</div>' +
+    '<div style="margin-top:14px">' + CONFIG.selectorVerCiclos('hojaVerCiclos', solo) + '</div>' +
+    '<div class="aviso" style="margin-top:14px"><b>Todos los ciclos:</b> ve los ciclos de cualquier persona en sus fundos asignados.<br>' +
+      '<b>Solo los suyos:</b> en Captura y en Resumen solo ve (y sigue) los ciclos que él mismo creó. Los fundos asignados se siguen aplicando.</div>' +
+    '<div class="acciones"><button type="button" class="btn sec" id="btnVerCiclosCancelar" style="flex:1">Cancelar</button>' +
+    '<button type="button" class="btn verde" id="btnVerCiclosGuardar" style="flex:1">Guardar</button></div>');
+  CONFIG.enlazarSelectorVerCiclos('hojaVerCiclos', function (v) { solo = v; });
+  DR.$('#btnVerCiclosCancelar').onclick = UI.cerrarHoja;
+  DR.$('#btnVerCiclosGuardar').onclick = function () {
+    var btn = this;
+    btn.disabled = true;
+    AT.llamarFuncion('admin-usuarios', { accion: 'actualizar', id: u.id, ciclos_solo_propios: solo }).then(function () {
+      UI.cerrarHoja();
+      DR.toast(u.nombre + ': ' + CONFIG.textoVerCiclos(solo).toLowerCase() + '.');
       return CONFIG.refrescar();
     }).catch(function (e) { btn.disabled = false; DR.toast(e.message, 'error'); });
   };
@@ -421,9 +472,10 @@ CONFIG.crearUsuario = function () {
   AT.llamarFuncion('admin-usuarios', {
     accion: 'crear', nombre: nombre, usuario: usuario, area: DR.$('#nuArea').value.trim(),
     rol: CONFIG.rolNuevo, password: DR.$('#nuClave').value, fundos: CONFIG.rolNuevo === 'admin' ? [] : CONFIG.fundosNuevo,
-    accesos: accesos
+    accesos: accesos, ciclos_solo_propios: CONFIG.rolNuevo !== 'admin' && CONFIG.soloPropiosNuevo
   }).then(function (r) {
     CONFIG.fundosNuevo = [];
+    CONFIG.soloPropiosNuevo = false;
     CONFIG.accesosNuevo = { completo: false, lista: [] };
     CONFIG.mostrarCredenciales(r, 'creado');
     return CONFIG.refrescar();

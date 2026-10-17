@@ -66,6 +66,25 @@ UI.copiar = function (texto) {
     document.body.removeChild(t);
   });
 };
+/** Copia contenido con formato (HTML) para pegarlo en Outlook/Word/Excel; texto plano como respaldo. */
+UI.copiarHtml = function (html, texto) {
+  if (navigator.clipboard && window.ClipboardItem && window.isSecureContext) {
+    return navigator.clipboard.write([new ClipboardItem({
+      'text/html': new Blob([html], { type: 'text/html' }),
+      'text/plain': new Blob([texto], { type: 'text/plain' })
+    })]);
+  }
+  return new Promise(function (resolve, reject) {
+    var d = document.createElement('div');
+    d.innerHTML = html; d.contentEditable = 'true'; d.style.position = 'fixed'; d.style.left = '-9999px';
+    document.body.appendChild(d);
+    var rango = document.createRange(), sel = window.getSelection();
+    rango.selectNodeContents(d); sel.removeAllRanges(); sel.addRange(rango);
+    try { if (document.execCommand('copy')) resolve(); else reject(new Error('No se pudo copiar.')); } catch (e) { reject(e); }
+    sel.removeAllRanges();
+    document.body.removeChild(d);
+  });
+};
 UI.tabla = function (columnas, filas, claseFilaFn) {
   if (!filas.length) return '<div class="vacio">No hay registros para este filtro.</div>';
   var h = '<div class="tabla-cont"><table><thead><tr>';

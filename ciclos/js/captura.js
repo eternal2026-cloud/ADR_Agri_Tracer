@@ -267,7 +267,7 @@ CAPTURA.diaInicial = function () {
 CAPTURA.cargarCiclos = function () {
   var desde = new Date(Date.now() - 36 * 3600 * 1000).toISOString(), m = CAPTURA.misFundos();
   // Solo ciclos capturados en la app (los importados del Excel histórico no son "en curso"),
-  // de cualquier persona, y solo de los fundos asignados al usuario.
+  // de cualquier persona (o solo los suyos si el admin lo marcó: lo filtra la RLS, 0042), y solo de sus fundos.
   // Con un día elegido se traen todos los cerrados de ese día; sin día, los cerrados de las últimas 36 h.
   var q1 = sb.from('ciclos_cosecha').select('*').eq('origen', 'app').eq('cerrado', false);
   var q2 = sb.from('ciclos_cosecha').select('*').eq('origen', 'app').eq('cerrado', true);

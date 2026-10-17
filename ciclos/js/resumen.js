@@ -2,12 +2,15 @@
  * resumen.js — DRILL-DOWN DEL TIEMPO DE CICLO
  * Ámbito: todas las semanas, una semana o un día. En cada ámbito:
  *   promedio por fundo (con «Minutos por tramo» arriba) → toca el resumen → por lote
- *   → toca un lote (o un fundo en la tabla) → muestras individuales.
+ *   → toca un lote → muestras individuales.
+ *   La tabla «Promedio por fundo» es dinámica (como una TD): fundo › grupo de lote (2 letras,
+ *   en mayúsculas: CA, VA…) › lote normalizado; cada nivel con su propio promedio y un botón
+ *   para copiarla con formato y pegarla en un correo de Outlook.
  * ==========================================================================*/
 var VISTAS = window.VISTAS || {};
 
 /** nivel: 'general' | 'semana' | 'dia' | 'lotes' | 'muestras'. lote: undefined = todos los lotes del fundo. */
-var RES = { nivel: 'general', semana: null, dia: null, fundo: null, lote: undefined, fundoLotes: '', umbral: 480, meta: 120 };
+var RES = { nivel: 'general', semana: null, dia: null, fundo: null, lote: undefined, loteNorm: null, fundoLotes: '', umbral: 480, meta: 120, pivAbiertos: {} };
 
 RES.cargarUmbral = function () {
   return sb.from('parametros').select('valor').eq('clave', 'UMBRAL_TIEMPO_CICLO_MIN').single().then(function (r) {
@@ -77,7 +80,9 @@ RES.irSemana = function (semana) { RES.ir('semana', { semana: semana, dia: null,
 RES.irDia = function (dia) { RES.ir('dia', { dia: dia, semana: null, fundo: null, lote: undefined }); };
 RES.irAmbito = function () { if (RES.dia) RES.irDia(RES.dia); else if (RES.semana) RES.irSemana(RES.semana); else RES.irGeneral(); };
 RES.irLotes = function () { RES.ir('lotes', { fundo: null, lote: undefined }); };
-RES.irMuestras = function (fundo, lote) { RES.ir('muestras', { fundo: fundo, lote: lote }); };
+RES.irMuestras = function (fundo, lote) { RES.ir('muestras', { fundo: fundo, lote: lote, loteNorm: null }); };
+/** Muestras de un lote normalizado de la tabla dinámica («Ca 3», «CA3 » → CA3). */
+RES.irMuestrasNorm = function (fundo, loteNorm) { RES.ir('muestras', { fundo: fundo, lote: undefined, loteNorm: loteNorm }); };
 
 RES.fechaTxt = function (d) { return d ? d.substring(8, 10) + '/' + d.substring(5, 7) + '/' + d.substring(0, 4) : ''; };
 RES.ambitoTxt = function () { return RES.dia ? 'Día ' + RES.fechaTxt(RES.dia) : (RES.semana ? 'Semana ' + RES.semana : 'Todas las semanas'); };
@@ -142,20 +147,21 @@ RES.renderPivot = function (cont) {
     }
     if (RES.nivel === 'dia' && !RES.dia) { RES.irGeneral(); return; }
     if (RES.nivel === 'dia' && dias.indexOf(RES.dia) < 0) dias = [RES.dia].concat(dias);
-    var datos = AT.rpc('fn_resumen_vivo', { p_semana: RES.nivel === 'semana' ? RES.semana : null, p_fecha: RES.nivel === 'dia' ? RES.dia : null });
+    var datos = AT.rpc('fn_resumen_pivot_vivo', { p_semana: RES.nivel === 'semana' ? RES.semana : null, p_fecha: RES.nivel === 'dia' ? RES.dia : null });
     return datos.then(function (filas) { RES.pintarPivot(cont, filas || [], semanas, dias); });
   }).catch(function (e) { UI.error(cont, e); });
 };
 
 RES.pintarPivot = function (cont, filas, semanas, dias) {
   var general = RES.nivel === 'general';
-  if (general && !filas.length) {
+  var total = filas.filter(function (f) { return f.nivel === 0; })[0] || { n_muestras: 0, n_en_curso: 0, t_ciclo_total: null, tiempo_horas: null };
+  total.fundo = 'Total general';
+  var fundos = RES.arbolPivot(filas);
+  if (general && !fundos.length) {
     cont.innerHTML = UI.encabezado('Toma de tiempos · Arándano', 'Resumen general', 'Todavía no hay ciclos cerrados registrados.') +
       UI.panel('Sin datos', '', '<div class="aviso">Registra el primer ciclo desde la pestaña <b>Captura</b>, o importa la hoja BD del Excel a la tabla <code>ciclos_cosecha</code>.</div>');
     DR.entrarPaneles('#contenido'); return;
   }
-  var total = filas.filter(function (f) { return f.fundo === 'Total general'; })[0] || { fundo: 'Total general', n_muestras: 0, n_en_curso: 0, t_ciclo_total: null, tiempo_horas: null };
-  var fundos = filas.filter(function (f) { return f.fundo !== 'Total general'; }).sort(function (a, b) { return (b.t_ciclo_total || 0) - (a.t_ciclo_total || 0); });
   var titulo = general ? 'Promedio general' : RES.ambitoTxt();
   var texto = general ? 'Todas las semanas registradas, agrupado por fundo.'
     : 'Promedio de cada tramo agrupado por fundo. Los registros que superan el umbral se excluyen del cálculo.';
@@ -173,9 +179,12 @@ RES.pintarPivot = function (cont, filas, semanas, dias) {
     h += UI.panel('Sin ciclos', '', '<div class="vacio">No hay ciclos (cerrados ni en curso) bajo el umbral en ' + DR.esc(RES.ambitoTxt().toLowerCase()) + '.</div>');
   } else {
     h += RES.tramosHtml(total);
-    fundos.forEach(function (f, i) { f._idx = i; f._clic = true; });
-    h += UI.panel(general ? 'Promedio por fundo (todas las semanas)' : 'Promedio por fundo · ' + RES.ambitoTxt(), fundos.length + ' fundo(s) · toca una fila para ver sus muestras',
-      UI.tabla(UI.columnasResumen(), fundos.concat([total]), function (f) { return f.fundo === 'Total general' ? 'fila-total' : 'clicable'; }));
+    h += UI.panel(general ? 'Promedio por fundo (todas las semanas)' : 'Promedio por fundo · ' + RES.ambitoTxt(),
+      fundos.length + ' fundo(s) · toca un fundo para abrir sus grupos de lote, un grupo para verlo lote a lote y un lote para ver sus muestras',
+      '<div class="piv-barra"><button type="button" class="btn sec chico" id="pivAbrir">Expandir todo</button>' +
+      '<button type="button" class="btn sec chico" id="pivCerrar">Contraer todo</button>' +
+      '<button type="button" class="btn verde chico" id="pivCopiar">' + RES.ICONO_COPIAR + '<span>Copiar tabla</span></button></div>' +
+      '<div id="pivTabla"></div>');
     var barras = fundos.filter(function (f) { return f.t_ciclo_total !== null; }).map(function (f) { return { etq: f.fundo, valor: f.t_ciclo_total, dec: 1 }; });
     h += UI.panel('Tiempo de ciclo total por fundo', 'La línea punteada marca la meta (' + DR.num(RES.meta) + ' min).', GRAFICO.barrasFundo(barras, RES.meta));
   }
@@ -186,6 +195,7 @@ RES.pintarPivot = function (cont, filas, semanas, dias) {
   GRAFICO.animarBarrasFundo();
   UI.animarBarrasTramos(cont);
   if (general) EVO.montar();
+  if (DR.$('#pivTabla')) RES.montarPivot(fundos, total);
 
   RES.enlazarSelectores();
   RES.enlazarMigas(cont);
@@ -194,9 +204,134 @@ RES.pintarPivot = function (cont, filas, semanas, dias) {
     res.onclick = RES.irLotes;
     res.onkeydown = function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); RES.irLotes(); } };
   }
-  DR.$$('tbody tr.clicable', cont).forEach(function (tr) {
-    tr.onclick = function () { RES.irMuestras(fundos[Number(this.getAttribute('data-idx'))].fundo); };
+};
+
+/* ============================================================ TABLA DINÁMICA (fundo › grupo de lote › lote) */
+RES.ICONO_COPIAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/></svg>';
+
+/** Igual que fn_lote_normalizado (0042): mayúsculas, sin espacios, sin ceros tras las letras. */
+RES.normLote = function (lote) {
+  var l = String(lote || '').replace(/\s+/g, '').toUpperCase().replace(/^([A-Z]+)0+(\d)/, '$1$2');
+  return l || null;
+};
+
+/** Filas de fn_resumen_pivot_vivo (nivel 1 fundo, 2 grupo, 3 lote) → fundos con hijos, del más lento al más rápido. */
+RES.arbolPivot = function (filas) {
+  var natural = function (a, b) {
+    if (a === b) return 0;
+    if (a === null) return 1;
+    if (b === null) return -1;
+    return a.localeCompare(b, 'es', { numeric: true });
+  };
+  var fundos = filas.filter(function (f) { return f.nivel === 1; })
+    .sort(function (a, b) { return (b.t_ciclo_total || 0) - (a.t_ciclo_total || 0); });
+  fundos.forEach(function (f) {
+    f.hijos = filas.filter(function (g) { return g.nivel === 2 && g.fundo === f.fundo; }).sort(function (a, b) { return natural(a.grupo, b.grupo); });
+    f.hijos.forEach(function (g) {
+      g.hijos = g.grupo === null ? [] : filas.filter(function (l) { return l.nivel === 3 && l.fundo === f.fundo && l.grupo === g.grupo; })
+        .sort(function (a, b) { return natural(a.lote, b.lote); });
+    });
   });
+  return fundos;
+};
+
+/** Filas visibles según lo abierto (RES.pivAbiertos sobrevive al refresco en vivo). */
+RES.pivVisibles = function (fundos, total) {
+  var vis = [];
+  fundos.forEach(function (f) {
+    var kf = 'f|' + f.fundo;
+    vis.push({ f: f, nivel: 1, etq: f.fundo, clave: kf, hijos: f.hijos.length, abierto: !!RES.pivAbiertos[kf] });
+    if (!RES.pivAbiertos[kf]) return;
+    f.hijos.forEach(function (g) {
+      var kg = 'g|' + f.fundo + '|' + g.grupo;
+      vis.push({ f: g, nivel: 2, etq: g.grupo === null ? 'Sin lote' : 'Lotes ' + g.grupo, nota: g.hijos.length ? g.hijos.length + ' lote(s)' : '',
+        clave: kg, hijos: g.hijos.length, abierto: !!RES.pivAbiertos[kg] });
+      if (!RES.pivAbiertos[kg]) return;
+      g.hijos.forEach(function (l) { vis.push({ f: l, nivel: 3, etq: l.lote }); });
+    });
+  });
+  vis.push({ f: total, nivel: 0, etq: 'Total general' });
+  return vis;
+};
+
+RES.pivNum = function (v, dec) { return v === null || v === undefined ? '—' : DR.num(v, dec); };
+RES.pivColumnas = function () {
+  return [{ t: 'N° muestras', r: function (f) { return DR.num(f.n_muestras); }, nota: function (f) { return f.n_en_curso ? '+' + f.n_en_curso + ' en curso' : ''; } }]
+    .concat(CAMPOS_RESUMEN.map(function (c) { return { t: c.titulo, r: function (f) { return RES.pivNum(f[c.clave], 1); } }; }))
+    .concat([{ t: 'Total ciclo (min)', fuerte: true, r: function (f) { return RES.pivNum(f.t_ciclo_total, 1); } },
+      { t: 'Horas', r: function (f) { return RES.pivNum(f.tiempo_horas, 2); } }]);
+};
+
+RES.montarPivot = function (fundos, total) {
+  var caja = DR.$('#pivTabla'), cols = RES.pivColumnas(), vis;
+  var pintar = function () {
+    var x = caja.firstChild ? caja.firstChild.scrollLeft : 0;
+    vis = RES.pivVisibles(fundos, total);
+    var h = '<div class="tabla-cont piv"><table><thead><tr><th>Fundo › grupo › lote</th>' +
+      cols.map(function (c) { return '<th>' + DR.esc(c.t) + '</th>'; }).join('') + '</tr></thead><tbody>';
+    vis.forEach(function (v, i) {
+      var clase = v.nivel === 0 ? 'fila-total' : 'piv-n' + v.nivel + (v.hijos || v.nivel === 3 ? ' clicable' : '');
+      var flecha = v.hijos ? '<span class="piv-flecha' + (v.abierto ? ' abierta' : '') + '">' + DR.ICONOS.chevron + '</span>' : '<span class="piv-flecha"></span>';
+      h += '<tr class="' + clase + '" data-piv="' + i + '"><td class="piv-etq">' + (v.nivel ? flecha : '') + DR.esc(v.etq) +
+        (v.nota ? ' <small>' + DR.esc(v.nota) + '</small>' : '') + '</td>' +
+        cols.map(function (c) {
+          var n = c.nota ? c.nota(v.f) : '';
+          return '<td class="num">' + (c.fuerte ? '<b>' + c.r(v.f) + '</b>' : c.r(v.f)) + (n ? '<small class="piv-vivo">' + n + '</small>' : '') + '</td>';
+        }).join('') + '</tr>';
+    });
+    caja.innerHTML = h + '</tbody></table></div>';
+    caja.firstChild.scrollLeft = x;
+    DR.$$('tr[data-piv]', caja).forEach(function (tr) {
+      tr.onclick = function () {
+        var v = vis[Number(this.getAttribute('data-piv'))];
+        if (v.nivel === 3) { RES.irMuestrasNorm(v.f.fundo, v.f.lote); return; }
+        if (!v.hijos) return;
+        RES.pivAbiertos[v.clave] = !RES.pivAbiertos[v.clave];
+        pintar();
+      };
+    });
+  };
+  pintar();
+  DR.$('#pivAbrir').onclick = function () {
+    fundos.forEach(function (f) {
+      RES.pivAbiertos['f|' + f.fundo] = true;
+      f.hijos.forEach(function (g) { if (g.hijos.length) RES.pivAbiertos['g|' + f.fundo + '|' + g.grupo] = true; });
+    });
+    pintar();
+  };
+  DR.$('#pivCerrar').onclick = function () { RES.pivAbiertos = {}; pintar(); };
+  DR.$('#pivCopiar').onclick = function () {
+    var c = RES.copiaPivot(vis, cols);
+    UI.copiarHtml(c.html, c.texto).then(function () { DR.toast('Tabla copiada tal como está abierta. Pégala en el correo de Outlook (Ctrl+V).'); })
+      .catch(function () { DR.toast('No se pudo copiar la tabla.', 'error'); });
+  };
+};
+
+/** Tabla con estilos en línea (Outlook ignora las hojas de estilo), con las filas tal como están abiertas. */
+RES.copiaPivot = function (vis, cols) {
+  var fuente = 'font-family:Calibri,Arial,sans-serif;font-size:10pt;';
+  var celda = 'border:1px solid #D9CFC4;padding:4px 8px;white-space:nowrap;' + fuente;
+  var fondos = { 0: '#FBEBDD', 1: '#F3EDE6', 2: '#FFFFFF', 3: '#FFFFFF' };
+  var sangria = { 0: 8, 1: 8, 2: 22, 3: 38 };
+  var encabezados = ['Fundo › grupo › lote'].concat(cols.map(function (c) { return c.t; }));
+  var titulo = 'Tiempo de ciclo · ' + RES.ambitoTxt() + ' · promedio en minutos (meta ' + DR.num(RES.meta) + ' min, umbral ' + DR.num(RES.umbral) + ' min)';
+  var h = '<p style="' + fuente + 'font-size:11pt;font-weight:bold;color:#3B3129;margin:0 0 6px">' + DR.esc(titulo) + '</p>' +
+    '<table cellspacing="0" cellpadding="0" style="border-collapse:collapse;' + fuente + '"><tr>' +
+    encabezados.map(function (t, i) {
+      return '<th style="' + celda + 'background:#3B3129;color:#FFFFFF;font-weight:bold;text-align:' + (i ? 'right' : 'left') + '">' + DR.esc(t) + '</th>';
+    }).join('') + '</tr>';
+  var texto = titulo + '\n' + encabezados.join('\t') + '\n';
+  vis.forEach(function (v) {
+    var estilo = celda + (v.nivel <= 1 ? 'font-weight:bold;' : '') + (v.nivel === 0 ? 'border-top:2px solid #EF7C3B;' : '') + 'background:' + fondos[v.nivel] + ';';
+    var t = v.f.t_ciclo_total;
+    var color = t === null || t === undefined ? '' : (Number(t) <= RES.meta ? 'color:#3F7A12;' : 'color:#B94A02;');
+    h += '<tr><td style="' + estilo + 'padding-left:' + sangria[v.nivel] + 'px">' + DR.esc(v.etq) + '</td>' +
+      cols.map(function (c) {
+        return '<td style="' + estilo + 'text-align:right;' + (c.fuerte ? 'font-weight:bold;' + color : '') + '">' + c.r(v.f) + '</td>';
+      }).join('') + '</tr>';
+    texto += [new Array(Math.max(v.nivel - 1, 0) + 1).join('  ') + v.etq].concat(cols.map(function (c) { return c.r(v.f); })).join('\t') + '\n';
+  });
+  return { html: h + '</table>', texto: texto };
 };
 
 /* ============================================================ RESUMEN POR LOTE */
@@ -250,8 +385,12 @@ RES.renderMuestras = function (cont) {
   return q.then(function (r) {
     if (r.error) throw new Error(r.error.message);
     var filas = r.data || [], nVivo = filas.filter(function (f) { return !f.cerrado; }).length;
+    if (RES.loteNorm) {
+      filas = filas.filter(function (f) { return RES.normLote(f.lote) === RES.loteNorm; });
+      nVivo = filas.filter(function (f) { return !f.cerrado; }).length;
+    }
     var porLote = RES.lote !== undefined;
-    var nombre = RES.fundo + (porLote ? ' · ' + RES.nombreLote(RES.lote) : '');
+    var nombre = RES.fundo + (porLote ? ' · ' + RES.nombreLote(RES.lote) : (RES.loteNorm ? ' · ' + RES.nombreLote(RES.loteNorm) : ''));
     var pasos = RES.pasosAmbito(false);
     if (porLote) pasos.push({ texto: 'Por lote', fn: RES.irLotes });
     pasos.push({ texto: nombre });

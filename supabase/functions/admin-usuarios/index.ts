@@ -4,12 +4,13 @@
  * incluida en las Edge Functions, así que no hay variables que configurar.
  * Solo un admin activo puede llamarla (se valida el JWT de su sesión).
  *
- * POST { accion: 'crear', usuario, nombre, area, rol, password?, fundos?, accesos? }
+ * POST { accion: 'crear', usuario, nombre, area, rol, password?, fundos?, accesos?, ciclos_solo_propios? }
  * POST { accion: 'reset', id }
- * POST { accion: 'actualizar', id, usuario?, rol?, activo?, nombre?, area?, fundos?, accesos? }
+ * POST { accion: 'actualizar', id, usuario?, rol?, activo?, nombre?, area?, fundos?, accesos?, ciclos_solo_propios? }
  * usuario: cambia el nombre de ingreso (y el correo técnico de Auth); la contraseña no cambia.
  * fundos: lista de fundos donde puede registrar ciclos ([] = todos).
  * accesos: claves grupo.modulo.funcion que puede ver (null = acceso completo; ver AT.ACCESOS).
+ * ciclos_solo_propios: true = en Tiempos de ciclo solo ve los ciclos que él creó (false = todos).
  * ==========================================================================*/
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
@@ -92,7 +93,7 @@ async function crear(sb: SupabaseClient, yo: Perfil, b: Record<string, unknown>)
 
   const { error: insErr } = await sb.from('perfiles').insert({
     id: nuevo.user.id, usuario, nombre, area: String(b.area || '').trim(), rol, activo: true, debe_cambiar_password: true,
-    fundos: limpiarFundos(b.fundos), accesos,
+    fundos: limpiarFundos(b.fundos), accesos, ciclos_solo_propios: rol !== 'admin' && b.ciclos_solo_propios === true,
   });
   if (insErr) {
     await sb.auth.admin.deleteUser(nuevo.user.id).catch(() => {});
@@ -128,6 +129,7 @@ async function actualizar(sb: SupabaseClient, yo: Perfil, b: Record<string, unkn
   if (b.nombre !== undefined) cambios.nombre = String(b.nombre).trim() || p.nombre;
   if (b.area !== undefined) cambios.area = String(b.area).trim();
   if (b.fundos !== undefined) cambios.fundos = limpiarFundos(b.fundos);
+  if (b.ciclos_solo_propios !== undefined) cambios.ciclos_solo_propios = b.ciclos_solo_propios === true;
   if (b.accesos !== undefined) {
     cambios.accesos = limpiarAccesos(b.accesos);
     if (cambios.accesos && !(cambios.accesos as string[]).length) return responder({ error: 'Marca al menos un módulo que podrá ver, o «Acceso completo».' }, 400);

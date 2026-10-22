@@ -6,11 +6,13 @@
  *   La tabla «Promedio por fundo» es dinámica (como una TD): fundo › grupo de lote (2 letras,
  *   en mayúsculas: CA, VA…) › lote normalizado; cada nivel con su propio promedio y un botón
  *   para copiarla con formato y pegarla en un correo de Outlook.
+ *   El filtro de fundo (RES.fundoPiv) acota «Minutos por tramo», la tabla dinámica y el gráfico;
+ *   se conserva al cambiar de semana o de día.
  * ==========================================================================*/
 var VISTAS = window.VISTAS || {};
 
 /** nivel: 'general' | 'semana' | 'dia' | 'lotes' | 'muestras'. lote: undefined = todos los lotes del fundo. */
-var RES = { nivel: 'general', semana: null, dia: null, fundo: null, lote: undefined, loteNorm: null, fundoLotes: '', umbral: 480, meta: 120, pivAbiertos: {} };
+var RES = { nivel: 'general', semana: null, dia: null, fundo: null, lote: undefined, loteNorm: null, fundoLotes: '', fundoPiv: '', umbral: 480, meta: 120, pivAbiertos: {} };
 
 RES.cargarUmbral = function () {
   return sb.from('parametros').select('valor').eq('clave', 'UMBRAL_TIEMPO_CICLO_MIN').single().then(function (r) {
@@ -86,6 +88,8 @@ RES.irMuestrasNorm = function (fundo, loteNorm) { RES.ir('muestras', { fundo: fu
 
 RES.fechaTxt = function (d) { return d ? d.substring(8, 10) + '/' + d.substring(5, 7) + '/' + d.substring(0, 4) : ''; };
 RES.ambitoTxt = function () { return RES.dia ? 'Día ' + RES.fechaTxt(RES.dia) : (RES.semana ? 'Semana ' + RES.semana : 'Todas las semanas'); };
+/** Ámbito más el fundo filtrado, para títulos y la copia a Outlook. */
+RES.ambitoFundoTxt = function () { return RES.ambitoTxt() + (RES.fundoPiv ? ' · ' + RES.fundoPiv : ''); };
 RES.nombreLote = function (lote) { return lote ? 'Lote ' + lote : 'Sin lote'; };
 
 /** Migas: [{ texto, fn }] (la última sin fn). */
@@ -107,19 +111,23 @@ RES.enlazarMigas = function (cont) {
   });
 };
 
-/** Selectores de semana y de día del encabezado. */
-RES.selectores = function (semanas, dias) {
+/** Selectores de semana, de día y de fundo del encabezado. */
+RES.selectores = function (semanas, dias, fundos) {
   return '<div class="res-selectores">' +
     '<select id="selSemana" aria-label="Semana"><option value="">Todas las semanas</option>' + semanas.map(function (s) {
       return '<option value="' + s + '"' + (s === RES.semana ? ' selected' : '') + '>Semana ' + s + '</option>';
     }).join('') + '</select>' +
     '<select id="selDia" aria-label="Día"><option value="">' + (RES.dia ? 'Ver todas las semanas' : 'Ver un día…') + '</option>' + dias.map(function (d) {
       return '<option value="' + d + '"' + (d === RES.dia ? ' selected' : '') + '>' + RES.fechaTxt(d) + '</option>';
+    }).join('') + '</select>' +
+    '<select id="selFundoPiv" aria-label="Fundo"><option value="">Todos los fundos</option>' + fundos.map(function (f) {
+      return '<option value="' + DR.esc(f) + '"' + (f === RES.fundoPiv ? ' selected' : '') + '>' + DR.esc(f) + '</option>';
     }).join('') + '</select></div>';
 };
 RES.enlazarSelectores = function () {
   DR.$('#selSemana').onchange = function () { if (this.value) RES.irSemana(Number(this.value)); else RES.irGeneral(); };
   DR.$('#selDia').onchange = function () { if (this.value) RES.irDia(this.value); else RES.irGeneral(); };
+  DR.$('#selFundoPiv').onchange = function () { RES.ir(RES.nivel, { fundoPiv: this.value }); };
 };
 
 /** «Minutos por tramo» del ámbito (fila Total general); al tocarlo se abre el resumen por lote. */
@@ -128,7 +136,7 @@ RES.tramosHtml = function (total) {
     .filter(function (x) { return x.v !== null && x.v !== undefined; });
   var meta = RES.meta, t = total.t_ciclo_total;
   return '<section class="panel entra res-tramos clicable" id="resTramos" role="button" tabindex="0">' +
-    '<h2>Minutos por tramo · ' + DR.esc(RES.ambitoTxt()) + '</h2>' +
+    '<h2>Minutos por tramo · ' + DR.esc(RES.ambitoFundoTxt()) + '</h2>' +
     '<div class="sub">' + RES.vivoTxt(total.n_en_curso) + '<br>Promedio de cada tramo de los ciclos cerrados y de los tramos ya completados de los ciclos en curso (sin los que superan el umbral). Toca para ver el resumen por lote.</div>' +
     '<div class="kpis">' +
       UI.kpi('Tiempo de ciclo', t === null ? '—' : DR.num(t, 0) + '<small>min</small>', (t === null ? 'Aún sin ciclos cerrados' : DR.num(total.tiempo_horas, 2) + ' horas') + ' · meta ' + DR.num(meta, 0) + ' min', t !== null && t <= meta ? '#76B729' : '#EF7C3B') +
@@ -154,10 +162,15 @@ RES.renderPivot = function (cont) {
 
 RES.pintarPivot = function (cont, filas, semanas, dias) {
   var general = RES.nivel === 'general';
-  var total = filas.filter(function (f) { return f.nivel === 0; })[0] || { n_muestras: 0, n_en_curso: 0, t_ciclo_total: null, tiempo_horas: null };
+  var todos = RES.arbolPivot(filas);
+  var nombres = todos.map(function (f) { return f.fundo; }).sort(function (a, b) { return String(a).localeCompare(String(b), 'es'); });
+  if (RES.fundoPiv && nombres.indexOf(RES.fundoPiv) < 0) nombres.push(RES.fundoPiv);
+  // Con un fundo elegido, su fila hace de «Total general» (mismas columnas que el nivel 0).
+  var fundos = RES.fundoPiv ? todos.filter(function (f) { return f.fundo === RES.fundoPiv; }) : todos;
+  var vacio = { n_muestras: 0, n_en_curso: 0, t_ciclo_total: null, tiempo_horas: null };
+  var total = Object.assign({}, RES.fundoPiv ? (fundos[0] || vacio) : (filas.filter(function (f) { return f.nivel === 0; })[0] || vacio));
   total.fundo = 'Total general';
-  var fundos = RES.arbolPivot(filas);
-  if (general && !fundos.length) {
+  if (general && !todos.length) {
     cont.innerHTML = UI.encabezado('Toma de tiempos · Arándano', 'Resumen general', 'Todavía no hay ciclos cerrados registrados.') +
       UI.panel('Sin datos', '', '<div class="aviso">Registra el primer ciclo desde la pestaña <b>Captura</b>, o importa la hoja BD del Excel a la tabla <code>ciclos_cosecha</code>.</div>');
     DR.entrarPaneles('#contenido'); return;
@@ -166,20 +179,21 @@ RES.pintarPivot = function (cont, filas, semanas, dias) {
   var texto = general ? 'Todas las semanas registradas, agrupado por fundo.'
     : 'Promedio de cada tramo agrupado por fundo. Los registros que superan el umbral se excluyen del cálculo.';
 
-  var h = RES.migas(RES.pasosAmbito(true)) + UI.encabezado('Toma de tiempos · Arándano', titulo, texto, RES.selectores(semanas, dias));
+  var h = RES.migas(RES.pasosAmbito(true)) + UI.encabezado('Toma de tiempos · Arándano', titulo, texto, RES.selectores(semanas, dias, nombres));
   // El tiempo de ciclo y las muestras válidas van en el panel «Minutos por tramo».
   if (general) {
     h += '<div class="kpis">' +
-      UI.kpi('Fundos', DR.num(fundos.length), 'Con datos registrados', '#B7A99C') +
+      UI.kpi('Fundos', DR.num(todos.length), 'Con datos registrados', '#B7A99C') +
       UI.kpi('Semanas', DR.num(semanas.length), semanas.length ? ('De la ' + semanas[0] + ' a la ' + semanas[semanas.length - 1]) : '', '#EF7C3B') +
       '</div>';
   }
 
   if (!total.n_muestras && !total.n_en_curso) {
-    h += UI.panel('Sin ciclos', '', '<div class="vacio">No hay ciclos (cerrados ni en curso) bajo el umbral en ' + DR.esc(RES.ambitoTxt().toLowerCase()) + '.</div>');
+    h += UI.panel('Sin ciclos', '', '<div class="vacio">No hay ciclos (cerrados ni en curso) bajo el umbral en ' + DR.esc(RES.ambitoTxt().toLowerCase()) +
+      (RES.fundoPiv ? ' para el fundo ' + DR.esc(RES.fundoPiv) : '') + '.</div>');
   } else {
     h += RES.tramosHtml(total);
-    h += UI.panel(general ? 'Promedio por fundo (todas las semanas)' : 'Promedio por fundo · ' + RES.ambitoTxt(),
+    h += UI.panel((general ? 'Promedio por fundo (todas las semanas)' : 'Promedio por fundo · ' + RES.ambitoTxt()) + (RES.fundoPiv ? ' · ' + RES.fundoPiv : ''),
       fundos.length + ' fundo(s) · toca un fundo para abrir sus grupos de lote, un grupo para verlo lote a lote y un lote para ver sus muestras',
       '<div class="piv-barra"><button type="button" class="btn sec chico" id="pivAbrir">Expandir todo</button>' +
       '<button type="button" class="btn sec chico" id="pivCerrar">Contraer todo</button>' +
@@ -201,8 +215,10 @@ RES.pintarPivot = function (cont, filas, semanas, dias) {
   RES.enlazarMigas(cont);
   var res = DR.$('#resTramos');
   if (res) {
-    res.onclick = RES.irLotes;
-    res.onkeydown = function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); RES.irLotes(); } };
+    // El resumen por lote abre con el mismo fundo filtrado.
+    var abrirLotes = function () { RES.fundoLotes = RES.fundoPiv; RES.irLotes(); };
+    res.onclick = abrirLotes;
+    res.onkeydown = function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); abrirLotes(); } };
   }
 };
 
@@ -314,7 +330,7 @@ RES.copiaPivot = function (vis, cols) {
   var fondos = { 0: '#FBEBDD', 1: '#F3EDE6', 2: '#FFFFFF', 3: '#FFFFFF' };
   var sangria = { 0: 8, 1: 8, 2: 22, 3: 38 };
   var encabezados = ['Fundo › grupo › lote'].concat(cols.map(function (c) { return c.t; }));
-  var titulo = 'Tiempo de ciclo · ' + RES.ambitoTxt() + ' · promedio en minutos (meta ' + DR.num(RES.meta) + ' min, umbral ' + DR.num(RES.umbral) + ' min)';
+  var titulo = 'Tiempo de ciclo · ' + RES.ambitoFundoTxt() + ' · promedio en minutos (meta ' + DR.num(RES.meta) + ' min, umbral ' + DR.num(RES.umbral) + ' min)';
   var h = '<p style="' + fuente + 'font-size:11pt;font-weight:bold;color:#3B3129;margin:0 0 6px">' + DR.esc(titulo) + '</p>' +
     '<table cellspacing="0" cellpadding="0" style="border-collapse:collapse;' + fuente + '"><tr>' +
     encabezados.map(function (t, i) {

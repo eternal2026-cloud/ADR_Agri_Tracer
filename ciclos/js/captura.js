@@ -111,7 +111,8 @@ CAPTURA.opciones = function (lista) {
 CAPTURA.pad = function (n) { return (n < 10 ? '0' : '') + n; };
 CAPTURA.localDe = function (d) {
   var p = CAPTURA.pad;
-  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+  // Con segundos: una etapa de menos de 1 min ya no queda en 0.
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
 };
 CAPTURA.ahoraLocal = function () { return CAPTURA.localDe(new Date()); };
 CAPTURA.hoyLocal = function () { return CAPTURA.ahoraLocal().substring(0, 10); };
@@ -119,7 +120,20 @@ CAPTURA.aIso = function (v) { if (!v) return null; var d = new Date(v); return i
 CAPTURA.aLocal = function (iso) { if (!iso) return ''; var d = new Date(iso); return isNaN(d.getTime()) ? '' : CAPTURA.localDe(d); };
 CAPTURA.horaCorta = function (local) {
   if (!local) return '—';
-  return local.substring(0, 10) === CAPTURA.hoyLocal() ? local.substring(11, 16) : local.substring(8, 10) + '/' + local.substring(5, 7) + ' ' + local.substring(11, 16);
+  var h = local.substring(11, local.length >= 19 ? 19 : 16);
+  return local.substring(0, 10) === CAPTURA.hoyLocal() ? h : local.substring(8, 10) + '/' + local.substring(5, 7) + ' ' + h;
+};
+/** Hora anterior en la cadena (para medir la etapa o la espera que termina en «clave»). */
+CAPTURA.horaPrevia = function (clave) {
+  var i = CADENA_HORAS.indexOf(clave);
+  return i > 0 ? CADENA_HORAS[i - 1] : null;
+};
+/** «Duró 3 min 05 s» (fin de etapa) o «Esperó 45 s» (inicio tras el fin anterior); '' si falta alguna hora. */
+CAPTURA.durTxt = function (clave, desde, hasta) {
+  if (!desde || !hasta) return '';
+  var ms = new Date(hasta).getTime() - new Date(desde).getTime();
+  if (isNaN(ms) || ms < 0) return '';
+  return (/^fin_/.test(clave) ? 'Duró ' : 'Esperó ') + UI.dur(ms / 60000);
 };
 
 /* ------------------------------------------------ preferencias del celular */
@@ -291,7 +305,7 @@ CAPTURA.tarjetaHtml = function (f) {
   var sub = [f.fundo, f.lote ? 'Lote ' + f.lote : '', f.lider].filter(Boolean).map(DR.esc).join(' · ');
   var pie = et
     ? '<span>Etapa ' + (idx + 1) + ' de ' + ETAPAS.length + ' · Siguiente: <b>' + et.titulo + '</b></span>'
-    : '<span><b>Cerrado</b> · ' + (f.t_ciclo_total !== null ? DR.num(f.t_ciclo_total, 0) + ' min de ciclo' : 'ver detalle') + '</span>';
+    : '<span><b>Cerrado</b> · ' + (f.t_ciclo_total !== null ? UI.dur(f.t_ciclo_total) + ' de ciclo' : 'ver detalle') + '</span>';
   var sig = CAPTURA.siguienteHora(f), color = et ? et.color : '#76B729';
   var placa = String(f.placa || '').trim();
   return '<div class="ciclo-item entra' + (sig ? ' con-rapido' : '') + '" style="--c:' + color + '">' +
@@ -335,7 +349,8 @@ CAPTURA.marcarRapido = function (btn, codigo) {
     if (r.yaEstaba) DR.toast(codigo + ': otra persona ya marcó «' + sig.campo.label + '». Lista actualizada.', 'info');
     else {
       DR.sonar(true);
-      DR.toast(codigo + ' · ' + sig.campo.label + ' ' + CAPTURA.horaCorta(CAPTURA.localDe(ahora)) + ' guardado.');
+      var previa = CAPTURA.horaPrevia(sig.campo.clave), dur = previa ? CAPTURA.durTxt(sig.campo.clave, r.fila[previa], ahora) : '';
+      DR.toast(codigo + ' · ' + sig.campo.label + ' ' + CAPTURA.horaCorta(CAPTURA.localDe(ahora)) + ' guardado' + (dur ? ' · ' + dur.toLowerCase() : '') + '.');
     }
     CAPTURA.pintarTarjetas(false);
   }).catch(function (e) {
@@ -434,7 +449,8 @@ CAPTURA.campoHtml = function (c) {
   if (c.tipo === 'hora') {
     return '<div class="hora' + (v ? ' llena' : '') + '" data-hora="' + c.clave + '">' +
       '<div class="hora-info"><label for="' + id + '">' + DR.ICONOS.checkChico + '<span>' + c.label + '</span></label>' +
-      '<input id="' + id + '" type="datetime-local" data-campo="' + c.clave + '" value="' + v + '"></div>' +
+      '<input id="' + id + '" type="datetime-local" step="1" data-campo="' + c.clave + '" value="' + v + '">' +
+      '<div class="hora-dur" data-dur="' + c.clave + '"></div></div>' +
       '<button type="button" class="hora-ahora" data-ahora="' + c.clave + '" aria-label="Marcar ' + c.label + ' con la hora actual">' + DR.ICONOS.reloj + '<span>Ahora</span></button>' +
       '<div class="hora-aviso" data-aviso="' + c.clave + '"></div>' +
       (CAPTURA.esInicioTraslado(c.clave) ? '<button type="button" class="btn sec hora-cerrar oculto" data-cerrar="1">' + DR.ICONOS.checkChico + '<span>Guardar y cerrar</span></button>' : '') +
@@ -610,6 +626,11 @@ CAPTURA.validar = function (v) {
   return { porCampo: porCampo, lista: lista };
 };
 
+/** Hora de la etapa en pantalla o, si es de otra etapa, la guardada en el ciclo. */
+CAPTURA.valorHora = function (v, clave) {
+  return (clave in v) ? v[clave] : (CAPTURA.fila ? CAPTURA.aLocal(CAPTURA.fila[clave]) : '');
+};
+
 CAPTURA.revisar = function () {
   var e = ETAPAS[CAPTURA.etapaIdx], v = CAPTURA.leer(), val = CAPTURA.validar(v);
   DR.$$('#etapaCard .hora').forEach(function (h) {
@@ -617,6 +638,8 @@ CAPTURA.revisar = function () {
     h.classList.toggle('llena', !!v[k]);
     h.classList.toggle('con-aviso', !!msg);
     DR.$('[data-aviso="' + k + '"]', h).textContent = msg;
+    var previa = CAPTURA.horaPrevia(k), dur = DR.$('[data-dur="' + k + '"]', h);
+    if (dur) dur.textContent = previa ? CAPTURA.durTxt(k, CAPTURA.valorHora(v, previa), v[k]) : '';
   });
 
   var btn = DR.$('#btnAccion'), sec = DR.$('#btnGuardarSolo');
@@ -727,7 +750,8 @@ CAPTURA.marcarAhora = function (clave) {
   CAPTURA.sucio = true; CAPTURA.insistir = false;
   CAPTURA.revisar();
   if (CAPTURA.fila || CAPTURA.leer().fundo) {
-    CAPTURA.guardar({ avanzar: false, mensaje: ETIQUETA_HORA[clave] + ' · ' + CAPTURA.horaCorta(inp.value) + ' guardado.' });
+    var previa = CAPTURA.horaPrevia(clave), dur = previa ? CAPTURA.durTxt(clave, CAPTURA.valorHora(CAPTURA.leer(), previa), inp.value) : '';
+    CAPTURA.guardar({ avanzar: false, mensaje: ETIQUETA_HORA[clave] + ' · ' + CAPTURA.horaCorta(inp.value) + ' guardado' + (dur ? ' · ' + dur.toLowerCase() : '') + '.' });
   } else {
     DR.toast('Hora marcada. Elige el fundo para guardar el ciclo.', 'info');
   }
@@ -829,7 +853,7 @@ CAPTURA.mostrarFin = function (fila) {
         total !== null ? DR.num(total / 60, 2) + ' horas' : 'Faltan tramos para calcular el total', '#76B729') +
       UI.kpi('Semana', DR.num(fila.semana), DR.esc(fila.fecha), '#0097CE') +
     '</div>' +
-    UI.panel('Minutos por tramo', 'Diferencia entre cada marca registrada' + (hayNegativos ? ' · en rojo: horas fuera de orden, corrígelas' : ''), barras || '<div class="vacio">Sin tramos calculados.</div>') +
+    UI.panel('Tiempo por tramo', 'Diferencia entre cada marca registrada (min y s)' + (hayNegativos ? ' · en rojo: horas fuera de orden, corrígelas' : ''), barras || '<div class="vacio">Sin tramos calculados.</div>') +
     '<div class="acciones-fin">' +
       '<button type="button" class="btn verde grande" id="btnOtroCiclo">' + DR.ICONOS.mas + '<span>Iniciar otro ciclo</span></button>' +
       '<button type="button" class="btn sec" id="btnFinLista">Ver ciclos en curso</button>' +

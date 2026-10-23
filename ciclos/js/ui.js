@@ -5,20 +5,47 @@ var UI = {};
 
 /** Tramos de tiempo del pivot, mismo orden que Postgres/Excel. */
 var CAMPOS_RESUMEN = [
-  { clave: 't_cosecha', titulo: 'Cosecha' },
-  { clave: 't_espera_jabero', titulo: 'Espera Jabero' },
-  { clave: 't_jabero', titulo: 'Jabero' },
-  { clave: 't_estadia_cs', titulo: 'Estadía C. Sombra' },
-  { clave: 't_carga_moto', titulo: 'Carga Motocarga' },
-  { clave: 't_espera_traslado', titulo: 'Espera Traslado a C.A.' },
-  { clave: 't_traslado_ca', titulo: 'Traslado a C.A.' },
-  { clave: 't_espera_descarga', titulo: 'Espera Descarga/Armado' },
-  { clave: 't_descarga_ca', titulo: 'Descarga y Armado' },
-  { clave: 't_estadia_ca', titulo: 'Estadía en C.A.' },
-  { clave: 't_carga_camion', titulo: 'Carga al Camión' },
-  { clave: 't_espera_traslado_planta', titulo: 'Espera Traslado a Planta' },
-  { clave: 't_traslado_planta', titulo: 'Traslado a Planta' }
+  { clave: 't_cosecha', titulo: 'Cosecha', corto: 'Cosecha' },
+  { clave: 't_espera_jabero', titulo: 'Espera Jabero', corto: 'Esp. jabero' },
+  { clave: 't_jabero', titulo: 'Jabero', corto: 'Jabero' },
+  { clave: 't_estadia_cs', titulo: 'Estadía C. Sombra', corto: 'Estadía C.S.' },
+  { clave: 't_carga_moto', titulo: 'Carga Motocarga', corto: 'Carga moto' },
+  { clave: 't_espera_traslado', titulo: 'Espera Traslado a C.A.', corto: 'Esp. tras. C.A.' },
+  { clave: 't_traslado_ca', titulo: 'Traslado a C.A.', corto: 'Traslado C.A.' },
+  { clave: 't_espera_descarga', titulo: 'Espera Descarga/Armado', corto: 'Esp. descarga' },
+  { clave: 't_descarga_ca', titulo: 'Descarga y Armado', corto: 'Descarga' },
+  { clave: 't_estadia_ca', titulo: 'Estadía en C.A.', corto: 'Estadía C.A.' },
+  { clave: 't_carga_camion', titulo: 'Carga al Camión', corto: 'Carga camión' },
+  { clave: 't_espera_traslado_planta', titulo: 'Espera Traslado a Planta', corto: 'Esp. tras. planta' },
+  { clave: 't_traslado_planta', titulo: 'Traslado a Planta', corto: 'Traslado planta' }
 ];
+
+/* ---- duraciones: los tramos vienen en minutos con decimales (las horas guardan segundos) ---- */
+UI.pad2 = function (n) { return (n < 10 ? '0' : '') + n; };
+/** Minutos → «m:ss» (tablas: angosto y con segundos). null → «—». */
+UI.mmss = function (min) {
+  if (min === null || min === undefined || min === '' || isNaN(min)) return '—';
+  var s = Math.round(Math.abs(Number(min)) * 60);
+  return (Number(min) < 0 && s ? '-' : '') + Math.floor(s / 60) + ':' + UI.pad2(s % 60);
+};
+/** Minutos → texto para leer: «45 s», «3 min 05 s»; desde 100 min, «132 min». */
+UI.dur = function (min) {
+  if (min === null || min === undefined || min === '' || isNaN(min)) return '—';
+  var neg = Number(min) < 0, s = Math.round(Math.abs(Number(min)) * 60), t;
+  if (s < 60) t = s + ' s';
+  else if (s < 6000) t = Math.floor(s / 60) + ' min' + (s % 60 ? ' ' + UI.pad2(s % 60) + ' s' : '');
+  else t = DR.num(s / 60, 0) + ' min';
+  return (neg && s ? '-' : '') + t;
+};
+/** Versión corta para cifras junto a barras: «45 s», «3m 05s», «132 min». */
+UI.durCorta = function (min) {
+  if (min === null || min === undefined || min === '' || isNaN(min)) return '—';
+  var neg = Number(min) < 0, s = Math.round(Math.abs(Number(min)) * 60), t;
+  if (s < 60) t = s + ' s';
+  else if (s < 6000) t = Math.floor(s / 60) + 'm ' + UI.pad2(s % 60) + 's';
+  else t = DR.num(s / 60, 0) + ' min';
+  return (neg && s ? '-' : '') + t;
+};
 
 UI.kpi = function (etq, val, nota, color) {
   return '<div class="kpi" style="--acento:' + (color || '#0097CE') + '"><div class="etq">' + DR.esc(etq) + '</div>' +
@@ -134,7 +161,7 @@ UI.barrasTramos = function (tramos, animar) {
     return '<div class="barra-fila"><div title="' + DR.esc(x.t) + '">' + DR.esc(x.t) + '</div>' +
       '<div class="barra-pista"><div class="barra-valor" data-ancho="' + ancho + '" style="' + (animar ? '' : 'width:' + ancho + '%;') + 'background:' +
       (negativo ? '#E5484D' : 'linear-gradient(90deg,#0097CE,#76B729)') + '"></div></div>' +
-      '<div class="barra-cifra"' + (negativo ? ' style="color:#FF8A8A"' : '') + '>' + DR.num(x.v, 0) + '</div></div>';
+      '<div class="barra-cifra"' + (negativo ? ' style="color:#FF8A8A"' : '') + '>' + UI.durCorta(x.v) + '</div></div>';
   }).join('');
 };
 UI.animarBarrasTramos = function (raiz) {
@@ -160,9 +187,9 @@ UI.lotesHtml = function (items, meta) {
 /* ---- columnas comunes del pivot (Resumen y Muestras las reutilizan) ---- */
 UI.columnasResumen = function () {
   return [{ t: 'Fundo', k: 'fundo' }, { t: 'N° muestras', k: 'n_muestras', num: true }]
-    .concat(CAMPOS_RESUMEN.map(function (c) { return { t: c.titulo, num: true, r: function (f) { return DR.num(f[c.clave], 1); } }; }))
+    .concat(CAMPOS_RESUMEN.map(function (c) { return { t: c.titulo, num: true, r: function (f) { return UI.mmss(f[c.clave]); } }; }))
     .concat([
-      { t: 'Total ciclo (min)', num: true, r: function (f) { return '<b>' + DR.num(f.t_ciclo_total, 1) + '</b>'; } },
+      { t: 'Total ciclo (min:seg)', num: true, r: function (f) { return '<b>' + UI.mmss(f.t_ciclo_total) + '</b>'; } },
       { t: 'Horas', num: true, r: function (f) { return DR.num(f.tiempo_horas, 2); } }
     ]);
 };

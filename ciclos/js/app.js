@@ -47,7 +47,7 @@ DR.moverIndicador = function (vista) {
  * El celular deja Integra abierta todo el día: sin recargar seguiría con el código viejo
  * (pasó el 23/10: horas sin segundos tras publicar el arreglo). Cada 2 min y al volver a la
  * pantalla se compara el ETag de los scripts; si cambió y no hay nada sin guardar, se recarga. */
-DR.SCRIPTS_VERSION = ['js/app.js', 'js/captura.js', 'js/resumen.js', 'js/ui.js'];
+DR.SCRIPTS_VERSION = ['js/app.js', 'js/captura.js', 'js/resumen.js', 'js/ui.js', 'js/mapa.js'];
 DR.firmaVersion = function () {
   return Promise.all(DR.SCRIPTS_VERSION.map(function (s) {
     return fetch(s, { method: 'HEAD', cache: 'no-store' }).then(function (r) { return r.headers.get('etag') || r.headers.get('last-modified') || ''; });

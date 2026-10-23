@@ -10,6 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../vendor/leaflet/leaflet.css">
 <link rel="stylesheet" href="../css/estilos.css">
 <script>/* Modo claro antes de pintar (se elige con el botón ☀ de la barra superior). */
 try { if (localStorage.getItem('integra.ciclos.tema') === 'claro') { document.documentElement.setAttribute('data-tema', 'claro'); document.querySelector('meta[name="theme-color"]').setAttribute('content', '#FFFFFF'); } } catch (e) { /* sin almacenamiento */ }</script>
@@ -47,6 +48,8 @@ try { if (localStorage.getItem('integra.ciclos.tema') === 'claro') { document.do
 <script src="js/ui.js"></script>
 <script src="js/grafico.js"></script>
 <script src="js/evolucion.js"></script>
+<script src="../vendor/leaflet/leaflet.js"></script>
+<script src="js/mapa.js"></script>
 <script src="js/resumen.js"></script>
 <script src="js/captura.js"></script>
 <script src="js/importar-excel.js"></script>

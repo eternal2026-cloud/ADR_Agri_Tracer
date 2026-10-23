@@ -1181,3 +1181,20 @@ b.sobre-meta{color:#FFA36B}
 :root[data-tema="claro"] .piv tr.piv-n1 td,:root[data-tema="claro"] .piv tr.piv-n1 td.piv-etq{background:#F6F0E9}
 :root[data-tema="claro"] .piv tr.fila-total td.piv-etq{background:#FBEBDD}
 :root[data-tema="claro"] .piv-flecha.abierta,:root[data-tema="claro"] .piv-vivo{color:#4E8A16}
+
+/* ------------------------------------------------ Mapa de lotes (ciclos/js/mapa.js, Leaflet) */
+.panel-mapa{opacity:1}
+.mapa-leyenda{display:flex;flex-wrap:wrap;gap:6px 14px;margin:-2px 0 10px;font-size:12px;color:var(--texto-2)}
+.mapa-ley{display:inline-flex;align-items:center;gap:6px}
+.mapa-ley i{width:14px;height:14px;border-radius:4px;border:1px solid rgba(255,255,255,.25)}
+.mapa-ley.vivo i{border:2px solid #FFFFFF;animation:mapa-latido 1.6s ease-in-out infinite}
+.mapa-slot{position:relative;width:100%;height:min(62vh,520px);min-height:320px;border-radius:12px;overflow:hidden;border:1px solid var(--borde);background:#0E0C0A}
+.mapa-lotes{position:absolute;inset:0}
+/* Leaflet necesita sus imágenes sin límite de ancho y sin transiciones heredadas. */
+.mapa-lotes img{max-width:none !important;max-height:none !important}
+.mapa-lotes .leaflet-tile{transition:none}
+.mapa-lotes .leaflet-control-attribution{font-size:10px}
+.leaflet-interactive.mapa-vivo{animation:mapa-latido 1.6s ease-in-out infinite}
+@keyframes mapa-latido{0%,100%{stroke-opacity:1}50%{stroke-opacity:.25}}
+.mapa-tip{font-family:Jost,system-ui,sans-serif;font-size:12.5px;line-height:1.45}
+.mapa-sin{margin-top:10px;font-size:12.5px;color:var(--texto-3);line-height:1.5}

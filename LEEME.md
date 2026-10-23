@@ -192,6 +192,19 @@ Protecciones en la base de datos (migración 0011):
 - **Meta de tiempo de ciclo** (`META_TIEMPO_CICLO_MIN`, 120 por defecto, Config → Ajustes):
   línea punteada del gráfico de tiempo de ciclo total. Solo se muestra; el umbral (480) sigue
   excluyendo los atípicos de los promedios, pero ya no se dibuja.
+- **Mapa de lotes en el Resumen** (`ciclos/js/mapa.js`, Leaflet 1.9.4 local en `vendor/leaflet/`):
+  polígonos de arándano de Agritracer (`ciclos/data/lotes_arandano.geojson`) pintados con las mismas
+  filas de `fn_resumen_pivot_vivo` que la tabla dinámica, así que sigue el filtro de semana, día y
+  fundo. Verde = promedio del lote ≤ meta, naranja = sobre la meta, azul = solo ciclos en curso,
+  gris = sin ciclos; borde blanco pulsante = ciclos en curso (en vivo). Cruce: fundo + lote guardado
+  contra `lote_clave` del polígono; si no hay polígono exacto se usa la base (YA1C, YA1D → YA1).
+  Lo que no cruza (VA1, YA12, lotes vacíos…) se lista debajo del mapa. El mapa se crea una sola
+  vez y el refresco en vivo solo cambia colores, sin perder el zoom. Para actualizar los polígonos:
+  `python extraer_geojson.py --integra` en `ADR\10. Mapa Carencias GeoJSON`.
+- **Lote guardado en mayúsculas** (migración 0045): «Ca 1», «CA1 » → `CA1` también en la tabla
+  (306 ciclos corregidos el 23/10, respaldo en `ciclos_lote_respaldo_0045`) y un trigger lo
+  normaliza al guardar. Google Sheets se reescribe completo en cada sync, así que `Ciclos_BD`
+  quedó corregido hacia el pasado tras el sync forzado.
 
 ## Auditoría 5S (módulo `auditoria5s/`, migraciones 0012, 0013, 0014 y 0026)
 

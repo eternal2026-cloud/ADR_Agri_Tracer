@@ -18,7 +18,7 @@
 var ETAPAS = [
   { id: 'cosecha', titulo: 'Cosecha', corto: 'Cosecha', color: '#76B729', campoCierre: 'fin_cosecha', campos: [
     { clave: 'fundo', tipo: 'lista', lista: 'fundo', label: 'Fundo', requerido: true },
-    { clave: 'lote', tipo: 'texto', label: 'Lote', medio: true },
+    { clave: 'lote', tipo: 'texto', label: 'Lote', medio: true, mayusculas: true },
     { clave: 'lider', tipo: 'texto', label: 'Líder de grupo', medio: true },
     { clave: 'variedad', tipo: 'lista', lista: 'variedad', label: 'Variedad' },
     { clave: 'calibre', tipo: 'lista', lista: 'calibre', label: 'Calibre' },

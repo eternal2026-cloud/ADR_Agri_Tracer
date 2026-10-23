@@ -12,6 +12,7 @@
  *   ciclo a la papelera desde ahí. Los tiempos de la tabla van en min:seg.
  *   Gráfico «Tiempo promedio por …» (como el tablero de uva): botones Fundo, Grupo, Lote,
  *   Variedad, Líder, Calibre, Placa y «Ver tabla» con el detalle por tramo.
+ *   Mapa de lotes (mapa.js): los mismos datos y filtros, sobre los polígonos de Agritracer.
  * ==========================================================================*/
 var VISTAS = window.VISTAS || {};
 
@@ -205,6 +206,7 @@ RES.pintarPivot = function (cont, filas, semanas, dias) {
   } else {
     h += RES.tramosHtml(total);
     h += RES.panelGrupoHtml();
+    h += MAPA.panelHtml();
     h += UI.panel((general ? 'Promedio por fundo (todas las semanas)' : 'Promedio por fundo · ' + RES.ambitoTxt()) + (RES.fundoPiv ? ' · ' + RES.fundoPiv : ''),
       fundos.length + ' fundo(s) · tiempos en min:seg · toca un fundo para abrir sus grupos de lote, un grupo para verlo lote a lote y un lote para ver sus ciclos' +
       (AT.esAdmin() ? ' (desde ahí puedes eliminar un ciclo)' : ''),
@@ -221,6 +223,7 @@ RES.pintarPivot = function (cont, filas, semanas, dias) {
   UI.animarBarrasTramos(cont);
   EVO.montar();
   if (DR.$('#grCuerpo')) RES.montarGrupo(fundos);
+  if (DR.$('#mapaSlot')) MAPA.montar(filas);
   if (DR.$('#pivTabla')) RES.montarPivot(fundos, total);
 
   RES.enlazarSelectores();

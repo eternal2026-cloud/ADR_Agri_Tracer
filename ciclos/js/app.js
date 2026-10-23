@@ -43,6 +43,33 @@ DR.moverIndicador = function (vista) {
   else ind.style.transform = 'translateX(' + x + '%)';
 };
 
+/* ------------------------------------------------ versión nueva publicada
+ * El celular deja Integra abierta todo el día: sin recargar seguiría con el código viejo
+ * (pasó el 23/10: horas sin segundos tras publicar el arreglo). Cada 2 min y al volver a la
+ * pantalla se compara el ETag de los scripts; si cambió y no hay nada sin guardar, se recarga. */
+DR.SCRIPTS_VERSION = ['js/app.js', 'js/captura.js', 'js/resumen.js', 'js/ui.js'];
+DR.firmaVersion = function () {
+  return Promise.all(DR.SCRIPTS_VERSION.map(function (s) {
+    return fetch(s, { method: 'HEAD', cache: 'no-store' }).then(function (r) { return r.headers.get('etag') || r.headers.get('last-modified') || ''; });
+  })).then(function (l) { return l.join('|'); });
+};
+DR.vigilarVersion = function () {
+  if (!window.fetch || location.protocol === 'file:') return;
+  var base = null, pendiente = false;
+  DR.firmaVersion().then(function (f) { base = f; }).catch(function () { /* sin señal */ });
+  var revisar = function () {
+    if (!base || document.visibilityState !== 'visible') return;
+    DR.firmaVersion().then(function (f) {
+      if (!f || f === base) return;
+      var ocupado = DR.vista === 'captura' && (CAPTURA.sucio || CAPTURA.guardando);
+      if (!ocupado) { location.reload(); return; }
+      if (!pendiente) { pendiente = true; DR.toast('Hay una versión nueva de Integra: se actualizará al guardar.', 'info'); }
+    }).catch(function () { /* sin señal: se reintenta */ });
+  };
+  setInterval(revisar, 120000);
+  document.addEventListener('visibilitychange', revisar);
+};
+
 function vistaInicial() {
   var h = (location.hash || '').replace('#', '');
   if (['usuarios', 'areas', 'listas', 'sheets', 'ajustes'].indexOf(h) > -1) { CONFIG.tab = h; return 'config'; }
@@ -99,5 +126,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     DR.$('#app').style.opacity = 1;
     DR.ir(vistaInicial());
+    DR.vigilarVersion();
   }).catch(function () { /* AT.requiereSesion ya redirige */ });
 });

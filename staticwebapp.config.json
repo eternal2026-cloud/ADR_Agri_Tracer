@@ -1,0 +1,20 @@
+{
+  "globalHeaders": {
+    "Permissions-Policy": "camera=(self)",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "same-origin"
+  },
+  "routes": [
+    {
+      "route": "/vendor/*",
+      "headers": { "Cache-Control": "public, max-age=31536000, immutable" }
+    },
+    {
+      "route": "/reubicacion/vendor/*",
+      "headers": { "Cache-Control": "public, max-age=31536000, immutable" }
+    }
+  ],
+  "mimeTypes": {
+    ".webmanifest": "application/manifest+json"
+  }
+}

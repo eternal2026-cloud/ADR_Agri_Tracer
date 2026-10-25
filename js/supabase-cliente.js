@@ -75,7 +75,11 @@ AT.ACCESOS = [
       { id: 'campo.arandano.captura', t: 'Captura de tiempos', registra: true },
       { id: 'campo.arandano.resumen', t: 'Resumen de tiempos' }] },
     { id: 'campo.uva', t: 'Toma de tiempos · Uva', funciones: [
-      { id: 'campo.uva', t: 'Uva (en definición)' }] }] },
+      { id: 'campo.uva', t: 'Uva (en definición)' }] },
+    { id: 'campo.top', t: 'Estudio de cosechador TOP', funciones: [
+      { id: 'campo.top.evaluar', t: 'Evaluar (tiempos, estándares, REBA)', registra: true },
+      { id: 'campo.top.resumen', t: 'Resumen e informe' },
+      { id: 'campo.top.propuesta', t: 'Propuesta de estándar' }] }] },
   { id: 'planta', t: 'Ingeniería · Planta', modulos: [
     { id: 'planta.reubicacion', t: 'Reubicación de personal', funciones: [
       { id: 'planta.reubicacion', t: 'Reubicación de personal' }] }] },

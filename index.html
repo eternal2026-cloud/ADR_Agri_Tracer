@@ -93,7 +93,8 @@ var ICO = {
   usuarios: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.8-3.2 3-5 5.5-5s4.7 1.8 5.5 5"/><path d="M17 8v6M14 11h6"/></svg>',
   auditoria: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M8.5 11l2 2 4-4M8.5 17h7"/></svg>',
   mantenimiento: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 6.5a4 4 0 0 0-5.2 5.2L4 17l3 3 5.3-5.3a4 4 0 0 0 5.2-5.2l-2.3 2.3-2.2-.8-.8-2.2z"/><path d="m16 17 1.5 1.5L21 15"/></svg>',
-  cliente: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 20 9.3l-3 9.2H7L4 9.3z"/><path d="M9 12.5c.8 1.2 1.8 1.8 3 1.8s2.2-.6 3-1.8"/><circle cx="9.6" cy="9.8" r=".6" fill="currentColor"/><circle cx="14.4" cy="9.8" r=".6" fill="currentColor"/></svg>'
+  cliente: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 20 9.3l-3 9.2H7L4 9.3z"/><path d="M9 12.5c.8 1.2 1.8 1.8 3 1.8s2.2-.6 3-1.8"/><circle cx="9.6" cy="9.8" r=".6" fill="currentColor"/><circle cx="14.4" cy="9.8" r=".6" fill="currentColor"/></svg>',
+  estrella: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3.5 2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/></svg>'
 };
 
 /**
@@ -102,15 +103,17 @@ var ICO = {
  * «Toma de tiempos campo» abre la sub-vista #campo con un acceso por cultivo:
  * Arándano (los tiempos de ciclo actuales) y Uva (en definición).
  * Usuarios y configuración es un apartado propio, solo para administradores.
- * acceso: clave de AT.ACCESOS; la tarjeta solo aparece si el usuario la tiene asignada.
+ * acceso: clave (o lista de claves) de AT.ACCESOS; la tarjeta solo aparece si el usuario tiene alguna asignada.
  * Para mover una tarjeta a otro grupo basta con cortar su línea { href: … } y
  * pegarla en la lista «modulos» del grupo destino.
  */
 var TODOS = ['admin', 'captura', 'visor'];
 var GRUPOS = [
-  { id: 'campo', titulo: 'Ingeniería · Campo', sub: 'Tiempos en campo por cultivo', modulos: [
+  { id: 'campo', titulo: 'Ingeniería · Campo', sub: 'Tiempos en campo y estudio del personal TOP', modulos: [
     { href: '#campo', color: '#0097CE', nombre: 'Toma de tiempos campo', icono: ICO.cronometro,
-      sub: 'Arándano (tiempos de ciclo de cosecha) · Uva (en definición)', roles: TODOS, acceso: 'campo' }
+      sub: 'Arándano (tiempos de ciclo de cosecha) · Uva (en definición)', roles: TODOS, acceso: ['campo.arandano', 'campo.uva'] },
+    { href: 'campo/estudio-top/', color: '#76B729', nombre: 'Estudio de cosechador TOP', icono: ICO.estrella,
+      sub: 'Tiempos por actividad, estándares, REBA y ergonomía para actualizar el estándar de cosecha', roles: TODOS, acceso: 'campo.top' }
   ] },
   { id: 'planta', titulo: 'Ingeniería · Planta', sub: 'Operación en planta', modulos: [
     { href: 'reubicacion/', color: '#EF7C3B', nombre: 'Reubicación de personal', icono: ICO.personas,
@@ -200,7 +203,8 @@ function tarjetaModulo(m) {
 function pintarModulos() {
   var rol = AT.perfil ? AT.perfil.rol : 'visor';
   // Rol (qué puede hacer) y accesos del usuario (qué grupos y funciones ve, Config → Usuarios).
-  var puede = function (x) { return x.roles.indexOf(rol) > -1 && (!x.acceso || AT.tieneAcceso(x.acceso)); };
+  // acceso puede ser una lista: basta con tener una de las claves.
+  var puede = function (x) { return x.roles.indexOf(rol) > -1 && (!x.acceso || [].concat(x.acceso).some(function (k) { return AT.tieneAcceso(k); })); };
   var cont = DR.$('#modulos');
   if (location.hash === '#campo') {
     DR.$('#saludoSub').textContent = 'Ingeniería · Campo › Toma de tiempos campo';

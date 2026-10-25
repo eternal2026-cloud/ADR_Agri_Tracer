@@ -1,12 +1,14 @@
 # Integra · Don Ricardo — Tiempos de Ciclo + Reubicación de Personal
 
-Sitio único en **Vercel** (HTML/CSS/JS plano, sin build, anime.js UMD)
+Sitio único en **Azure Static Web Apps** (HTML/CSS/JS plano, sin build, anime.js UMD;
+se publica solo con cada push a `main` mediante GitHub Actions,
+`.github/workflows/azure-static-web-apps-*.yml`)
 respaldado por **Supabase** (Postgres + Auth + Edge Functions + Vault + pg_cron).
 
 ## Estado actual
 
 - **Proyecto Supabase** `agritracer-don-ricardo` (ref `ptsvriudoilsyofgccsb`) con
-  migraciones `supabase/migrations/0001..0025` aplicadas (0026 pendiente de aplicar) (0012: Auditoría 5S,
+  migraciones `supabase/migrations/0001..0046` aplicadas (0012: Auditoría 5S,
   0013: Auditoría 5S por cultivo, 0014: observaciones 5S por área,
   0015: Revisión del plan de mantenimiento, 0016: Satisfacción del cliente
   interno y cultivo en los tiempos de ciclo, 0017: acceso por correo —retirado
@@ -14,7 +16,8 @@ respaldado por **Supabase** (Postgres + Auth + Edge Functions + Vault + pg_cron)
   0019: evolución semanal y plantas/áreas por evaluador en Cliente interno,
   0020-0023: áreas propias de Cliente interno, 0024: accesos por usuario,
   0025: cada usuario ve sus encuestas —reemplazada por 0026—, 0026: Cliente interno
-  por área evaluada, cultivo «-» en 5S, hasta 6 fotos y Excel de avance).
+  por área evaluada, cultivo «-» en 5S, hasta 6 fotos y Excel de avance;
+  0046: Estudio de cosechador TOP).
 - **Edge Functions desplegadas** (código en `supabase/functions/`):
   - `admin-usuarios` — crear usuarios, restablecer contraseñas, cambiar rol, desactivar.
   - `sync-sheets` — espejo de auditoría hacia Google Sheets.
@@ -205,6 +208,33 @@ Protecciones en la base de datos (migración 0011):
   (306 ciclos corregidos el 23/10, respaldo en `ciclos_lote_respaldo_0045`) y un trigger lo
   normaliza al guardar. Google Sheets se reescribe completo en cada sync, así que `Ciclos_BD`
   quedó corregido hacia el pasado tras el sync forzado.
+
+## Estudio de cosechador TOP (módulo `campo/estudio-top/`, migración 0046)
+
+Ingeniería · Campo. Sustento técnico para actualizar el estándar de cosecha de arándano a
+partir del personal TOP (todos los evaluados ya son TOP: no se registra producción).
+Fuentes: «Evaluación Líderes TOP.xlsx» (instructivo, LUP, formato y lista de actividades)
+y «FORMATO REBA Y CHECKLIST ERGONOMÍA - COSECHA ARÁNDANO.xlsx».
+
+- **Evaluar** (`campo.top.evaluar`, rol Captura): una evaluación por cosechador/día/lote/
+  presentación (código `TOP-0001`…). Secciones:
+  - *Tiempos*: actividad aislada → Iniciar → Terminar, con segundos. El reloj en curso vive
+    en el celular (`integra.top.reloj.<id>`) y sobrevive a una recarga; sin señal la toma
+    queda en `integra.top.pend.<id>` y se sube al volver la conexión.
+  - *Estándares*: C / NC / NA, observación, **«Cómo lo hace el TOP»** (estándar descubierto)
+    y hasta 3 fotos (bucket privado `estudio-top`). Borrador local hasta «Guardar».
+  - *REBA*: imágenes de la hoja (`campo/estudio-top/img/`), tablas A/B/C y nivel de riesgo;
+    el servidor recalcula el puntaje (`fn_top_reba_puntaje`). Varias posturas por evaluación.
+  - *Ergonomía*: checklist SI/NO/NS con diagrama corporal y momentos de dolor.
+- **Resumen** (`campo.top.resumen`): tiempo estándar por actividad = mediana TOP × (1 +
+  suplemento %), distribución de la jornada (productiva / soporte / espera / personal, la
+  clase está en `top_actividades.clase`), % de cumplimiento por ítem con las prácticas TOP,
+  REBA y ergonomía. Exporta **Excel** (datos crudos) e **informe técnico PDF**.
+- **Propuesta** (`campo.top.propuesta`): sugerencias calculadas → propuestas
+  (mantener / modificar / eliminar / nuevo / reducir) con sustento; solo un admin aprueba.
+- Escritura solo por `rpc_top_*`; solo quien creó la evaluación (o un admin) la edita.
+  Para cambiar el catálogo de actividades o de ítems se edita `top_actividades` /
+  `top_estandar_items` (desactivar con `activo = false`, no borrar).
 
 ## Auditoría 5S (módulo `auditoria5s/`, migraciones 0012, 0013, 0014 y 0026)
 

@@ -31,7 +31,8 @@ TIEMPOS.pintar = function (cont) {
     h += UI.panel(r ? 'Actividades' : 'Toca la actividad para iniciar', r ? 'Termina la actividad en curso para iniciar otra.' : 'Cada toma es independiente: inicio y fin con segundos.',
       TOP.ORDEN_CLASES.map(function (c) {
         var acts = TOP.actividades.filter(function (a2) { return a2.clase === c; });
-        return '<div class="top-clase-tit" style="--c:' + TOP.CLASES[c].c + '">' + DR.esc(TOP.CLASES[c].t) + '</div><div class="top-acts">' +
+        // Cosecha (productiva) va sola y grande: es la toma más frecuente.
+        return '<div class="top-clase-tit" style="--c:' + TOP.CLASES[c].c + '">' + DR.esc(TOP.CLASES[c].t) + '</div><div class="top-acts' + (c === 'productiva' ? ' grande' : '') + '">' +
           acts.map(function (a2) {
             var n = EVAL.d.tiempos.filter(function (t) { return t.actividad_id === a2.id; }).length;
             return '<button type="button" class="top-act" style="--c:' + TOP.CLASES[c].c + '" data-act="' + a2.id + '"' + (r ? ' disabled' : '') + '>' +

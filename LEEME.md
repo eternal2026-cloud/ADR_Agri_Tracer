@@ -8,7 +8,7 @@ respaldado por **Supabase** (Postgres + Auth + Edge Functions + Vault + pg_cron)
 ## Estado actual
 
 - **Proyecto Supabase** `agritracer-don-ricardo` (ref `ptsvriudoilsyofgccsb`) con
-  migraciones `supabase/migrations/0001..0046` aplicadas (0012: Auditoría 5S,
+  migraciones `supabase/migrations/0001..0047` aplicadas (0012: Auditoría 5S,
   0013: Auditoría 5S por cultivo, 0014: observaciones 5S por área,
   0015: Revisión del plan de mantenimiento, 0016: Satisfacción del cliente
   interno y cultivo en los tiempos de ciclo, 0017: acceso por correo —retirado
@@ -17,7 +17,7 @@ respaldado por **Supabase** (Postgres + Auth + Edge Functions + Vault + pg_cron)
   0020-0023: áreas propias de Cliente interno, 0024: accesos por usuario,
   0025: cada usuario ve sus encuestas —reemplazada por 0026—, 0026: Cliente interno
   por área evaluada, cultivo «-» en 5S, hasta 6 fotos y Excel de avance;
-  0046: Estudio de cosechador TOP).
+  0046: Estudio de cosechador TOP; 0047: cosechadores por Excel, material y lotes en cosecha).
 - **Edge Functions desplegadas** (código en `supabase/functions/`):
   - `admin-usuarios` — crear usuarios, restablecer contraseñas, cambiar rol, desactivar.
   - `sync-sheets` — espejo de auditoría hacia Google Sheets.
@@ -217,7 +217,16 @@ Fuentes: «Evaluación Líderes TOP.xlsx» (instructivo, LUP, formato y lista de
 y «FORMATO REBA Y CHECKLIST ERGONOMÍA - COSECHA ARÁNDANO.xlsx».
 
 - **Evaluar** (`campo.top.evaluar`, rol Captura): una evaluación por cosechador/día/lote/
-  presentación (código `TOP-0001`…). Secciones:
+  material (código `TOP-0001`…), creada solo con toques (migración 0047):
+  - *Cosechador*: se elige de `top_cosechadores`, que se carga en **Evaluar › Cosechadores**
+    con la plantilla Excel descargable (DNI · NOMBRES Y APELLIDOS · FUNDO · LÍDER; se
+    actualiza por DNI, nadie se borra). El DNI y el líder se completan solos.
+  - *Lote*: chips del mapa de calor (`ciclos/data/lotes_arandano.geojson`); arriba los lotes
+    con ciclos de los últimos 14 días (`fn_top_lotes_en_cosecha`), que traen su material y
+    variedad.
+  - *Material*: presentaciones de Tiempos de ciclo (Jarra 0.5 kg, Bandeja 2–5 kg, Bulk 3.5).
+    `presentacion` guarda la familia del estándar: jarra → JARRA; bandeja y bulk → BANDEJA (granel).
+  Secciones de la ficha:
   - *Tiempos*: actividad aislada → Iniciar → Terminar, con segundos. El reloj en curso vive
     en el celular (`integra.top.reloj.<id>`) y sobrevive a una recarga; sin señal la toma
     queda en `integra.top.pend.<id>` y se sube al volver la conexión.

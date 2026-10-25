@@ -213,15 +213,93 @@ TOP.cargarCatalogos = function () {
   TOP._cat = Promise.all([
     sb.from('top_actividades').select('*').eq('activo', true).order('orden'),
     sb.from('top_estandar_items').select('*').eq('activo', true).order('presentacion').order('orden'),
-    sb.from('listas_maestras').select('tipo,valor').eq('tipo', 'fundo').eq('activo', true).order('orden').order('valor')
+    sb.from('listas_maestras').select('tipo,valor').in('tipo', ['fundo', 'presentacion']).eq('activo', true).order('orden').order('valor')
   ]).then(function (r) {
     r.forEach(function (x) { if (x.error) throw new Error(x.error.message); });
     TOP.actividades = r[0].data;
     TOP.items = r[1].data;
-    TOP.listas.fundo = r[2].data.map(function (x) { return x.valor; });
+    TOP.listas.fundo = r[2].data.filter(function (x) { return x.tipo === 'fundo'; }).map(function (x) { return x.valor; });
+    // Materiales = presentaciones de Tiempos de ciclo (Jarra 0.5 kg, Bandeja 2-5 kg) + Bulk 3.5.
+    var m = r[2].data.filter(function (x) { return x.tipo === 'presentacion'; }).map(function (x) { return x.valor.toUpperCase(); });
+    TOP.listas.material = TOP.ordenarMateriales(m.concat(['BULK 3.5']));
   }).catch(function (e) { TOP._cat = null; throw e; });
   return TOP._cat;
 };
+
+/* ------------------------------------------------ materiales (presentación real de cosecha) */
+TOP.ordenarMateriales = function (lista) {
+  var vistos = {};
+  return lista.filter(function (x) { x = String(x || '').toUpperCase(); if (!x || vistos[x]) return false; vistos[x] = true; return true; })
+    .map(function (x) { return x.toUpperCase(); })
+    .sort(function (a, b) {
+      var ra = /^JARRA/.test(a) ? 0 : (/^BANDEJA/.test(a) ? 1 : 2), rb = /^JARRA/.test(b) ? 0 : (/^BANDEJA/.test(b) ? 1 : 2);
+      return ra - rb || a.localeCompare(b, 'es', { numeric: true });
+    });
+};
+/** Familia del estándar (igual que fn_top_familia): JARRA* → JARRA; bandeja y bulk (granel) → BANDEJA. */
+TOP.familia = function (material) { return /^JARRA/i.test(material || '') ? 'JARRA' : 'BANDEJA'; };
+TOP.materialTxt = function (m) {
+  return String(m || '—').toLowerCase().replace(/^./, function (c) { return c.toUpperCase(); }).replace(/ kg$/, ' kg');
+};
+TOP.familiaTxt = function (f) { return f === 'JARRA' ? 'estándar de jarra cosechera' : 'estándar de cosecha a granel'; };
+TOP.ICO_MATERIAL = {
+  JARRA: '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M8 9h14l-1.5 17a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2z"/><path d="M22 12h3a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-4"/><circle cx="13" cy="7" r="2" fill="currentColor" stroke="none"/><circle cx="17" cy="6" r="2" fill="currentColor" stroke="none"/></svg>',
+  BANDEJA: '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 14h24l-2.5 10a2 2 0 0 1-2 1.5h-15a2 2 0 0 1-2-1.5z"/><circle cx="11" cy="11" r="2.2" fill="currentColor" stroke="none"/><circle cx="16" cy="10" r="2.2" fill="currentColor" stroke="none"/><circle cx="21" cy="11" r="2.2" fill="currentColor" stroke="none"/></svg>',
+  BULK: '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="5" y="9" width="22" height="17" rx="2"/><path d="M5 15h22M11 9V6h10v3"/></svg>'
+};
+TOP.icoMaterial = function (m) { return /^JARRA/i.test(m) ? TOP.ICO_MATERIAL.JARRA : (/^BULK/i.test(m) ? TOP.ICO_MATERIAL.BULK : TOP.ICO_MATERIAL.BANDEJA); };
+
+/* ------------------------------------------------ lotes (mapa de calor) y cosechadores */
+/** Lotes del mapa de Tiempos de ciclo (ciclos/data/lotes_arandano.geojson): { fundo: [{ lote, ha, variedades }] }. */
+TOP.cargarLotes = function () {
+  if (!TOP._lotes) {
+    TOP._lotes = Promise.all([
+      fetch('../../ciclos/data/lotes_arandano.geojson', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : { features: [] }; }).catch(function () { return { features: [] }; }),
+      AT.rpc('fn_top_lotes_en_cosecha', { p_dias: 14 }).catch(function () { return []; })
+    ]).then(function (r) {
+      var porFundo = {};
+      (r[0].features || []).forEach(function (f) {
+        var p = f.properties || {};
+        if (!p.fundo || !p.lote_clave) return;
+        (porFundo[p.fundo] = porFundo[p.fundo] || []).push({ lote: p.lote_clave, ha: p.area_ha, variedades: p.variedades || '' });
+      });
+      // Lotes con ciclos recientes: material y variedad que se están cosechando.
+      TOP.enCosecha = {};
+      (r[1] || []).forEach(function (c) {
+        TOP.enCosecha[c.fundo + '|' + c.lote] = c;
+        var l = porFundo[c.fundo] = porFundo[c.fundo] || [];
+        if (!l.some(function (x) { return x.lote === c.lote; })) l.push({ lote: c.lote, ha: null, variedades: c.variedad || '' });
+      });
+      Object.keys(porFundo).forEach(function (f) {
+        porFundo[f].sort(function (a, b) { return a.lote.localeCompare(b.lote, 'es', { numeric: true }); });
+      });
+      TOP.lotes = porFundo;
+      return porFundo;
+    });
+  }
+  return TOP._lotes;
+};
+/** Ciclos recientes del lote (o de su base: YA1C → YA1). */
+TOP.cosechaDe = function (fundo, lote) {
+  if (!TOP.enCosecha || !fundo || !lote) return null;
+  return TOP.enCosecha[fundo + '|' + lote] || Object.keys(TOP.enCosecha).map(function (k) { return TOP.enCosecha[k]; })
+    .filter(function (c) { return c.fundo === fundo && (c.lote.indexOf(lote) === 0 || lote.indexOf(c.lote) === 0); })
+    .sort(function (a, b) { return a.ultima < b.ultima ? 1 : -1; })[0] || null;
+};
+
+TOP.cargarCosechadores = function (forzar) {
+  if (!TOP._cos || forzar) {
+    TOP._cos = sb.from('top_cosechadores').select('*').order('nombre').limit(5000).then(function (r) {
+      if (r.error) throw new Error(r.error.message);
+      TOP.cosechadores = r.data;
+      return r.data;
+    }).catch(function (e) { TOP._cos = null; throw e; });
+  }
+  return TOP._cos;
+};
+/** Sin tildes y en minúsculas, para buscar. */
+TOP.norm = function (s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); };
+
 TOP.actividad = function (id) { return TOP.actividades.filter(function (a) { return a.id === Number(id); })[0] || { nombre: '—', clase: 'soporte' }; };
 TOP.item = function (id) { return TOP.items.filter(function (a) { return a.id === Number(id); })[0]; };
 TOP.itemsDe = function (presentacion) { return TOP.items.filter(function (i) { return i.presentacion === presentacion; }); };
@@ -257,6 +335,7 @@ TOP.cargarDatos = function (f) {
   if (f.hasta) q = q.lte('fecha', f.hasta);
   if (f.presentacion) q = q.eq('presentacion', f.presentacion);
   if (f.fundo) q = q.eq('fundo', f.fundo);
+  if (f.material) q = q.eq('material', f.material);
   return Promise.all([TOP.cargarCatalogos(), q]).then(function (r) {
     if (r[1].error) throw new Error(r[1].error.message);
     var evals = r[1].data, ids = evals.map(function (e) { return e.id; });

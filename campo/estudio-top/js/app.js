@@ -42,7 +42,7 @@ DR.moverIndicador = function (vista) {
  * El celular deja Integra abierta todo el día: cada 2 min y al volver a la pantalla se
  * compara el ETag de los scripts; si cambió y no hay un reloj corriendo, se recarga.
  * Los borradores (estándares, REBA, ergonomía) quedan en el celular y se recuperan. */
-DR.SCRIPTS_VERSION = ['js/app.js', 'js/datos.js', 'js/tiempos.js', 'js/evaluar.js', 'js/estandares.js', 'js/reba.js', 'js/resumen.js'];
+DR.SCRIPTS_VERSION = ['js/app.js', 'js/datos.js', 'js/tiempos.js', 'js/evaluar.js', 'js/cosechadores.js', 'js/estandares.js', 'js/reba.js', 'js/resumen.js'];
 DR.firmaVersion = function () {
   return Promise.all(DR.SCRIPTS_VERSION.map(function (s) {
     return fetch(s, { method: 'HEAD', cache: 'no-store' }).then(function (r) { return r.headers.get('etag') || r.headers.get('last-modified') || ''; });

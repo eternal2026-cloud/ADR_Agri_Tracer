@@ -23,8 +23,10 @@ RES.pintar = function (cont) {
       '<section class="panel entra"><div class="form" id="frmFiltro">' +
       '<div class="campo"><label>Desde</label><input type="date" data-campo="desde" value="' + DR.esc(f.desde) + '"></div>' +
       '<div class="campo"><label>Hasta</label><input type="date" data-campo="hasta" value="' + DR.esc(f.hasta) + '"></div>' +
-      '<div class="campo"><label>Presentación</label><select data-campo="presentacion"><option value="">Todas</option>' + ['JARRA', 'BANDEJA'].map(function (p) {
-        return '<option' + (f.presentacion === p ? ' selected' : '') + '>' + p + '</option>'; }).join('') + '</select></div>' +
+      '<div class="campo"><label>Estándar</label><select data-campo="presentacion"><option value="">Jarra y granel</option>' + ['JARRA', 'BANDEJA'].map(function (p) {
+        return '<option value="' + p + '"' + (f.presentacion === p ? ' selected' : '') + '>' + (p === 'JARRA' ? 'Jarra cosechera' : 'Granel (bandeja y bulk)') + '</option>'; }).join('') + '</select></div>' +
+      '<div class="campo"><label>Material</label><select data-campo="material"><option value="">Todos</option>' + TOP.listas.material.map(function (m) {
+        return '<option value="' + DR.esc(m) + '"' + (f.material === m ? ' selected' : '') + '>' + DR.esc(TOP.materialTxt(m)) + '</option>'; }).join('') + '</select></div>' +
       '<div class="campo"><label>Fundo</label><select data-campo="fundo"><option value="">Todos</option>' + TOP.misFundos().map(function (x) {
         return '<option' + (f.fundo === x ? ' selected' : '') + '>' + DR.esc(x) + '</option>'; }).join('') + '</select></div>' +
       '<div class="campo"><label>Suplemento % <em>fatiga y necesidades</em></label><input type="number" min="0" max="50" step="1" data-campo="suplemento" value="' + DR.esc(f.suplemento) + '"></div>' +
@@ -158,7 +160,7 @@ RES.dibujar = function (c, D, A, f) {
 
   h += UI.panel('Evaluaciones incluidas', '', UI.tabla([
     { t: 'Código', k: 'codigo' }, { t: 'Fecha', r: function (e) { return TOP.fecha(e.fecha); } }, { t: 'Cosechador', k: 'cosechador' },
-    { t: 'Fundo', k: 'fundo' }, { t: 'Lote', k: 'lote' }, { t: 'Presentación', k: 'presentacion' }, { t: 'Líder', k: 'lider' }
+    { t: 'Fundo', k: 'fundo' }, { t: 'Lote', k: 'lote' }, { t: 'Material', r: function (e) { return DR.esc(TOP.materialTxt(e.material || e.presentacion)); } }, { t: 'Líder', k: 'lider' }
   ], D.evals.map(function (e) { e._clic = true; return e; })));
   c.innerHTML = h;
   DR.entrarPaneles('#resCuerpo');

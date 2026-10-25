@@ -50,7 +50,8 @@ EST.pintar = function (cont) {
 EST.render = function (cont) {
   var scroll = DR.$('#contenido').scrollTop;
   var edita = TOP.puedeEditar(EVAL.ev), items = TOP.itemsDe(EVAL.ev.presentacion);
-  var h = '<div class="aviso entra" style="margin-bottom:14px">Presentación <b>' + DR.esc(EVAL.ev.presentacion) + '</b>. Si el TOP lo hace distinto, ' +
+  var mat = EVAL.ev.material || EVAL.ev.presentacion;
+  var h = '<div class="aviso entra" style="margin-bottom:14px">' + DR.esc(TOP.materialTxt(mat)) + ': se evalúa el <b>' + TOP.familiaTxt(EVAL.ev.presentacion) + '</b>. Si el TOP lo hace distinto, ' +
     'anota <b>cómo lo hace</b>: esa práctica sustenta la actualización del estándar.</div>';
   EST.TIPOS.forEach(function (tp) {
     var lista = items.filter(function (i) { return i.tipo === tp.k; });

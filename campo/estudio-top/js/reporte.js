@@ -44,8 +44,9 @@ REPORTE.excel = function (D, A) {
       ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: cols.length } };
       return ws;
     };
-    var base = function (e) { return { codigo: e.codigo, fecha: e.fecha, cosechador: e.cosechador, dni: e.dni, fundo: e.fundo, lote: e.lote, presentacion: e.presentacion, lider: e.lider }; };
-    var colsBase = [['Código', 'codigo', 11], ['Fecha', 'fecha', 11], ['Cosechador', 'cosechador', 28], ['DNI', 'dni', 11], ['Fundo', 'fundo', 14], ['Lote', 'lote', 9], ['Presentación', 'presentacion', 12], ['Líder', 'lider', 22]];
+    var base = function (e) { return { codigo: e.codigo, fecha: e.fecha, cosechador: e.cosechador, dni: e.dni, fundo: e.fundo, lote: e.lote, material: e.material, presentacion: e.presentacion, variedad: e.variedad, lider: e.lider }; };
+    var colsBase = [['Código', 'codigo', 11], ['Fecha', 'fecha', 11], ['Cosechador', 'cosechador', 28], ['DNI', 'dni', 11], ['Fundo', 'fundo', 14], ['Lote', 'lote', 9],
+      ['Material', 'material', 14], ['Estándar', 'presentacion', 10], ['Variedad', 'variedad', 11], ['Líder', 'lider', 22]];
     var minutos = function (s) { return s === null || s === undefined ? null : Math.round(s / 60 * 100) / 100; };
 
     hoja('Tiempo estándar', [['Actividad', 'act', 40], ['Clase', 'clase', 18], ['Tomas', 'n', 8], ['TOP evaluados', 'nEval', 10], ['Promedio (min)', 'prom', 12],
@@ -195,7 +196,7 @@ REPORTE.pdf = function (D, A) {
     D.evals.forEach(function (e) { cos[e.cosechador] = true; });
     y = 66;
     parrafo('Periodo: ' + (f.desde ? TOP.fecha(f.desde) : 'inicio') + ' al ' + (f.hasta ? TOP.fecha(f.hasta) : TOP.fecha(TOP.hoy())) +
-      ' · Presentación: ' + (f.presentacion || 'jarra y bandeja') + ' · Fundo: ' + (f.fundo || 'todos') + '.', 10.5);
+      ' · Estándar: ' + (f.presentacion ? (f.presentacion === 'JARRA' ? 'jarra cosechera' : 'granel') : 'jarra y granel') + (f.material ? ' · Material: ' + TOP.materialTxt(f.material) : '') + ' · Fundo: ' + (f.fundo || 'todos') + '.', 10.5);
     parrafo(Object.keys(cos).length + ' cosechadores TOP · ' + D.evals.length + ' evaluaciones · ' + D.tiempos.length + ' tomas de tiempo · ' +
       D.cump.length + ' verificaciones de estándar · ' + D.reba.length + ' posturas REBA · ' + D.ergo.length + ' entrevistas ergonómicas.', 10.5);
     parrafo('Emitido el ' + TOP.fecha(TOP.hoy()) + ' por ' + ((AT.perfil && AT.perfil.nombre) || '—') + '.', 9, colores.gris);

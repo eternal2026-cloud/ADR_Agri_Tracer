@@ -44,6 +44,8 @@ EVAL.pintarLista = function (cont) {
     }));
   }).then(function (conteos) {
     EVAL.conteos = conteos;
+    // Si mientras cargaba se fue a otra pantalla (#evaluar/…), no se pisa.
+    if (/^#evaluar\/./.test(location.hash) || DR.vista !== 'evaluar') return;
     EVAL.dibujarLista(cont);
   }).catch(function (e) { UI.error(cont, e); });
 };
@@ -96,6 +98,7 @@ EVAL.abrir = function (id, cont) {
   ]).then(function (r) {
     r.forEach(function (x) { if (x.error) throw new Error(x.error.message); });
     if (!r[0].data) throw new Error('No se encontró la evaluación (o no tienes acceso).');
+    if (location.hash !== '#evaluar/' + id) return;   // ya se fue a otra pantalla
     EVAL.ev = r[0].data;
     EVAL.d = { tiempos: r[1].data, cump: r[2].data, reba: r[3].data, ergo: r[4].data };
     EVAL.pintarFicha(cont);

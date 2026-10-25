@@ -26,7 +26,7 @@ COS.pintar = function (cont) {
         '<div class="sub">1) Descarga la plantilla · 2) Pega la lista (DNI y nombres; fundo y líder opcionales) · 3) Súbela aquí. ' +
         'Si el DNI ya existe se actualiza; no se borra a nadie.</div>' +
         '<div class="top-carga-pasos"><button type="button" class="btn sec" id="btnPlantilla">' + DR.ICONOS.subir.replace('M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5', 'M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5') + 'Descargar plantilla</button>' +
-        '<label class="btn verde" for="archCos">' + DR.ICONOS.subir + 'Subir Excel</label><input type="file" id="archCos" accept=".xlsx" class="oculto"></div>' +
+        '<button type="button" class="btn verde" id="btnSubirCos">' + DR.ICONOS.subir + 'Subir Excel</button><input type="file" id="archCos" accept=".xlsx" class="oculto"></div>' +
         '<div id="cosPrevia"></div></section>' : '') +
       '<section class="panel entra"><div class="panel-cab"><h2>Lista</h2></div>' +
       '<input type="search" id="cosBuscar" placeholder="Buscar por nombre, DNI, fundo o líder" autocomplete="off" style="margin:8px 0 12px">' +
@@ -36,6 +36,7 @@ COS.pintar = function (cont) {
     DR.$('#cosVolver').onclick = function () { location.hash = '#evaluar'; };
     if (DR.$('#btnPlantilla')) {
       DR.$('#btnPlantilla').onclick = function () { COS.plantilla(this); };
+      DR.$('#btnSubirCos').onclick = function () { DR.$('#archCos').click(); };
       DR.$('#archCos').onchange = function () { var a = this.files && this.files[0]; this.value = ''; if (a) COS.leer(a); };
     }
     DR.$('#cosBuscar').oninput = function () { COS.lista(this.value); };

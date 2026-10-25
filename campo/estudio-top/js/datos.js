@@ -261,7 +261,9 @@ TOP.cargarLotes = function () {
       (r[0].features || []).forEach(function (f) {
         var p = f.properties || {};
         if (!p.fundo || !p.lote_clave) return;
-        (porFundo[p.fundo] = porFundo[p.fundo] || []).push({ lote: p.lote_clave, ha: p.area_ha, variedades: p.variedades || '' });
+        var l = porFundo[p.fundo] = porFundo[p.fundo] || [];
+        // Un lote puede venir en varios polígonos: una sola ficha.
+        if (!l.some(function (x) { return x.lote === p.lote_clave; })) l.push({ lote: p.lote_clave, ha: p.area_ha, variedades: p.variedades || '' });
       });
       // Lotes con ciclos recientes: material y variedad que se están cosechando.
       TOP.enCosecha = {};
@@ -283,7 +285,11 @@ TOP.cargarLotes = function () {
 TOP.cosechaDe = function (fundo, lote) {
   if (!TOP.enCosecha || !fundo || !lote) return null;
   return TOP.enCosecha[fundo + '|' + lote] || Object.keys(TOP.enCosecha).map(function (k) { return TOP.enCosecha[k]; })
-    .filter(function (c) { return c.fundo === fundo && (c.lote.indexOf(lote) === 0 || lote.indexOf(c.lote) === 0); })
+    .filter(function (c) {
+      // Solo sublotes con letra (YA1C ↔ YA1); MA12 no es MA1.
+      var largo = c.lote.length > lote.length ? c.lote : lote, corto = largo === c.lote ? lote : c.lote;
+      return c.fundo === fundo && largo.indexOf(corto) === 0 && /^[A-Z]+$/.test(largo.substring(corto.length));
+    })
     .sort(function (a, b) { return a.ultima < b.ultima ? 1 : -1; })[0] || null;
 };
 

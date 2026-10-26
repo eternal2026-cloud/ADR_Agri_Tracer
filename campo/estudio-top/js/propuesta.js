@@ -27,7 +27,10 @@ PROP.puedeProponer = function () { return AT.puedeCapturar() && AT.tieneAcceso('
 PROP.dibujar = function (cont, f) {
   var sug = TOP.sugerencias(RES.A).filter(function (s) {
     // Oculta las sugerencias que ya tienen propuesta (mismo ítem o actividad).
-    return !PROP.lista.some(function (p) { return p.estado !== 'descartada' && ((s.item_id && p.item_id === s.item_id) || (s.actividad_id && p.actividad_id === s.actividad_id && p.ambito === s.ambito)); });
+    return !PROP.lista.some(function (p) {
+      return p.estado !== 'descartada' && ((s.item_id && p.item_id === s.item_id) || (s.actividad_id && p.actividad_id === s.actividad_id && p.ambito === s.ambito) ||
+        (!s.item_id && !s.actividad_id && s.texto_propuesto && p.texto_propuesto === s.texto_propuesto));
+    });
   });
   PROP.sug = sug;
   var puede = PROP.puedeProponer();

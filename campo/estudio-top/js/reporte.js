@@ -107,6 +107,21 @@ REPORTE.excel = function (D, A) {
         });
         return f;
       }));
+    var encRes = function (x, k) { return ENC.etiqueta(k, (x.respuestas || {})[k]); };
+    hoja('Encuesta', colsBase.concat([['Aceptó', 'acepto', 8], ['Presentaciones', 'pres', 12], ['Momento', 'momento', 14],
+      ['1 Campañas', 'p1', 16], ['2 Cómo trabaja la planta', 'p2', 40], ['3 Distinto a capacitación', 'p3', 12], ['3 ¿En qué?', 'p3_que', 36],
+      ['4 Rinde más en', 'p4', 16], ['5 Granel', 'p5_granel', 32], ['5 Jarra', 'p5_jarra', 32], ['6 Tiempo perdido 1º', 'f1', 22],
+      ['6 2º', 'f2', 22], ['6 3º', 'f3', 22], ['6 Otro', 'p6_otro', 20], ['7 Cómo lo resuelve', 'p7', 36], ['8 Cómo aprendió', 'p8', 20],
+      ['9 Truco', 'p9', 40], ['10 Qué cambiaría', 'p10', 40], ['Observaciones', 'obs', 30]]),
+      (D.enc || []).map(function (x) {
+        var f = base(REPORTE.evalDe(D, x.evaluacion_id)), r = x.respuestas || {}, p6 = r.p6 || [];
+        f.acepto = x.acepto ? 'Sí' : 'No';
+        f.pres = encRes(x, 'presentaciones'); f.momento = r.momento === 'OTRO' ? (r.momento_otro || 'Otro') : encRes(x, 'momento');
+        ['p1', 'p3', 'p4', 'p8'].forEach(function (k) { f[k] = encRes(x, k); });
+        ['p2', 'p3_que', 'p5_granel', 'p5_jarra', 'p6_otro', 'p7', 'p9', 'p10', 'obs'].forEach(function (k) { f[k] = r[k] || ''; });
+        [0, 1, 2].forEach(function (i) { f['f' + (i + 1)] = p6[i] ? ENC.etiqueta('p6', p6[i]) : ''; });
+        return f;
+      }));
     hoja('Propuesta', [['N°', 'id', 6], ['Estado', 'estado', 11], ['Ámbito', 'ambito', 18], ['Tipo', 'tipo', 14], ['Presentación', 'pres', 12], ['Actual', 'actual', 50],
       ['Propuesto', 'prop', 50], ['Tiempo estándar', 'tiempo', 12], ['Sustento', 'sust', 70]],
       props.map(function (p) {
@@ -198,7 +213,8 @@ REPORTE.pdf = function (D, A) {
     parrafo('Periodo: ' + (f.desde ? TOP.fecha(f.desde) : 'inicio') + ' al ' + (f.hasta ? TOP.fecha(f.hasta) : TOP.fecha(TOP.hoy())) +
       ' · Estándar: ' + (f.presentacion ? (f.presentacion === 'JARRA' ? 'jarra cosechera' : 'granel') : 'jarra y granel') + (f.material ? ' · Material: ' + TOP.materialTxt(f.material) : '') + ' · Fundo: ' + (f.fundo || 'todos') + '.', 10.5);
     parrafo(Object.keys(cos).length + ' cosechadores TOP · ' + D.evals.length + ' evaluaciones · ' + D.tiempos.length + ' tomas de tiempo · ' +
-      D.cump.length + ' verificaciones de estándar · ' + D.reba.length + ' posturas REBA · ' + D.ergo.length + ' entrevistas ergonómicas.', 10.5);
+      D.cump.length + ' verificaciones de estándar · ' + D.reba.length + ' posturas REBA · ' + D.ergo.length + ' entrevistas ergonómicas · ' +
+      (D.enc || []).length + ' encuestas de factores de rendimiento.', 10.5);
     parrafo('Emitido el ' + TOP.fecha(TOP.hoy()) + ' por ' + ((AT.perfil && AT.perfil.nombre) || '—') + '.', 9, colores.gris);
 
     titulo('1. Objetivo y metodología');
@@ -206,6 +222,7 @@ REPORTE.pdf = function (D, A) {
     parrafo('a) Tiempo por actividad aislada (inicio y fin con segundos) de las ' + TOP.actividades.length + ' actividades del seguimiento al cosechador, clasificadas en productiva, soporte necesario, espera/eliminable y personal.');
     parrafo('b) Cumplimiento (cumple / no cumple / no aplica) del instructivo, la LUP y el formato de puesto de trabajo de su presentación, anotando cómo lo hace el TOP cuando difiere del estándar.');
     parrafo('c) Evaluación postural REBA (tablas A, B y C) y checklist ergonómico de síntomas, fatiga, carga mental, ritmo y jornada.');
+    parrafo('d) Encuesta de factores de rendimiento (1 por cosechador y día): experiencia, método, presentación, tiempo perdido, aprendizaje, trucos y mejoras.');
     parrafo('Tiempo estándar = mediana de las tomas TOP × (1 + suplemento ' + (Number(f.suplemento) || 0) + '%). Se usa la mediana para que una toma atípica no distorsione el estándar.');
 
     titulo('2. Tiempo estándar por actividad');
@@ -281,7 +298,24 @@ REPORTE.pdf = function (D, A) {
       }
     } else parrafo('Sin entrevistas ergonómicas en el periodo.');
 
-    titulo('7. Propuesta de actualización del estándar');
+    titulo('7. Encuesta de factores de rendimiento');
+    var E = A.enc;
+    if (E && E.n) {
+      parrafo(E.n + ' cosechadores TOP respondieron' + (E.noAcepto ? ' (' + E.noAcepto + ' no aceptaron)' : '') + '.');
+      if (E.factores.length) tabla([{ t: 'Factor que quita tiempo', w: 80 }, { t: '1º', w: 14, al: 'r' }, { t: '2º', w: 14, al: 'r' }, { t: '3º', w: 14, al: 'r' }, { t: 'Puntos', w: 20, al: 'r' }, { t: 'Menciones', w: 36, al: 'r' }],
+        E.factores.map(function (x) { return [x.t, x.pos[0], x.pos[1], x.pos[2], x.puntos, x.menciones]; }));
+      tabla([{ t: 'Pregunta', w: 60 }, { t: 'Respuestas', w: 118 }], [
+        ['Experiencia (campañas)', E.p1.map(function (o) { return o.t + ': ' + o.n; }).join(' · ')],
+        ['Hace algo distinto a la capacitación', E.p3.map(function (o) { return o.t + ': ' + o.n; }).join(' · ')],
+        ['Presentación donde rinde más', E.p4.map(function (o) { return o.t + ': ' + o.n; }).join(' · ')],
+        ['Cómo aprendió', E.p8.map(function (o) { return o.t + ': ' + o.n; }).join(' · ')]]);
+      var voces = function (t, l) { if (l.length) tabla([{ t: t, w: 130 }, { t: 'Cosechador', w: 48 }], l.map(function (x) { return [x.t, x.quien]; })); };
+      voces('Trucos para cosechar más rápido cuidando la fruta', E.trucos);
+      voces('Qué hacen distinto a lo enseñado', E.distinto);
+      voces('Qué cambiarían del puesto, herramienta o instructivo', E.mejoras);
+    } else parrafo('Sin encuestas en el periodo.');
+
+    titulo('8. Propuesta de actualización del estándar');
     var vigentes = props.filter(function (p) { return p.estado !== 'descartada'; });
     if (vigentes.length) {
       parrafo('Aprobadas: ' + vigentes.filter(function (p) { return p.estado === 'aprobada'; }).length + ' · En borrador: ' + vigentes.filter(function (p) { return p.estado === 'borrador'; }).length + '.');

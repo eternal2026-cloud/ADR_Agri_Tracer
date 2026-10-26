@@ -1,6 +1,7 @@
 /* ============================================================================
  * evaluar.js — LISTA DE EVALUACIONES Y FICHA DEL COSECHADOR TOP
- * Ficha con 5 secciones: Tiempos · Estándares · REBA · Ergonomía · Datos.
+ * Ficha con 6 secciones: Tiempos · Estándares · REBA · Ergonomía · Encuesta · Datos.
+ * Una evaluación (y su encuesta) por cosechador y día; se puede anular o borrar.
  * Nueva evaluación sin digitar: cosechador de la lista cargada por Excel, fundo,
  * lote del mapa de calor (con lo que se está cosechando) y material con botones.
  * Enlaces: #evaluar/<id>, #evaluar/nueva, #evaluar/cosechadores.
@@ -12,6 +13,7 @@ EVAL.TABS = [
   { k: 'estandares', t: 'Estándares', ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m3.5 6 1.2 1.2L7 5M3.5 12l1.2 1.2L7 11M3.5 18l1.2 1.2L7 17"/></svg>' },
   { k: 'reba', t: 'REBA', ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="4.5" r="2"/><path d="M12 7v6l-3 7M12 13l3 7M7 10l5-1 5 1"/></svg>' },
   { k: 'ergonomia', t: 'Ergonomía', ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10z"/></svg>' },
+  { k: 'encuesta', t: 'Encuesta', ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/></svg>' },
   { k: 'datos', t: 'Datos', ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c1-4 4-6 7-6s6 2 7 6"/></svg>' }
 ];
 
@@ -38,7 +40,7 @@ EVAL.pintarLista = function (cont) {
     if (r[0].error) throw new Error(r[0].error.message);
     EVAL.lista = r[0].data;
     var ids = r[0].data.map(function (e) { return e.id; });
-    return Promise.all(['top_tiempos', 'top_cumplimiento', 'top_reba', 'top_ergonomia'].map(function (t) {
+    return Promise.all(['top_tiempos', 'top_cumplimiento', 'top_reba', 'top_ergonomia', 'top_encuestas'].map(function (t) {
       if (!ids.length) return Promise.resolve([]);
       return sb.from(t).select('evaluacion_id').in('evaluacion_id', ids.slice(0, 150)).then(function (x) { return x.data || []; });
     }));
@@ -71,13 +73,13 @@ EVAL.dibujarLista = function (cont) {
   if (!lista.length) h += '<div class="panel entra"><div class="vacio">No hay evaluaciones en los últimos 60 días.</div></div>';
   grupos.forEach(function (g) {
     h += '<div class="top-dia">' + DR.esc(g.t) + '<span>' + g.l.length + '</span></div><div class="top-evals">' + g.l.map(function (e) {
-      var n = [cuenta(0, e.id), cuenta(1, e.id), cuenta(2, e.id), cuenta(3, e.id)], hechas = n.filter(Boolean).length;
+      var n = [cuenta(0, e.id), cuenta(1, e.id), cuenta(2, e.id), cuenta(3, e.id), cuenta(4, e.id)], hechas = n.filter(Boolean).length;
       return '<a class="top-eval entra' + (e.anulada ? ' anulada' : '') + '" href="#evaluar/' + e.id + '">' +
         '<span class="top-avatar">' + DR.esc(COS.iniciales(e.cosechador)) + '</span>' +
         '<div class="top-eval-cuerpo"><div class="top-eval-cab"><b>' + DR.esc(e.cosechador) + '</b><span>' + DR.esc(e.codigo) + '</span></div>' +
         '<div class="top-eval-sub">' + DR.esc([e.fundo, e.lote].filter(Boolean).join(' · ') || 'sin lote') + ' · ' + DR.esc(TOP.materialTxt(e.material || e.presentacion)) +
           (e.evaluador_id !== AT.perfil.id ? ' · ' + DR.esc(e.evaluador_txt || 'otro evaluador') : '') + '</div>' +
-        '<div class="top-progreso" title="' + hechas + ' de 4 secciones">' + ['Tiempos', 'Estándares', 'REBA', 'Ergonomía'].map(function (t, i) {
+        '<div class="top-progreso" title="' + hechas + ' de 5 secciones">' + ['Tiempos', 'Estándares', 'REBA', 'Ergonomía', 'Encuesta'].map(function (t, i) {
           return '<span class="' + (n[i] ? 'ok' : '') + '">' + t + (n[i] && i < 3 ? ' ' + n[i] : '') + '</span>';
         }).join('') + '</div>' + (e.anulada ? '<span class="pill rojo">Anulada</span>' : '') + '</div></a>';
     }).join('') + '</div>';
@@ -94,13 +96,14 @@ EVAL.abrir = function (id, cont) {
     sb.from('top_tiempos').select('*').eq('evaluacion_id', id),
     sb.from('top_cumplimiento').select('*').eq('evaluacion_id', id),
     sb.from('top_reba').select('*').eq('evaluacion_id', id),
-    sb.from('top_ergonomia').select('*').eq('evaluacion_id', id).maybeSingle()
+    sb.from('top_ergonomia').select('*').eq('evaluacion_id', id).maybeSingle(),
+    sb.from('top_encuestas').select('*').eq('evaluacion_id', id).maybeSingle()
   ]).then(function (r) {
     r.forEach(function (x) { if (x.error) throw new Error(x.error.message); });
     if (!r[0].data) throw new Error('No se encontró la evaluación (o no tienes acceso).');
     if (location.hash !== '#evaluar/' + id) return;   // ya se fue a otra pantalla
     EVAL.ev = r[0].data;
-    EVAL.d = { tiempos: r[1].data, cump: r[2].data, reba: r[3].data, ergo: r[4].data };
+    EVAL.d = { tiempos: r[1].data, cump: r[2].data, reba: r[3].data, ergo: r[4].data, enc: r[5].data };
     EVAL.pintarFicha(cont);
     TIEMPOS.subirPendientes(false);
   });
@@ -115,7 +118,8 @@ EVAL.pintarFicha = function (cont) {
   var e = EVAL.ev, edita = TOP.puedeEditar(e), scroll = DR.$('#contenido').scrollTop;
   var avance = {
     tiempos: EVAL.d.tiempos.length, estandares: EVAL.d.cump.filter(function (c) { return c.resultado; }).length,
-    reba: EVAL.d.reba.length, ergonomia: EVAL.d.ergo ? Object.keys(EVAL.d.ergo.respuestas || {}).length : 0
+    reba: EVAL.d.reba.length, ergonomia: EVAL.d.ergo ? Object.keys(EVAL.d.ergo.respuestas || {}).length : 0,
+    encuesta: EVAL.d.enc ? '✓' : 0
   };
   var mat = e.material || e.presentacion;
   cont.innerHTML = '<div class="vista">' +
@@ -148,7 +152,7 @@ EVAL.pintarFicha = function (cont) {
 
 /** Al salir de Estándares o Ergonomía con cambios: el borrador queda en el celular, solo se avisa. */
 EVAL.puedeCambiar = function () {
-  if ((EVAL.tab === 'estandares' && EST.sucio) || (EVAL.tab === 'ergonomia' && ERGO.sucio)) {
+  if ((EVAL.tab === 'estandares' && EST.sucio) || (EVAL.tab === 'ergonomia' && ERGO.sucio) || (EVAL.tab === 'encuesta' && ENC.sucio)) {
     DR.toast('Tus cambios quedan como borrador en este celular. Recuerda «Guardar».', 'info');
   }
   return true;
@@ -161,6 +165,7 @@ EVAL.pintarSeccion = function () {
   else if (EVAL.tab === 'estandares') EST.pintar(s);
   else if (EVAL.tab === 'reba') REBA.pintar(s);
   else if (EVAL.tab === 'ergonomia') ERGO.pintar(s);
+  else if (EVAL.tab === 'encuesta') ENC.pintar(s);
   else EVAL.formulario(s, EVAL.ev);
 };
 
@@ -171,7 +176,10 @@ EVAL.formulario = function (cont, e) {
   var nueva = !e;
   var edita = nueva ? (AT.puedeCapturar() && AT.tieneAcceso('campo.top.evaluar')) : TOP.puedeEditar(e);
   cont.innerHTML = '<div class="vacio">Cargando lotes y cosechadores…</div>';
-  return Promise.all([TOP.cargarLotes(), TOP.cargarCosechadores().catch(function () { return []; })]).then(function () {
+  return Promise.all([TOP.cargarLotes(), TOP.cargarCosechadores().catch(function () { return []; }),
+    sb.from('top_evaluaciones').select('id,codigo,cosechador_id,fecha').eq('anulada', false).gte('fecha', TOP.localDe(new Date(Date.now() - 7 * 86400000)).substring(0, 10))
+  ]).then(function (rr) {
+    EVAL.recientes = (rr[2] && rr[2].data) || [];
     var ult = TOP.leer('ultimos', {});
     var st = EVAL.f = nueva ? {
       fecha: TOP.hoy(), fundo: ult.fundo || (TOP.misFundos().length === 1 ? TOP.misFundos()[0] : ''), lote: '', material: ult.material || '',
@@ -197,13 +205,16 @@ EVAL.formulario = function (cont, e) {
       (!nueva ? '<div class="ayuda-campo" style="margin:12px 2px">Registrada por ' + DR.esc(e.evaluador_txt || '—') + ' · ' + DR.fechaHora(e.creado_en) + '</div>' : '') +
       (!nueva && (AT.esAdmin() || e.evaluador_id === AT.perfil.id) && AT.puedeCapturar() ? '<section class="panel entra zona-peligro"><h2>' + (e.anulada ? 'Restaurar evaluación' : 'Anular evaluación') + '</h2>' +
         '<div class="sub">' + (e.anulada ? 'Vuelve a contar en el Resumen y la Propuesta.' : 'Deja de contar en el Resumen y la Propuesta (no se borra).') + '</div>' +
-        '<button type="button" class="btn sec chico" id="btnAnular">' + (e.anulada ? 'Restaurar' : 'Anular') + '</button></section>' : '') +
+        '<div class="acciones" style="margin-top:8px"><button type="button" class="btn sec chico" id="btnAnular">' + (e.anulada ? 'Restaurar' : 'Anular') + '</button>' +
+        '<button type="button" class="btn sec chico btn-peligro" id="btnBorrarEval">Borrar definitivamente</button></div>' +
+        '<div class="ayuda-campo" style="margin-top:8px">Borrar elimina la evaluación con sus tiempos, estándares, fotos, REBA, ergonomía y encuesta. No se puede deshacer.</div></section>' : '') +
       (nueva ? '</div>' : '');
     cont.innerHTML = h;
     DR.entrarPaneles('#' + cont.id);
     EVAL.pasoCosechador(); EVAL.pasoLugar(); EVAL.pasoMaterial(); EVAL.resumenSel();
 
     if (DR.$('#btnGuardarEval')) DR.$('#btnGuardarEval').onclick = function () { EVAL.guardar(this, nueva); };
+    if (DR.$('#btnBorrarEval')) DR.$('#btnBorrarEval').onclick = function () { EVAL.borrar(e, this); };
     if (DR.$('#btnAnular')) DR.$('#btnAnular').onclick = function () {
       if (!window.confirm(e.anulada ? '¿Restaurar esta evaluación?' : '¿Anular esta evaluación? Dejará de contar en el Resumen.')) return;
       AT.rpc('rpc_top_anular_evaluacion', { p_id: e.id, p_anular: !e.anulada }).then(function () {
@@ -252,7 +263,7 @@ EVAL.pasoCosechador = function (buscar) {
     '<div class="top-cos-lista elegir">' + (res.length ? res.map(function (c) {
       return '<button type="button" class="top-cos" data-cos="' + c.id + '"><span class="top-avatar">' + DR.esc(COS.iniciales(c.nombre)) + '</span>' +
         '<div><b>' + DR.esc(c.nombre) + '</b><small>DNI ' + DR.esc(c.dni) + (c.fundo ? ' · ' + DR.esc(c.fundo) : '') + (c.lider ? ' · ' + DR.esc(c.lider) : '') + '</small></div>' +
-        (evaluados[c.id] ? '<span class="pill gris">' + evaluados[c.id] + ' eval.</span>' : '') + '</button>';
+        (EVAL.deHoy(c.id, st.fecha) ? '<span class="pill verde">Hoy ✓</span>' : (evaluados[c.id] ? '<span class="pill gris">' + evaluados[c.id] + ' eval.</span>' : '')) + '</button>';
     }).join('') : '<div class="vacio">Nadie coincide. ¿Falta en la lista? <a href="#evaluar/cosechadores">Cárgalo</a>.</div>') + '</div>';
   cont.innerHTML = h;
   var inp = DR.$('#buscarCos');
@@ -264,6 +275,12 @@ EVAL.pasoCosechador = function (buscar) {
   DR.$$('[data-cos]', cont).forEach(function (b) {
     b.onclick = function () {
       var c = lista.filter(function (x) { return x.id === Number(b.getAttribute('data-cos')); })[0];
+      // Una evaluación (y una encuesta) por cosechador y día: si ya existe, se abre esa.
+      var hoy = !st.id && EVAL.deHoy(c.id, st.fecha);
+      if (hoy) {
+        if (window.confirm(c.nombre + ' ya tiene la evaluación ' + hoy.codigo + ' de este día. ¿Abrirla?')) location.hash = '#evaluar/' + hoy.id;
+        return;
+      }
       st.cosechador_id = c.id; st.cosechador = c.nombre; st.dni = c.dni;
       if (c.lider) { st.lider = c.lider; var l = DR.$('#inpLider'); if (l) l.value = c.lider; }
       if (c.fundo && !st.fundo && TOP.misFundos().indexOf(c.fundo) > -1) { st.fundo = c.fundo; EVAL.pasoLugar(); }
@@ -348,5 +365,28 @@ EVAL.guardar = function (btn, nueva) {
     DR.toast(nueva ? 'Evaluación ' + fila.codigo + ' creada.' : 'Datos guardados.');
     if (nueva) { EVAL.tab = 'tiempos'; location.hash = '#evaluar/' + fila.id; }
     else EVAL.recargar();
+  }).catch(function (er) {
+    btn.classList.remove('cargando');
+    DR.toast(/cosechador_dia|duplicate/i.test(er.message) ? 'Este cosechador ya tiene una evaluación ese día: ábrela desde la lista.' : er.message, 'error');
+  });
+};
+
+EVAL.deHoy = function (cosechadorId, fecha) {
+  return (EVAL.recientes || []).filter(function (x) { return x.cosechador_id === cosechadorId && x.fecha === (fecha || TOP.hoy()); })[0] || null;
+};
+
+/** Borrado definitivo (además de anular): pide escribir el código para evitar toques accidentales. */
+EVAL.borrar = function (e, btn) {
+  var t = window.prompt('Se borrará ' + e.codigo + ' (' + e.cosechador + ', ' + TOP.fecha(e.fecha) + ') con todo su detalle y fotos. ' +
+    'No se puede deshacer.\n\nEscribe el código ' + e.codigo + ' para confirmar:');
+  if (t === null) return;
+  if (t.trim().toUpperCase() !== e.codigo) { DR.toast('El código no coincide: no se borró nada.', 'error'); return; }
+  btn.classList.add('cargando');
+  AT.rpc('rpc_top_borrar_evaluacion', { p_id: e.id }).then(function (fotos) {
+    ['est.', 'ergo.', 'enc.', 'reba.', 'reloj.', 'pend.'].forEach(function (k) { TOP.escribir(k + e.id, null); });
+    if (fotos && fotos.length) sb.storage.from(FOTOS.BUCKET).remove(fotos).catch(function () { /* quedan huérfanas, sin efecto */ });
+    DR.toast('Evaluación ' + e.codigo + ' borrada.');
+    EVAL.ev = null;
+    location.hash = '#evaluar';
   }).catch(function (er) { btn.classList.remove('cargando'); DR.toast(er.message, 'error'); });
 };

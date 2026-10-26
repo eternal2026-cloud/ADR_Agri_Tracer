@@ -346,8 +346,8 @@ TOP.cargarDatos = function (f) {
     if (r[1].error) throw new Error(r[1].error.message);
     var evals = r[1].data, ids = evals.map(function (e) { return e.id; });
     return Promise.all([TOP.porEvaluaciones('top_tiempos', ids), TOP.porEvaluaciones('top_cumplimiento', ids),
-      TOP.porEvaluaciones('top_reba', ids), TOP.porEvaluaciones('top_ergonomia', ids)]).then(function (d) {
-      return { evals: evals, tiempos: d[0], cump: d[1], reba: d[2], ergo: d[3], filtro: f };
+      TOP.porEvaluaciones('top_reba', ids), TOP.porEvaluaciones('top_ergonomia', ids), TOP.porEvaluaciones('top_encuestas', ids)]).then(function (d) {
+      return { evals: evals, tiempos: d[0], cump: d[1], reba: d[2], ergo: d[3], enc: d[4], filtro: f };
     });
   });
 };
@@ -427,6 +427,31 @@ TOP.analizar = function (D, suplemento) {
     var resp = items.reduce(function (s2, i) { return s2 + i.SI + i.NO; }, 0), malos = items.reduce(function (s2, i) { return s2 + i[i.malo]; }, 0);
     return { t: s.t, dolor: !!s.dolor, items: items, desfav: resp ? malos / resp * 100 : null };
   }) };
+
+  // Encuesta de factores de rendimiento (encuesta.js).
+  var encs = (D.enc || []).filter(function (x) { return x.acepto; });
+  var quien = function (x) { var e = D.evals.filter(function (v) { return v.id === x.evaluacion_id; })[0]; return e ? e.cosechador : ''; };
+  var dist = function (k) {
+    return ENC.OP[k].map(function (o) {
+      return { v: o[0], t: o[1], n: encs.filter(function (x) { return String((x.respuestas || {})[k]) === String(o[0]); }).length };
+    });
+  };
+  var textos = function (k) {
+    return encs.filter(function (x) { return ((x.respuestas || {})[k] || '').trim(); })
+      .map(function (x) { return { t: x.respuestas[k].trim(), quien: quien(x) }; });
+  };
+  A.enc = {
+    n: encs.length, noAcepto: (D.enc || []).length - encs.length,
+    p1: dist('p1'), p3: dist('p3'), p4: dist('p4'), p8: dist('p8'), presentaciones: dist('presentaciones'),
+    // Factores que quitan tiempo: 1º = 3 pts, 2º = 2, 3º = 1.
+    factores: ENC.OP.p6.map(function (o) {
+      var pos = [0, 0, 0];
+      encs.forEach(function (x) { var i = ((x.respuestas || {}).p6 || []).indexOf(o[0]); if (i > -1) pos[i]++; });
+      return { v: o[0], t: o[1], pos: pos, menciones: pos[0] + pos[1] + pos[2], puntos: pos[0] * 3 + pos[1] * 2 + pos[2] };
+    }).filter(function (f) { return f.menciones; }).sort(function (a, b) { return b.puntos - a.puntos; }),
+    otros: textos('p6_otro'), metodo: textos('p2'), distinto: textos('p3_que'), granel: textos('p5_granel'), jarra: textos('p5_jarra'),
+    resuelve: textos('p7'), trucos: textos('p9'), mejoras: textos('p10')
+  };
   return A;
 };
 
@@ -472,6 +497,22 @@ TOP.sugerencias = function (A) {
         sustento: A.reba.n + ' evaluaciones REBA: ' + alto + ' en riesgo alto o muy alto; puntaje promedio ' + DR.num(A.reba.prom.prom, 1) +
           '. Segmento más exigido: ' + peor.t + ' (promedio ' + DR.num(peor.prom, 1) + ' de ' + peor.max + ').', peso: 60 + alto });
     }
+  }
+  if (A.enc && A.enc.n) {
+    A.enc.factores.slice(0, 3).forEach(function (f, i) {
+      s.push({ ambito: 'otro', tipo: 'reducir', texto_actual: f.t,
+        texto_propuesto: 'Atacar «' + f.t.toLowerCase() + '» como causa de tiempo perdido en el estándar.',
+        sustento: 'Encuesta a ' + A.enc.n + ' cosechadores TOP: ' + f.menciones + ' lo ponen entre los 3 factores que más tiempo les quitan (' +
+          f.pos[0] + ' en 1º lugar, ' + f.pos[1] + ' en 2º, ' + f.pos[2] + ' en 3º).', peso: 45 - i * 5 + f.puntos });
+    });
+    A.enc.trucos.forEach(function (t) {
+      s.push({ ambito: 'estandar', tipo: 'nuevo', texto_actual: '', texto_propuesto: t.t,
+        sustento: 'Truco declarado por el cosechador TOP ' + t.quien + ' en la encuesta (pregunta 9): validar con tiempos y cumplimiento antes de incorporarlo.', peso: 15 });
+    });
+    A.enc.mejoras.forEach(function (t) {
+      s.push({ ambito: 'otro', tipo: 'modificar', texto_actual: '', texto_propuesto: t.t,
+        sustento: 'Mejora pedida por el cosechador TOP ' + t.quien + ' (pregunta 10: puesto, herramienta o instructivo).', peso: 12 });
+    });
   }
   return s.sort(function (a, b) { return b.peso - a.peso; });
 };

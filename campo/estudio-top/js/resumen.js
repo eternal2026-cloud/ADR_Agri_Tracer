@@ -158,6 +158,8 @@ RES.dibujar = function (c, D, A, f) {
         .sort(function (a, b) { return b.desfav - a.desfav; }).slice(0, 12)));
   }
 
+  if (A.enc.n || A.enc.noAcepto) h += RES.panelEncuesta(A.enc);
+
   h += UI.panel('Evaluaciones incluidas', '', UI.tabla([
     { t: 'Código', k: 'codigo' }, { t: 'Fecha', r: function (e) { return TOP.fecha(e.fecha); } }, { t: 'Cosechador', k: 'cosechador' },
     { t: 'Fundo', k: 'fundo' }, { t: 'Lote', k: 'lote' }, { t: 'Material', r: function (e) { return DR.esc(TOP.materialTxt(e.material || e.presentacion)); } }, { t: 'Líder', k: 'lider' }
@@ -166,6 +168,37 @@ RES.dibujar = function (c, D, A, f) {
   DR.entrarPaneles('#resCuerpo');
   FOTOS.pintar(c);
   DR.$$('tr[data-clic]', c).forEach(function (tr, i) { tr.onclick = function () { location.hash = '#evaluar/' + D.evals[i].id; }; });
+};
+
+/** Encuesta de factores de rendimiento: distribuciones, factores que quitan tiempo y respuestas abiertas. */
+RES.panelEncuesta = function (E) {
+  var barrasDist = function (l) {
+    return RES.barras(l.map(function (o) { return { etq: o.t, valor: o.n, color: '#0097CE', texto: o.n + ' <small>(' + (E.n ? DR.num(o.n / E.n * 100, 0) : 0) + '%)</small>' }; }));
+  };
+  var lista = function (titulo, l) {
+    if (!l.length) return '';
+    return '<div class="sep-titulo">' + titulo + ' <small>(' + l.length + ')</small></div><div class="top-voces">' + l.map(function (x) {
+      return '<div>«' + DR.esc(x.t) + '»<small>' + DR.esc(x.quien) + '</small></div>';
+    }).join('') + '</div>';
+  };
+  return UI.panel('Encuesta de factores de rendimiento', E.n + ' encuestas respondidas' + (E.noAcepto ? ' · ' + E.noAcepto + ' no aceptaron' : '') +
+    '. Lo que dicen los propios TOP sobre su método, el tiempo perdido y sus trucos.',
+    (E.factores.length ? '<div class="sep-titulo">¿Qué les quita más tiempo? <small>1º = 3 pts · 2º = 2 · 3º = 1</small></div>' +
+      RES.barras(E.factores.map(function (f) {
+        return { etq: f.t, sub: f.menciones + ' menciones (1º ' + f.pos[0] + ' · 2º ' + f.pos[1] + ' · 3º ' + f.pos[2] + ')', valor: f.puntos, color: '#EF7C3B', texto: f.puntos + ' <small>pts</small>' };
+      })) : '') +
+    '<div class="grid-2"><div><div class="sep-titulo">Experiencia</div>' + barrasDist(E.p1) + '</div>' +
+    '<div><div class="sep-titulo">¿Hace algo distinto a la capacitación?</div>' + barrasDist(E.p3) + '</div>' +
+    '<div><div class="sep-titulo">¿Dónde rinde más?</div>' + barrasDist(E.p4) + '</div>' +
+    '<div><div class="sep-titulo">¿Cómo aprendió?</div>' + barrasDist(E.p8) + '</div></div>' +
+    lista('Trucos para cosechar más rápido cuidando la fruta', E.trucos) +
+    lista('Qué hacen distinto a lo enseñado', E.distinto) +
+    lista('Cómo trabajan una planta', E.metodo) +
+    lista('Qué cambiarían del puesto, herramienta o instructivo', E.mejoras) +
+    lista('Cómo resuelven el tiempo perdido', E.resuelve) +
+    lista('Granel: qué facilita o complica', E.granel) +
+    lista('Jarra: qué facilita o complica', E.jarra) +
+    lista('Otros factores de tiempo perdido', E.otros));
 };
 
 TOP.rebaNivel = function (f) { return f <= 1 ? 0 : (f <= 3 ? 1 : (f <= 7 ? 2 : (f <= 10 ? 3 : 4))); };

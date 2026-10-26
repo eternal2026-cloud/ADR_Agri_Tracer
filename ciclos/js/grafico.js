@@ -25,7 +25,7 @@ GRAFICO.barras = function (items, meta) {
     h += '<div class="gf-fila" data-gf="' + i + '">' +
       '<div class="gf-nombre">' + DR.esc(it.etq) + (it.sub ? '<small>' + DR.esc(it.sub) + '</small>' : '') + '</div>' +
       '<div class="gf-pista">' + linea + '<span class="gf-barra' + (sobre ? ' sobre' : '') + '" data-ancho="' + (sin ? 0 : pct(it.valor)).toFixed(2) + '"></span></div>' +
-      '<div class="gf-cifra">' + (sin ? '—' : DR.num(it.valor, 0) + ' <small>min</small>') + (sobre ? ' <span class="gf-alerta" aria-label="Sobre la meta">▲</span>' : '') + '</div>' +
+      '<div class="gf-cifra">' + (sin ? '—' : UI.mmss(it.valor) + ' <small>min:seg</small>') + (sobre ? ' <span class="gf-alerta" aria-label="Sobre la meta">▲</span>' : '') + '</div>' +
     '</div>';
   });
   return h + '</div>';

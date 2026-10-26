@@ -177,7 +177,7 @@ UI.lotesHtml = function (items, meta) {
   return items.map(function (g) {
     var t = g.total, sobre = t !== null && t > meta;
     return '<button type="button" class="lote-card entra" data-lote="' + DR.esc(g.id) + '">' +
-      '<div class="lc-top"><b>' + DR.esc(g.nombre) + '</b><span class="lc-min' + (sobre ? ' sobre' : '') + '">' + (t === null ? '—' : DR.num(t, 0) + ' min') + '</span></div>' +
+      '<div class="lc-top"><b>' + DR.esc(g.nombre) + '</b><span class="lc-min' + (sobre ? ' sobre' : '') + '">' + (t === null ? '—' : UI.mmss(t) + ' min') + '</span></div>' +
       '<div class="lc-pista"><span class="lc-meta" style="left:' + (meta / tope * 100).toFixed(1) + '%"></span>' +
       '<span class="lc-barra' + (sobre ? ' sobre' : '') + '" style="width:' + (t === null ? 0 : Math.min(100, t / tope * 100)).toFixed(1) + '%"></span></div>' +
       '<div class="lc-pie"><span>' + DR.esc(g.pie) + '</span>' + DR.ICONOS.chevron + '</div></button>';

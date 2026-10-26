@@ -35,7 +35,7 @@ function iguales(a: string, b: string): boolean {
 
 /* ------------------------------------------------------------ formato de celdas */
 const FMT = new Intl.DateTimeFormat('sv-SE', {
-  timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
 });
 const fechaHora = (v: unknown) => {
   if (!v) return '';
@@ -46,10 +46,15 @@ const num = (v: unknown, dec = 2) => (v === null || v === undefined || v === '')
 const txt = (v: unknown) => (v === null || v === undefined) ? '' : String(v);
 
 type Fila = Record<string, any>;
-type Col = [string, (f: Fila) => unknown];
+/** Tercer elemento 'dur': la columna es una duración (ver DU). */
+type Col = [string, (f: Fila) => unknown, string?];
 const TS = (k: string, t: string): Col => [t, (f) => fechaHora(f[k])];
 const TX = (k: string, t: string): Col => [t, (f) => txt(f[k])];
 const NU = (k: string, t: string, d = 2): Col => [t, (f) => num(f[k], d)];
+/** Minutos con decimales → duración de Sheets (fracción de día, redondeada al segundo). Se muestra como [m]:ss
+ *  y sigue siendo número: SUMA, PROMEDIO y tablas dinámicas funcionan. */
+const DU = (k: string, t: string): Col => [t, (f) => (f[k] === null || f[k] === undefined || f[k] === '') ? '' : Math.round(Number(f[k]) * 60) / 86400, 'dur'];
+const columnasDuracion = (cols: Col[]) => cols.map((c, i) => (c[2] === 'dur' ? i : -1)).filter((i) => i >= 0);
 
 const TRAMOS: [string, string][] = [
   ['t_cosecha', 'Cosecha'], ['t_espera_jabero', 'Espera Jabero'], ['t_jabero', 'Jabero'],
@@ -114,7 +119,7 @@ async function gapi(token: string, saEmail: string, metodo: string, ruta: string
 }
 
 /** formulas: la pestaña se escribe con USER_ENTERED (miniaturas =IMAGE); altoFila y anchos en píxeles. */
-type Pestana = { titulo: string; valores: unknown[][]; formulas?: boolean; altoFila?: number; anchos?: [number, number][] };
+type Pestana = { titulo: string; valores: unknown[][]; formulas?: boolean; altoFila?: number; anchos?: [number, number][]; duraciones?: number[] };
 
 async function escribirHoja(token: string, saEmail: string, id: string, pestanas: Pestana[]): Promise<string> {
   const meta = await gapi(token, saEmail, 'GET', `${id}?fields=properties.title,sheets.properties(sheetId,title,gridProperties(rowCount,columnCount))`);
@@ -152,6 +157,16 @@ async function escribirHoja(token: string, saEmail: string, id: string, pestanas
         updateDimensionProperties: {
           range: { sheetId: pr.sheetId, dimension: 'ROWS', startIndex: 1, endIndex: p.valores.length },
           properties: { pixelSize: p.altoFila }, fields: 'pixelSize',
+        },
+      });
+    }
+    // Duraciones: formato [m]:ss (minutos y segundos) en toda la columna, sin el encabezado.
+    for (const col of p.duraciones || []) {
+      requests.push({
+        repeatCell: {
+          range: { sheetId: pr.sheetId, startRowIndex: 1, startColumnIndex: col, endColumnIndex: col + 1 },
+          cell: { userEnteredFormat: { numberFormat: { type: 'TIME', pattern: '[m]:ss' } } },
+          fields: 'userEnteredFormat.numberFormat',
         },
       });
     }
@@ -532,8 +547,8 @@ Deno.serve(async (req) => {
       TS('inicio_carga_camion', 'Inicio carga camión'), TS('fin_carga_camion', 'Fin carga camión'),
       TS('inicio_traslado_planta', 'Inicio traslado planta'), TX('obs_traslado_planta', 'Obs. traslado planta'), TS('fin_traslado_planta', 'Fin traslado planta'),
       TX('obs_cs', 'Obs. Casa Sombra'), TX('tareadora', 'Tareadora'), TX('obs_ca', 'Obs. C. Acopio'),
-      ...TRAMOS.map(([k, t]) => NU(k, 'T. ' + t + ' (min)')),
-      NU('t_ciclo_total', 'T. ciclo total (min)'),
+      ...TRAMOS.map(([k, t]) => DU(k, 'T. ' + t + ' (min:seg)')),
+      DU('t_ciclo_total', 'T. ciclo total (min:seg)'),
       ['Horas', (f) => (f.t_ciclo_total === null || f.t_ciclo_total === undefined) ? '' : num(Number(f.t_ciclo_total) / 60)],
       ['Estado', (f) => f.cerrado ? 'Cerrado' : 'En curso'],
       ['Registrado por', (f) => quien(f.creado_por)], TS('creado_en', 'Creado'), TS('actualizado_en', 'Actualizado'),
@@ -541,7 +556,7 @@ Deno.serve(async (req) => {
     ];
     const colsResumen: Col[] = [
       ['Semana', (f) => f._semana], TX('fundo', 'Fundo'), NU('n_muestras', 'N° muestras', 0),
-      ...TRAMOS.map(([k, t]) => NU(k, t + ' (min)')), NU('t_ciclo_total', 'Total ciclo (min)'), NU('tiempo_horas', 'Horas'),
+      ...TRAMOS.map(([k, t]) => DU(k, t + ' (min:seg)')), DU('t_ciclo_total', 'Total ciclo (min:seg)'), NU('tiempo_horas', 'Horas'),
     ];
     const colsPersonal: Col[] = [
       TX('dni', 'DNI'), TX('nombre', 'Nombre'), TX('linea', 'Línea'), TX('lado', 'Lado'), TX('labor', 'Labor'), TX('obs', 'Observación'),
@@ -558,8 +573,8 @@ Deno.serve(async (req) => {
     const estadoMP = mp ? (mp.fotosError ? 'OK · fotos sin miniatura: ' + mp.fotosError : 'OK') : 'No sincronizada: ' + mpError;
     const estadoSCI = sci ? 'OK' : 'No sincronizada: ' + sciError;
     const pestanas: Pestana[] = [
-      { titulo: 'Ciclos_BD', valores: tabla(colsCiclos, ciclos) },
-      { titulo: 'Resumen_Semanal', valores: tabla(colsResumen, resumen) },
+      { titulo: 'Ciclos_BD', valores: tabla(colsCiclos, ciclos), duraciones: columnasDuracion(colsCiclos) },
+      { titulo: 'Resumen_Semanal', valores: tabla(colsResumen, resumen), duraciones: columnasDuracion(colsResumen) },
       { titulo: 'Personal_Reubicacion', valores: tabla(colsPersonal, personal) },
       { titulo: 'Auditoria_Escaneos', valores: tabla(colsEscaneos, escaneos) },
       ...pestanasS5(s5),
@@ -581,6 +596,7 @@ Deno.serve(async (req) => {
         ['Cliente interno · encuestas', sci ? sci.resultados.length : ''],
         ['Cliente interno · filas BD', sci ? sci.bd.length : ''],
         ['Cliente interno · estado', estadoSCI],
+        ['Tiempos', 'Las columnas (min:seg) son duraciones de Sheets: se ven como minutos:segundos y suman/promedian como números. Para pasarlas a minutos con decimales, multiplica por 1440.'],
         ['Nota', 'Estas pestañas se sobrescriben en cada sincronización. Crea tus gráficos o tablas dinámicas en otras pestañas. Las miniaturas de 5S_Observaciones y PM_Hallazgos se renuevan en cada sincronización.'],
       ] },
     ];

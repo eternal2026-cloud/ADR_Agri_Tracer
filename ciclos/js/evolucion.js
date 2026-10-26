@@ -187,7 +187,7 @@ EVO.dibujar = function (animar) {
   }).filter(Boolean).sort(function (a, b) { return a.y - b.y; });
   for (var j = 1; j < finales.length; j++) if (finales[j].y - finales[j - 1].y < 14) finales[j].y = finales[j - 1].y + 14;
   finales.forEach(function (f) {
-    svg += '<text class="evo-final" x="' + (x(f.i) + 9).toFixed(1) + '" y="' + (f.y + 4).toFixed(1) + '"><tspan fill="' + f.s.color + '">●</tspan> ' + DR.num(f.v, 0) + '</text>';
+    svg += '<text class="evo-final" x="' + (x(f.i) + 9).toFixed(1) + '" y="' + (f.y + 4).toFixed(1) + '"><tspan fill="' + f.s.color + '">●</tspan> ' + UI.mmss(f.v) + '</text>';
   });
 
   svg += '<rect id="evoCaptura" x="' + m.l + '" y="' + m.t + '" width="' + aw + '" height="' + ah + '" fill="transparent"/></svg>';
@@ -195,7 +195,7 @@ EVO.dibujar = function (animar) {
   var leyenda = '<div class="evo-leyenda">' + series.map(function (s) {
     return '<span><i class="' + (s.fundo === EVO.TODOS ? 'punteada' : '') + '" style="--c:' + s.color + '"></i>' + DR.esc(EVO.nombre(s.fundo)) + '</span>';
   }).join('') + '</div>';
-  caja.innerHTML = '<div class="evo-titulo">' + DR.esc(EVO.tituloCampo()) + ' · minutos por semana</div>' + leyenda +
+  caja.innerHTML = '<div class="evo-titulo">' + DR.esc(EVO.tituloCampo()) + ' · promedio por semana (min:seg)</div>' + leyenda +
     '<div class="evo-lienzo">' + svg + '<div class="evo-tip" id="evoTip" role="status"></div></div>';
 
   EVO.enlazarHover(semanas, series, x);
@@ -239,7 +239,7 @@ EVO.enlazarHover = function (semanas, series, x) {
         fila.className = 'evo-tip-fila';
         clave.style.setProperty('--c', o.s.color);
         if (o.s.fundo === EVO.TODOS) clave.className = 'punteada';
-        val.textContent = o.p ? DR.num(o.p.v, 1) + ' min' : '—';
+        val.textContent = o.p ? UI.mmss(o.p.v) + ' min:seg' : '—';
         nom.textContent = EVO.nombre(o.s.fundo) + (o.p ? ' · ' + o.p.n + ' muestra(s)' : ' · sin muestras');
         fila.appendChild(clave); fila.appendChild(val); fila.appendChild(nom);
         tip.appendChild(fila);
@@ -263,7 +263,7 @@ EVO.tabla = function (semanas, series) {
   var t = DR.$('#evoTabla');
   if (!t) return;
   var cols = [{ t: 'Semana', r: function (f) { return 'S' + f.semana; } }].concat(series.map(function (s, k) {
-    return { t: EVO.nombre(s.fundo), num: true, r: function (f) { var p = series[k].puntos[f._i]; return p ? DR.num(p.v, 1) : ''; } };
+    return { t: EVO.nombre(s.fundo), num: true, r: function (f) { var p = series[k].puntos[f._i]; return p ? UI.mmss(p.v) : ''; } };
   }));
   t.innerHTML = UI.tabla(cols, semanas.map(function (s, i) { return { semana: s.semana, _i: i }; }).reverse());
 };

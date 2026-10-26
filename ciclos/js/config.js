@@ -4,7 +4,7 @@
  * (admin-usuarios, sync-sheets): no dependen de variables en Vercel.
  * ==========================================================================*/
 
-var CONFIG = { tab: 'usuarios', parametros: {}, listas: [], usuarios: [], areas: [], sync: null, rolNuevo: 'captura', usuarioEditado: false, fundosNuevo: [], soloPropiosNuevo: false, accesosNuevo: { completo: false, lista: [] } };
+var CONFIG = { tab: 'usuarios', parametros: {}, listas: [], usuarios: [], areas: [], sync: null, rolNuevo: 'captura', usuarioEditado: false, fundosNuevo: [], soloPropiosNuevo: false, accesosNuevo: { completo: false, lista: [], horarios: {} } };
 
 CONFIG.TABS = [
   { id: 'usuarios', t: 'Usuarios', ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.8-3.2 3-5 5.5-5s4.7 1.8 5.5 5"/><path d="M17 8v6M14 11h6"/></svg>' },
@@ -136,6 +136,7 @@ CONFIG.tabUsuarios = function (c) {
       (u.activo && u.debe_cambiar_password ? ' <span class="pill gris">Aún no crea su contraseña</span>' : '') +
       (u.id === yo ? ' <span class="pill gris">Tú</span>' : '') +
       (u.rol === 'admin' ? '' : ' <span class="pill ' + (u.accesos ? 'azul' : 'gris') + '">' + DR.esc(CONFIG.textoAccesos(u.accesos)) + '</span>') +
+      (u.rol === 'admin' || !u.horarios ? '' : ' <span class="pill naranja">' + DR.esc(CONFIG.textoHorarios(u.horarios)) + '</span>') +
       (u.rol === 'admin' ? '' : ' <span class="pill ' + ((u.fundos || []).length ? 'azul' : 'gris') + '">' + DR.esc(CONFIG.textoFundos(u.fundos)) + '</span>') +
       (u.rol === 'admin' ? '' : ' <span class="pill ' + (u.ciclos_solo_propios ? 'azul' : 'gris') + '">' + CONFIG.textoVerCiclos(u.ciclos_solo_propios) + '</span>');
     var selector = '<select data-rol-de="' + u.id + '"' + (u.id === yo ? ' disabled' : '') + ' aria-label="Rol de ' + DR.esc(u.nombre) + '">' +
@@ -366,6 +367,45 @@ CONFIG.funcionesPorDefecto = function (k, lista) {
   return r;
 };
 CONFIG.valorAccesos = function (estado) { return estado.completo ? null : estado.lista.slice(); };
+
+/* ---- horario por módulo (perfiles.horarios, 0049): { 'campo.arandano': { desde: '07:00', hasta: '18:00' } } ---- */
+CONFIG.moduloDe = function (id) {
+  var r = null;
+  AT.ACCESOS.forEach(function (g) { g.modulos.forEach(function (m) { if (m.id === id) r = m; }); });
+  return r;
+};
+CONFIG.horarioSugerido = function (mod) {
+  var m = CONFIG.moduloDe(mod), h = (m && m.horario) || ['07:00', '18:00'];
+  return { desde: h[0], hasta: h[1] };
+};
+/** Primera función de un módulo con horario sugerido (Arándano 07–18, Uva 06–18): el horario se pone solo. */
+CONFIG.aplicarHorarioSugerido = function (k, estado) {
+  AT.ACCESOS.forEach(function (g) {
+    g.modulos.forEach(function (m) {
+      var ids = m.funciones.map(function (f) { return f.id; });
+      if (!m.horario || ids.indexOf(k) < 0 || estado.horarios[m.id]) return;
+      if (estado.lista.some(function (x) { return ids.indexOf(x) > -1; })) return;
+      estado.horarios[m.id] = CONFIG.horarioSugerido(m.id);
+    });
+  });
+};
+/** Solo los horarios de módulos que el usuario ve; null si no queda ninguno (todo el día). */
+CONFIG.valorHorarios = function (estado) {
+  var p = { rol: 'captura', accesos: CONFIG.valorAccesos(estado) }, r = {}, n = 0;
+  Object.keys(estado.horarios || {}).forEach(function (mod) {
+    var h = estado.horarios[mod];
+    if (!h || !h.desde || !h.hasta || h.desde === h.hasta || !AT.tieneAcceso(mod, p)) return;
+    r[mod] = { desde: h.desde, hasta: h.hasta };
+    n++;
+  });
+  return n ? r : null;
+};
+CONFIG.textoHorarios = function (horarios) {
+  return '⏰ ' + Object.keys(horarios || {}).map(function (mod) {
+    var m = CONFIG.moduloDe(mod), t = m ? m.t.replace(/^.*· /, '') : mod;
+    return t + ' ' + horarios[mod].desde + '–' + horarios[mod].hasta;
+  }).join(' · ');
+};
 CONFIG.textoAccesos = function (accesos) {
   if (!accesos) return 'Acceso completo';
   var p = { rol: 'captura', accesos: accesos };
@@ -386,16 +426,32 @@ CONFIG.selectorAccesos = function (id) {
         g.modulos.map(function (m) {
           var solo = m.funciones.length === 1;
           return '<div class="acc-mod">' + (solo ? '' : '<span>' + DR.esc(m.t) + '</span>') +
-            '<div class="opciones">' + m.funciones.map(function (f) { return chip(f, solo ? m.t : f.t); }).join('') + '</div></div>';
+            '<div class="opciones">' + m.funciones.map(function (f) { return chip(f, solo ? m.t : f.t); }).join('') + '</div>' +
+            (m.sinHorario ? '' : '<div class="acc-horario oculto" data-hor-mod="' + m.id + '">' +
+              '<button type="button" class="opcion" data-hor-toggle>Todo el día</button>' +
+              '<span class="acc-horas"><input type="time" data-hor="desde" aria-label="Desde"> a <input type="time" data-hor="hasta" aria-label="Hasta"></span></div>') +
+            '</div>';
         }).join('') + '</div>';
     }).join('') +
-    '<div class="ayuda-campo">✎ = registra datos: solo lo usa quien tiene el rol <b>Captura en campo</b>. Sin ✎ = consulta.</div></div>';
+    '<div class="ayuda-campo">✎ = registra datos: solo lo usa quien tiene el rol <b>Captura en campo</b>. Sin ✎ = consulta.</div>' +
+    '<div class="ayuda-campo">⏰ Horario (hora de Perú): fuera de él el módulo no abre; si estaba registrando, tiene 30 min para guardar. «Todo el día» = sin límite.</div></div>';
 };
 /** estado = { completo, lista }: se modifica en el lugar. */
 CONFIG.enlazarSelectorAccesos = function (id, estado) {
   var cont = DR.$('#' + id);
   if (!cont) return;
+  estado.horarios = estado.horarios || {};
   var pintar = function () {
+    var p = { rol: 'captura', accesos: estado.completo ? null : estado.lista };
+    DR.$$('[data-hor-mod]', cont).forEach(function (fila) {
+      var mod = fila.getAttribute('data-hor-mod'), h = estado.horarios[mod];
+      fila.classList.toggle('oculto', !AT.tieneAcceso(mod, p));
+      var b = DR.$('[data-hor-toggle]', fila);
+      b.textContent = h ? '⏰ Con horario' : 'Todo el día';
+      b.classList.toggle('activa', !!h);
+      DR.$('.acc-horas', fila).classList.toggle('oculto', !h);
+      if (h) { DR.$('[data-hor="desde"]', fila).value = h.desde; DR.$('[data-hor="hasta"]', fila).value = h.hasta; }
+    });
     DR.$('[data-acc-todo]', cont).classList.toggle('activa', estado.completo);
     DR.$$('[data-acceso]', cont).forEach(function (o) {
       o.classList.toggle('activa', estado.completo || estado.lista.indexOf(o.getAttribute('data-acceso')) > -1);
@@ -405,10 +461,20 @@ CONFIG.enlazarSelectorAccesos = function (id, estado) {
   var salirDeCompleto = function () {
     if (estado.completo) { estado.completo = false; estado.lista = CONFIG.todasFunciones(); }
   };
+  cont.onchange = function (ev) {
+    var campo = ev.target.getAttribute('data-hor'), fila = ev.target.closest('[data-hor-mod]');
+    if (!campo || !fila || !ev.target.value) return;
+    var h = estado.horarios[fila.getAttribute('data-hor-mod')];
+    if (h) h[campo] = ev.target.value;
+  };
   cont.onclick = function (ev) {
     var b = ev.target.closest('button');
     if (!b) return;
-    if (b.hasAttribute('data-acc-todo')) {
+    if (b.hasAttribute('data-hor-toggle')) {
+      var mod = b.closest('[data-hor-mod]').getAttribute('data-hor-mod');
+      if (estado.horarios[mod]) delete estado.horarios[mod];
+      else estado.horarios[mod] = CONFIG.horarioSugerido(mod);
+    } else if (b.hasAttribute('data-acc-todo')) {
       estado.completo = !estado.completo;
       if (!estado.completo) estado.lista = [];
     } else if (b.hasAttribute('data-acc-grupo')) {
@@ -423,6 +489,7 @@ CONFIG.enlazarSelectorAccesos = function (id, estado) {
       if (i > -1) estado.lista.splice(i, 1);
       else {
         CONFIG.funcionesPorDefecto(k, estado.lista).forEach(function (x) { if (estado.lista.indexOf(x) < 0) estado.lista.push(x); });
+        CONFIG.aplicarHorarioSugerido(k, estado);
         estado.lista.push(k);
       }
     } else return;
@@ -433,10 +500,10 @@ CONFIG.enlazarSelectorAccesos = function (id, estado) {
 };
 CONFIG.editarAccesos = function (u) {
   if (!u) return;
-  var estado = { completo: !u.accesos, lista: (u.accesos || []).slice() };
+  var estado = { completo: !u.accesos, lista: (u.accesos || []).slice(), horarios: JSON.parse(JSON.stringify(u.horarios || {})) };
   UI.abrirHoja('<div class="asa"></div>' +
     '<div class="res-nombre">' + DR.esc(u.nombre) + '</div>' +
-    '<div class="res-dni">Qué grupos y funciones puede ver · ' + DR.esc(CONFIG.NOMBRE_ROL[u.rol] || u.rol) + '</div>' +
+    '<div class="res-dni">Qué grupos y funciones puede ver, y en qué horario · ' + DR.esc(CONFIG.NOMBRE_ROL[u.rol] || u.rol) + '</div>' +
     '<div style="margin-top:14px">' + CONFIG.selectorAccesos('hojaAccesos') + '</div>' +
     '<div class="acciones"><button type="button" class="btn sec" id="btnAccesosCancelar" style="flex:1">Cancelar</button>' +
     '<button type="button" class="btn verde" id="btnAccesosGuardar" style="flex:1">Guardar</button></div>');
@@ -445,11 +512,12 @@ CONFIG.editarAccesos = function (u) {
   DR.$('#btnAccesosGuardar').onclick = function () {
     var valor = CONFIG.valorAccesos(estado);
     if (valor && !valor.length) { DR.toast('Marca al menos una función o «Acceso completo».', 'error'); return; }
+    var horarios = CONFIG.valorHorarios(estado);
     var btn = this;
     btn.disabled = true;
-    AT.llamarFuncion('admin-usuarios', { accion: 'actualizar', id: u.id, accesos: valor }).then(function () {
+    AT.llamarFuncion('admin-usuarios', { accion: 'actualizar', id: u.id, accesos: valor, horarios: horarios }).then(function () {
       UI.cerrarHoja();
-      DR.toast(u.nombre + ': ' + CONFIG.textoAccesos(valor) + '.');
+      DR.toast(u.nombre + ': ' + CONFIG.textoAccesos(valor) + (horarios ? ' · ' + CONFIG.textoHorarios(horarios) : '') + '.');
       return CONFIG.refrescar();
     }).catch(function (e) { btn.disabled = false; DR.toast(e.message, 'error'); });
   };
@@ -472,11 +540,12 @@ CONFIG.crearUsuario = function () {
   AT.llamarFuncion('admin-usuarios', {
     accion: 'crear', nombre: nombre, usuario: usuario, area: DR.$('#nuArea').value.trim(),
     rol: CONFIG.rolNuevo, password: DR.$('#nuClave').value, fundos: CONFIG.rolNuevo === 'admin' ? [] : CONFIG.fundosNuevo,
-    accesos: accesos, ciclos_solo_propios: CONFIG.rolNuevo !== 'admin' && CONFIG.soloPropiosNuevo
+    accesos: accesos, horarios: CONFIG.rolNuevo === 'admin' ? null : CONFIG.valorHorarios(CONFIG.accesosNuevo),
+    ciclos_solo_propios: CONFIG.rolNuevo !== 'admin' && CONFIG.soloPropiosNuevo
   }).then(function (r) {
     CONFIG.fundosNuevo = [];
     CONFIG.soloPropiosNuevo = false;
-    CONFIG.accesosNuevo = { completo: false, lista: [] };
+    CONFIG.accesosNuevo = { completo: false, lista: [], horarios: {} };
     CONFIG.mostrarCredenciales(r, 'creado');
     return CONFIG.refrescar();
   }).catch(function (e) {

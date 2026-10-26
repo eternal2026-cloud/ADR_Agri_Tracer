@@ -73,6 +73,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (perfil.debe_cambiar_password) { location.href = '../'; return; }
     // Sin ninguna pestaña asignada (Config → Usuarios → Accesos): de vuelta a la portada.
     if (!DR.tabsVisibles().length) { location.href = '../'; return; }
+    if (AT.vigilarHorario && !AT.vigilarHorario('gestion.mtto', '../#gestion')) return;
     pintarBarraSup();
     pintarNav();
     DR.$('#chipDatos').addEventListener('click', function () {

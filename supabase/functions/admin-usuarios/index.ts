@@ -4,12 +4,13 @@
  * incluida en las Edge Functions, así que no hay variables que configurar.
  * Solo un admin activo puede llamarla (se valida el JWT de su sesión).
  *
- * POST { accion: 'crear', usuario, nombre, area, rol, password?, fundos?, accesos?, ciclos_solo_propios? }
+ * POST { accion: 'crear', usuario, nombre, area, rol, password?, fundos?, accesos?, horarios?, ciclos_solo_propios? }
  * POST { accion: 'reset', id }
- * POST { accion: 'actualizar', id, usuario?, rol?, activo?, nombre?, area?, fundos?, accesos?, ciclos_solo_propios? }
+ * POST { accion: 'actualizar', id, usuario?, rol?, activo?, nombre?, area?, fundos?, accesos?, horarios?, ciclos_solo_propios? }
  * usuario: cambia el nombre de ingreso (y el correo técnico de Auth); la contraseña no cambia.
  * fundos: lista de fundos donde puede registrar ciclos ([] = todos).
  * accesos: claves grupo.modulo.funcion que puede ver (null = acceso completo; ver AT.ACCESOS).
+ * horarios: { modulo: { desde: 'HH:MM', hasta: 'HH:MM' } } en que puede usar cada módulo (null = todo el día; 0049).
  * ciclos_solo_propios: true = en Tiempos de ciclo solo ve los ciclos que él creó (false = todos).
  * ==========================================================================*/
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
@@ -61,6 +62,21 @@ function limpiarAccesos(v: unknown): string[] | null {
   return [...new Set(v.map((x) => String(x || '').trim().toLowerCase()).filter((x) => /^[a-z0-9]+(\.[a-z0-9]+)*$/.test(x)))].slice(0, 100);
 }
 
+/** Horarios limpios por módulo: solo claves válidas y horas HH:MM; null si no queda ninguno. */
+function limpiarHorarios(v: unknown): Record<string, { desde: string; hasta: string }> | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  const hora = (x: unknown) => {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(String(x || '').trim());
+    return m && +m[1] < 24 && +m[2] < 60 ? m[1].padStart(2, '0') + ':' + m[2] : null;
+  };
+  const r: Record<string, { desde: string; hasta: string }> = {};
+  for (const [k, h] of Object.entries(v as Record<string, Record<string, unknown>>).slice(0, 50)) {
+    const desde = hora(h && h.desde), hasta = hora(h && h.hasta);
+    if (/^[a-z0-9]+(\.[a-z0-9]+)*$/.test(k) && desde && hasta && desde !== hasta) r[k] = { desde, hasta };
+  }
+  return Object.keys(r).length ? r : null;
+}
+
 type Perfil = { id: string; usuario: string; nombre: string; rol: string; activo: boolean };
 
 const anotar = (sb: SupabaseClient, yo: Perfil, accion: string, detalle: string) =>
@@ -93,7 +109,7 @@ async function crear(sb: SupabaseClient, yo: Perfil, b: Record<string, unknown>)
 
   const { error: insErr } = await sb.from('perfiles').insert({
     id: nuevo.user.id, usuario, nombre, area: String(b.area || '').trim(), rol, activo: true, debe_cambiar_password: true,
-    fundos: limpiarFundos(b.fundos), accesos, ciclos_solo_propios: rol !== 'admin' && b.ciclos_solo_propios === true,
+    fundos: limpiarFundos(b.fundos), accesos, horarios: rol === 'admin' ? null : limpiarHorarios(b.horarios), ciclos_solo_propios: rol !== 'admin' && b.ciclos_solo_propios === true,
   });
   if (insErr) {
     await sb.auth.admin.deleteUser(nuevo.user.id).catch(() => {});
@@ -130,6 +146,7 @@ async function actualizar(sb: SupabaseClient, yo: Perfil, b: Record<string, unkn
   if (b.area !== undefined) cambios.area = String(b.area).trim();
   if (b.fundos !== undefined) cambios.fundos = limpiarFundos(b.fundos);
   if (b.ciclos_solo_propios !== undefined) cambios.ciclos_solo_propios = b.ciclos_solo_propios === true;
+  if (b.horarios !== undefined) cambios.horarios = limpiarHorarios(b.horarios);
   if (b.accesos !== undefined) {
     cambios.accesos = limpiarAccesos(b.accesos);
     if (cambios.accesos && !(cambios.accesos as string[]).length) return responder({ error: 'Marca al menos un módulo que podrá ver, o «Acceso completo».' }, 400);

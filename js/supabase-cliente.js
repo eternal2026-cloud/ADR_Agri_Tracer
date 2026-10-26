@@ -67,21 +67,23 @@ AT.puedeCapturar = function () { return !!(AT.perfil && (AT.perfil.rol === 'admi
  * Accesos por usuario (perfiles.accesos, migración 0024): grupos › módulos › funciones.
  * Claves grupo.modulo.funcion. registra: la función guarda datos (necesita rol Captura).
  * porDefecto: se marca sola al dar cualquier otra función del módulo (el admin puede quitarla).
+ * horario (módulo): horario sugerido al limitarlo por horas en Usuarios › Accesos (perfiles.horarios, 0049).
+ * sinHorario: el módulo no se puede limitar por horas (Reubicación abre sin sesión).
  * Al agregar un módulo nuevo, sumarlo aquí; quien tiene acceso completo lo ve solo.
  */
 AT.ACCESOS = [
   { id: 'campo', t: 'Ingeniería · Campo', modulos: [
-    { id: 'campo.arandano', t: 'Toma de tiempos · Arándano', funciones: [
+    { id: 'campo.arandano', t: 'Toma de tiempos · Arándano', horario: ['07:00', '18:00'], funciones: [
       { id: 'campo.arandano.captura', t: 'Captura de tiempos', registra: true },
       { id: 'campo.arandano.resumen', t: 'Resumen de tiempos' }] },
-    { id: 'campo.uva', t: 'Toma de tiempos · Uva', funciones: [
+    { id: 'campo.uva', t: 'Toma de tiempos · Uva', horario: ['06:00', '18:00'], funciones: [
       { id: 'campo.uva', t: 'Uva (en definición)' }] },
     { id: 'campo.top', t: 'Estudio de cosechador TOP', funciones: [
       { id: 'campo.top.evaluar', t: 'Evaluar (tiempos, estándares, REBA)', registra: true },
       { id: 'campo.top.resumen', t: 'Resumen e informe' },
       { id: 'campo.top.propuesta', t: 'Propuesta de estándar' }] }] },
   { id: 'planta', t: 'Ingeniería · Planta', modulos: [
-    { id: 'planta.reubicacion', t: 'Reubicación de personal', funciones: [
+    { id: 'planta.reubicacion', t: 'Reubicación de personal', sinHorario: true, funciones: [
       { id: 'planta.reubicacion', t: 'Reubicación de personal' }] }] },
   { id: 'gestion', t: 'Gestión de Procesos', modulos: [
     { id: 'gestion.5s', t: 'Auditoría 5S', funciones: [
@@ -105,6 +107,57 @@ AT.tieneAcceso = function (clave, perfil) {
   if (!p) return false;
   if (p.rol === 'admin' || !p.accesos) return true;
   return p.accesos.some(function (a) { return a === clave || a.indexOf(clave + '.') === 0; });
+};
+
+/**
+ * Horario por módulo (perfiles.horarios = { 'campo.arandano': { desde: '07:00', hasta: '18:00' } }, 0049).
+ * Mismo criterio que fn_fuera_de_horario: hora de Lima; desde > hasta cruza la medianoche; admin sin horario.
+ * La base da 30 min de tolerancia al registrar, para que suba lo hecho justo antes del cierre.
+ */
+AT.horarioDe = function (clave, perfil) {
+  var p = perfil || AT.perfil;
+  if (!p || p.rol === 'admin' || !p.horarios) return null;
+  var r = null;
+  Object.keys(p.horarios).forEach(function (k) {
+    var h = p.horarios[k];
+    if ((clave === k || clave.indexOf(k + '.') === 0) && h && h.desde && h.hasta && h.desde !== h.hasta) r = h;
+  });
+  return r;
+};
+/** 'HH:MM' de ahora en Lima (el celular puede tener otra zona). */
+AT.horaLima = function () {
+  try {
+    return new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date());
+  } catch (e) {
+    var d = new Date(Date.now() - 5 * 3600000);
+    return ('0' + d.getUTCHours()).slice(-2) + ':' + ('0' + d.getUTCMinutes()).slice(-2);
+  }
+};
+AT.enHorario = function (clave, perfil) {
+  var h = AT.horarioDe(clave, perfil);
+  if (!h) return true;
+  var a = AT.horaLima();
+  return h.desde < h.hasta ? a >= h.desde && a < h.hasta : a >= h.desde || a < h.hasta;
+};
+AT.textoHorario = function (h) { return h ? h.desde + ' a ' + h.hasta : 'Todo el día'; };
+/**
+ * Al entrar a un módulo: fuera de horario vuelve a `volver` (la portada lo muestra cerrado) y devuelve false.
+ * Dentro, revisa cada minuto: al cerrarse el horario vuelve a la portada, salvo que `ocupado()` diga que hay
+ * algo sin guardar; entonces avisa una vez (la base acepta registros hasta 30 min después del cierre).
+ */
+AT.vigilarHorario = function (modulo, volver, ocupado) {
+  if (!AT.enHorario(modulo)) { location.href = volver; return false; }
+  if (!AT.horarioDe(modulo)) return true;
+  var avisado = false;
+  setInterval(function () {
+    if (AT.enHorario(modulo)) return;
+    if (ocupado && ocupado()) {
+      if (!avisado) { avisado = true; DR.toast('Terminó tu horario (' + AT.textoHorario(AT.horarioDe(modulo)) + '). Guarda ahora: tienes 30 minutos.', 'error'); }
+      return;
+    }
+    location.href = volver;
+  }, 60000);
+  return true;
 };
 
 /** Llama una función Postgres (fn_/rpc_) vía PostgREST; lanza Error con mensaje legible. */

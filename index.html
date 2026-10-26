@@ -104,6 +104,7 @@ var ICO = {
  * Arándano (los tiempos de ciclo actuales) y Uva (en definición).
  * Usuarios y configuración es un apartado propio, solo para administradores.
  * acceso: clave (o lista de claves) de AT.ACCESOS; la tarjeta solo aparece si el usuario tiene alguna asignada.
+ * Fuera del horario del usuario (Usuarios › Accesos, AT.horarioDe) el acceso se ve pero no abre.
  * Para mover una tarjeta a otro grupo basta con cortar su línea { href: … } y
  * pegarla en la lista «modulos» del grupo destino.
  */
@@ -194,9 +195,26 @@ function pintarLanding() {
   DR.entrarPaneles('#landing');
 }
 
+/** Horario que deja fuera ahora a todas las claves asignadas de x (null si alguna está en horario). */
+function horarioCerrado(x) {
+  if (!AT.enHorario) return null; // supabase-cliente.js viejo en caché
+  var claves = [].concat(x.acceso || []).filter(function (k) { return AT.tieneAcceso(k); });
+  if (!claves.length || claves.some(function (k) { return AT.enHorario(k); })) return null;
+  return AT.horarioDe(claves[0]);
+}
+
 function tarjetaModulo(m) {
+  var h = horarioCerrado(m);
   return '<a class="modulo-card entra" href="' + m.href + '" style="--c:' + m.color + '"><div class="ico">' + m.icono + '</div>' +
-    '<div class="mc-txt"><b>' + DR.esc(m.nombre) + '</b><span>' + DR.esc(m.sub) + '</span></div>' + DR.ICONOS.chevron + '</a>';
+    '<div class="mc-txt"><b>' + DR.esc(m.nombre) + '</b><span>' + DR.esc(m.sub) + '</span>' +
+    (h ? '<span class="fuera-horario">Fuera de horario · disponible de ' + DR.esc(AT.textoHorario(h)) + '</span>' : '') + '</div>' + DR.ICONOS.chevron + '</a>';
+}
+
+/** Línea «Tu horario: 07:00 a 18:00» bajo el cultivo, si el usuario tiene uno. */
+function horarioCultivo(c) {
+  var h = AT.horarioDe && AT.horarioDe('campo.' + c.id);
+  if (!h) return '';
+  return '<div class="horario-linea' + (AT.enHorario('campo.' + c.id) ? '' : ' cerrado') + '">Tu horario: ' + DR.esc(AT.textoHorario(h)) + '</div>';
 }
 
 /** Grupos de la portada o, con #campo, los cultivos de Toma de tiempos campo. */
@@ -214,7 +232,11 @@ function pintarModulos() {
         if (!accesos.length) return '';
         return '<section class="cultivo-tarjeta" style="--c:' + c.color + '"><div class="cultivo-tarjeta-cab">' + DR.iconoCultivo(c.id, c.color, 48) +
           '<div><b>' + DR.esc(c.nombre) + '</b><span>' + DR.esc(c.sub) + '</span></div></div>' +
-          '<div class="acceso-par">' + accesos.map(function (a) { return '<a class="btn ' + a.clase + '" href="' + a.href + '">' + DR.esc(a.t) + '</a>'; }).join('') + '</div></section>';
+          '<div class="acceso-par">' + accesos.map(function (a) {
+            var h = horarioCerrado(a);
+            return h ? '<span class="btn sec deshabilitado" aria-disabled="true">' + DR.esc(a.t) + ' · desde ' + DR.esc(h.desde) + '</span>'
+              : '<a class="btn ' + a.clase + '" href="' + a.href + '">' + DR.esc(a.t) + '</a>';
+          }).join('') + '</div>' + horarioCultivo(c) + '</section>';
       }).join('') + '</div>' +
       '<button type="button" class="campo-volver" id="btnVolverInicio">' + DR.ICONOS.atras + 'Volver al inicio</button></div>';
     DR.$('#btnVolverInicio').onclick = function () { location.hash = ''; };

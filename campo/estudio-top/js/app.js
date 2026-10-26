@@ -96,6 +96,7 @@ document.addEventListener('DOMContentLoaded', function () {
   AT.requiereSesion('../../').then(function (perfil) {
     if (perfil.debe_cambiar_password) { location.href = '../../'; return; }
     if (!DR.ORDEN.some(DR.puedeVer)) { location.href = '../../#campo'; return; }
+    if (AT.vigilarHorario && !AT.vigilarHorario('campo.top', '../../#campo')) return;
     pintarBarraSup();
     DR.$$('.nav-btn').forEach(function (b) { b.addEventListener('click', function () { location.hash = '#' + b.getAttribute('data-vista'); }); });
     DR.ORDEN.forEach(function (v) { if (!DR.puedeVer(v)) DR.$('[data-vista="' + v + '"]').classList.add('oculto'); });

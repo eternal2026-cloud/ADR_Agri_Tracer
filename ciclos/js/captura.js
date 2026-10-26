@@ -450,6 +450,11 @@ CAPTURA.campoHtml = function (c) {
     return '<div class="hora' + (v ? ' llena' : '') + '" data-hora="' + c.clave + '">' +
       '<div class="hora-info"><label for="' + id + '">' + DR.ICONOS.checkChico + '<span>' + c.label + '</span></label>' +
       '<input id="' + id + '" type="datetime-local" step="1" data-campo="' + c.clave + '" value="' + v + '">' +
+      // El selector nativo del celular solo deja elegir hora y minutos: los segundos se ajustan aquí.
+      '<div class="hora-seg"><span>Segundos</span>' +
+        '<button type="button" data-seg-paso="-1" data-seg-clave="' + c.clave + '" aria-label="Restar un segundo a ' + c.label + '">−</button>' +
+        '<input type="number" inputmode="numeric" min="0" max="59" step="1" data-seg="' + c.clave + '" aria-label="Segundos de ' + c.label + '" value="' + (v ? (v.substring(17, 19) || '00') : '') + '"' + (v ? '' : ' disabled') + '>' +
+        '<button type="button" data-seg-paso="1" data-seg-clave="' + c.clave + '" aria-label="Sumar un segundo a ' + c.label + '">+</button></div>' +
       '<div class="hora-dur" data-dur="' + c.clave + '"></div></div>' +
       '<button type="button" class="hora-ahora" data-ahora="' + c.clave + '" aria-label="Marcar ' + c.label + ' con la hora actual">' + DR.ICONOS.reloj + '<span>Ahora</span></button>' +
       '<div class="hora-aviso" data-aviso="' + c.clave + '"></div>' +
@@ -548,6 +553,13 @@ CAPTURA.enlazarCiclo = function (cont) {
     el.addEventListener('input', CAPTURA.alEditar);
     el.addEventListener('change', CAPTURA.alEditar);
   });
+  // Segundos: − / + suman o restan uno (pasando al minuto siguiente o anterior); escritos, de 0 a 59.
+  DR.$$('[data-seg-paso]', cont).forEach(function (b) {
+    b.onclick = function () { CAPTURA.ponerSegundos(this.getAttribute('data-seg-clave'), null, Number(this.getAttribute('data-seg-paso'))); };
+  });
+  DR.$$('[data-seg]', cont).forEach(function (el) {
+    el.addEventListener('change', function () { CAPTURA.ponerSegundos(this.getAttribute('data-seg'), this.value, 0); });
+  });
   DR.$$('.opciones', cont).forEach(function (grupo) {
     grupo.onclick = function (ev) {
       var op = ev.target.closest('.opcion');
@@ -562,6 +574,19 @@ CAPTURA.enlazarCiclo = function (cont) {
       CAPTURA.alEditar();
     };
   });
+};
+
+/** Ajusta los segundos de una hora: con «valor» los fija (0-59); con «paso» suma o resta (puede cambiar el minuto). */
+CAPTURA.ponerSegundos = function (clave, valor, paso) {
+  var inp = DR.$('#cp_' + clave);
+  if (!inp || !inp.value || CAPTURA.guardando) return;
+  var d = new Date(inp.value.length === 16 ? inp.value + ':00' : inp.value);
+  if (isNaN(d.getTime())) return;
+  if (paso) d.setSeconds(d.getSeconds() + paso);
+  else d.setSeconds(Math.max(0, Math.min(59, parseInt(valor, 10) || 0)));
+  inp.value = CAPTURA.localDe(d);
+  DR.vibrar(10);
+  CAPTURA.alEditar({ target: inp });
 };
 
 CAPTURA.alEditar = function (ev) {
@@ -640,6 +665,13 @@ CAPTURA.revisar = function () {
     DR.$('[data-aviso="' + k + '"]', h).textContent = msg;
     var previa = CAPTURA.horaPrevia(k), dur = DR.$('[data-dur="' + k + '"]', h);
     if (dur) dur.textContent = previa ? CAPTURA.durTxt(k, CAPTURA.valorHora(v, previa), v[k]) : '';
+    // Campo de segundos al día con la hora (también tras «Ahora» o al elegir en el selector).
+    var seg = DR.$('[data-seg="' + k + '"]', h), hv = (DR.$('#cp_' + k, h) || {}).value || '';
+    if (seg) {
+      seg.disabled = !hv;
+      DR.$$('[data-seg-paso]', h).forEach(function (b) { b.disabled = !hv; });
+      if (document.activeElement !== seg) seg.value = hv ? (hv.substring(17, 19) || '00') : '';
+    }
   });
 
   var btn = DR.$('#btnAccion'), sec = DR.$('#btnGuardarSolo');

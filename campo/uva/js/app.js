@@ -67,21 +67,31 @@ APP.enlazarAtras = function () {
 
 /* ------------------------------ sesión de Integra ------------------------------ */
 APP.PERFIL = 'tcu.perfil';
+/** Usuario de la sesión guardada en el equipo (clave por defecto de supabase-js). */
+APP.usuarioGuardado = function () {
+  try {
+    var s = JSON.parse(localStorage.getItem('sb-' + new URL(SB_URL).hostname.split('.')[0] + '-auth-token'));
+    return s && s.user ? s.user.id : null;
+  } catch (e) { return null; }
+};
 APP.sesion = function () {
+  // Sin señal (o señal débil): el último perfil de este mismo usuario guardado en el equipo.
+  // Todo lo que se sube lo vuelve a validar el servidor; si la sesión venció, la subida lo avisa.
+  var guardado = function (uid) {
+    var p = DR.leer(APP.PERFIL, null);
+    if (uid && p && p.id === uid) { AT.perfil = p; return p; }
+    return null;
+  };
   return sb.auth.getSession().then(function (r) {
     var ses = r.data && r.data.session;
-    if (!ses) return null;
+    // El token dura 1 h: sin señal no se puede renovar y getSession devuelve vacío, pero la sesión
+    // sigue guardada (supabase solo la borra si el servidor la rechaza). No mandar al ingreso, que no abre sin señal.
+    if (!ses) return guardado(APP.usuarioGuardado());
     return AT.cargarPerfil().then(function (p) {
       DR.guardar(APP.PERFIL, p);
       return p;
-    }, function () {
-      // Sin señal (o señal débil): el último perfil de este mismo usuario guardado en el equipo.
-      // Todo lo que se sube lo vuelve a validar el servidor; si la sesión venció, la subida lo avisa.
-      var p = DR.leer(APP.PERFIL, null);
-      if (p && p.id === ses.user.id) { AT.perfil = p; return p; }
-      return null;
-    });
-  }, function () { return null; });
+    }, function () { return guardado(ses.user.id); });
+  }, function () { return guardado(APP.usuarioGuardado()); });
 };
 
 document.addEventListener('DOMContentLoaded', function () {

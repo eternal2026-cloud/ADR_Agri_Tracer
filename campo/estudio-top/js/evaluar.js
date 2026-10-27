@@ -42,7 +42,7 @@ EVAL.pintarLista = function (cont) {
     var ids = r[0].data.map(function (e) { return e.id; });
     return Promise.all(['top_tiempos', 'top_cumplimiento', 'top_reba', 'top_ergonomia', 'top_encuestas'].map(function (t) {
       if (!ids.length) return Promise.resolve([]);
-      return sb.from(t).select('evaluacion_id').in('evaluacion_id', ids.slice(0, 150)).then(function (x) { return x.data || []; });
+      return sb.from(t).select(t === 'top_cumplimiento' ? 'evaluacion_id,ronda' : 'evaluacion_id').in('evaluacion_id', ids.slice(0, 150)).then(function (x) { return x.data || []; });
     }));
   }).then(function (conteos) {
     EVAL.conteos = conteos;
@@ -53,7 +53,14 @@ EVAL.pintarLista = function (cont) {
 };
 
 EVAL.dibujarLista = function (cont) {
-  var conteos = EVAL.conteos, cuenta = function (i, id) { return conteos[i].filter(function (x) { return x.evaluacion_id === id; }).length; };
+  var conteos = EVAL.conteos, cuenta = function (i, id) {
+    var l = conteos[i].filter(function (x) { return x.evaluacion_id === id; });
+    if (i !== 1) return l.length;
+    // Estándares: rondas guardadas (hasta 3 por día), no ítems.
+    var r = {};
+    l.forEach(function (x) { r[x.ronda || 1] = true; });
+    return Object.keys(r).length;
+  };
   var puede = AT.puedeCapturar() && AT.tieneAcceso('campo.top.evaluar'), nCos = (TOP.cosechadores || []).filter(function (c) { return c.activo; }).length;
   var lista = EVAL.lista.filter(function (e) { return EVAL.filtro === 'todas' || e.evaluador_id === AT.perfil.id; });
   var hoy = TOP.hoy(), ayer = TOP.localDe(new Date(Date.now() - 86400000)).substring(0, 10);
@@ -80,7 +87,7 @@ EVAL.dibujarLista = function (cont) {
         '<div class="top-eval-sub">' + DR.esc([e.fundo, e.lote].filter(Boolean).join(' · ') || 'sin lote') + ' · ' + DR.esc(TOP.materialTxt(e.material || e.presentacion)) +
           (e.evaluador_id !== AT.perfil.id ? ' · ' + DR.esc(e.evaluador_txt || 'otro evaluador') : '') + '</div>' +
         '<div class="top-progreso" title="' + hechas + ' de 5 secciones">' + ['Tiempos', 'Estándares', 'REBA', 'Ergonomía', 'Encuesta'].map(function (t, i) {
-          return '<span class="' + (n[i] ? 'ok' : '') + '">' + t + (n[i] && i < 3 ? ' ' + n[i] : '') + '</span>';
+          return '<span class="' + (n[i] ? 'ok' : '') + '">' + t + (n[i] && i < 3 ? ' ' + n[i] + (i ? '/3' : '') : '') + '</span>';
         }).join('') + '</div>' + (e.anulada ? '<span class="pill rojo">Anulada</span>' : '') + '</div></a>';
     }).join('') + '</div>';
   });
@@ -116,9 +123,12 @@ EVAL.recargar = function () {
 
 EVAL.pintarFicha = function (cont) {
   var e = EVAL.ev, edita = TOP.puedeEditar(e), scroll = DR.$('#contenido').scrollTop;
+  var rondas = {};
+  EVAL.d.cump.forEach(function (c) { if (c.resultado) rondas[c.ronda || 1] = true; });
+  // Estándares y REBA: 3 veces por día; ergonomía y encuesta: 1.
   var avance = {
-    tiempos: EVAL.d.tiempos.length, estandares: EVAL.d.cump.filter(function (c) { return c.resultado; }).length,
-    reba: EVAL.d.reba.length, ergonomia: EVAL.d.ergo ? Object.keys(EVAL.d.ergo.respuestas || {}).length : 0,
+    tiempos: EVAL.d.tiempos.length, estandares: Object.keys(rondas).length ? Object.keys(rondas).length + '/3' : 0,
+    reba: EVAL.d.reba.length ? EVAL.d.reba.length + '/3' : 0, ergonomia: EVAL.d.ergo ? Object.keys(EVAL.d.ergo.respuestas || {}).length : 0,
     encuesta: EVAL.d.enc ? '✓' : 0
   };
   var mat = e.material || e.presentacion;
@@ -383,7 +393,8 @@ EVAL.borrar = function (e, btn) {
   if (t.trim().toUpperCase() !== e.codigo) { DR.toast('El código no coincide: no se borró nada.', 'error'); return; }
   btn.classList.add('cargando');
   AT.rpc('rpc_top_borrar_evaluacion', { p_id: e.id }).then(function (fotos) {
-    ['est.', 'ergo.', 'enc.', 'reba.', 'reloj.', 'pend.'].forEach(function (k) { TOP.escribir(k + e.id, null); });
+    ['est.', 'ergo.', 'enc.', 'reba.', 'reloj.', 'pend.', 'jornada.'].forEach(function (k) { TOP.escribir(k + e.id, null); });
+    [2, 3].forEach(function (n) { TOP.escribir('est.' + e.id + '.r' + n, null); });
     if (fotos && fotos.length) sb.storage.from(FOTOS.BUCKET).remove(fotos).catch(function () { /* quedan huérfanas, sin efecto */ });
     DR.toast('Evaluación ' + e.codigo + ' borrada.');
     EVAL.ev = null;

@@ -65,6 +65,7 @@ ENC.dibujar = function (cont) {
   var h = '<section class="panel entra top-enc-cab"><div class="top-enc-datos">' +
       '<span><small>Fecha</small>' + TOP.fecha(ev.fecha) + '</span><span><small>Código</small>' + DR.esc(ev.dni || ev.codigo) + '</span>' +
       '<span><small>Fundo / lote</small>' + DR.esc([ev.fundo, ev.lote].filter(Boolean).join(' / ') || '—') + '</span><span><small>Variedad</small>' + DR.esc(ev.variedad || '—') + '</span></div>' +
+      '<div class="ayuda-campo" style="margin:8px 0 0"><b>1 vez por día</b> por cosechador.</div>' +
       '<div class="top-enc-intro">«Estamos estudiando cómo se trabaja mejor la cosecha para mejorar los instructivos y las herramientas. ' +
       'No es una evaluación y no hay respuestas buenas o malas.»</div>' +
       '<div class="top-enc-fila"><b>¿Aceptó responder?</b><div class="opciones">' +

@@ -90,7 +90,10 @@ RES.dibujar = function (c, D, A, f) {
       return { etq: x.actividad.nombre, sub: x.n + ' tomas · ' + TOP.CLASES[x.actividad.clase].t, valor: x.prom, marca: x.estandar, color: TOP.CLASES[x.actividad.clase].c,
         texto: TOP.seg(x.prom) + ' <small>prom.</small>' };
     })) + UI.tabla([
-      { t: 'Actividad', r: function (x) { return '<span class="top-punto" style="background:' + TOP.CLASES[x.actividad.clase].c + '"></span>' + DR.esc(x.actividad.nombre); } },
+      { t: 'Actividad', r: function (x) {
+        return '<span class="top-punto" style="background:' + TOP.CLASES[x.actividad.clase].c + '"></span>' + DR.esc(x.actividad.nombre) +
+          (x.actividad.sustento ? '<br><small class="ayuda-campo">Etapa nueva: ' + DR.esc(x.actividad.sustento) + '</small>' : '');
+      } },
       { t: 'Tomas', k: 'n', num: true }, { t: 'TOP', k: 'nEval', num: true },
       { t: 'Promedio', num: true, r: function (x) { return TOP.seg(x.prom); } },
       { t: 'Mediana', num: true, r: function (x) { return TOP.seg(x.med); } },

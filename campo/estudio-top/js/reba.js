@@ -1,15 +1,15 @@
 /* ============================================================================
  * reba.js — HOJA «CHECKLIST REBA» CON LAS IMÁGENES DE POSTURA
- * Una evaluación TOP puede tener varios REBA (p. ej. cosecha en zona baja y en
- * zona alta). El puntaje se calcula en vivo (tablas A, B y C) y el servidor lo
+ * Una evaluación TOP tiene hasta 3 REBA (3 veces por día; p. ej. inicio, media
+ * mañana y final, o cosecha en zona baja y en zona alta). El puntaje se calcula en vivo (tablas A, B y C) y el servidor lo
  * vuelve a calcular al guardar (fn_top_reba_puntaje).
  * ==========================================================================*/
-var REBA = { r: null };
+var REBA = { r: null, MAX: 3 };
 
 REBA.pintar = function (cont) {
   REBA.r = null;
   var edita = TOP.puedeEditar(EVAL.ev), lista = EVAL.d.reba.slice().sort(function (a, b) { return a.id - b.id; });
-  var h = UI.panel('Evaluaciones REBA', 'Una por postura o actividad observada. Toca una para verla o corregirla.',
+  var h = UI.panel('Evaluaciones REBA · ' + lista.length + ' de ' + REBA.MAX, 'Hasta ' + REBA.MAX + ' veces por día, una por postura o momento observado. Toca una para verla o corregirla.',
     (lista.length ? '<div class="top-tomas">' + lista.map(function (r) {
       var rg = TOP.RIESGOS[r.nivel] || TOP.RIESGOS[0];
       return '<button type="button" class="top-toma" data-reba="' + r.id + '" style="--c:' + rg.c + '">' +
@@ -17,7 +17,8 @@ REBA.pintar = function (cont) {
         '<span class="top-toma-hora">A ' + r.puntaje_a + ' · B ' + r.puntaje_b + ' · C ' + r.puntaje_c + '</span>' +
         '<b class="top-reba-chip" style="background:' + rg.c + '">' + r.puntaje_final + ' · ' + DR.esc(rg.t) + '</b></button>';
     }).join('') + '</div>' : '<div class="vacio">Aún no hay evaluaciones REBA.</div>') +
-    (edita ? '<div class="acciones"><button type="button" class="btn azul" id="btnNuevoReba">' + DR.ICONOS.mas + 'Nueva evaluación REBA</button></div>' : ''));
+    (edita && lista.length < REBA.MAX ? '<div class="acciones"><button type="button" class="btn azul" id="btnNuevoReba">' + DR.ICONOS.mas + 'Nueva evaluación REBA (' + (lista.length + 1) + ' de ' + REBA.MAX + ')</button></div>' :
+      (edita ? '<div class="ayuda-campo" style="margin-top:10px">Ya están las ' + REBA.MAX + ' del día: para cambiar algo, corrige una de ellas.</div>' : '')));
   cont.innerHTML = h;
   DR.entrarPaneles('#' + cont.id);
   if (DR.$('#btnNuevoReba')) DR.$('#btnNuevoReba').onclick = function () {

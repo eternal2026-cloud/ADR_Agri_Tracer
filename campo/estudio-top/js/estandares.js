@@ -3,8 +3,9 @@
  * Por ítem: Cumple / No cumple / No aplica, observación, «cómo lo hace el TOP»
  * (el estándar descubierto que alimenta la Propuesta) y hasta 3 fotos.
  * Cada toque queda en un borrador local; «Guardar» sube fotos y respuestas.
+ * Se evalúa hasta 3 veces por día (rondas); al guardar una se ofrece la siguiente.
  * ==========================================================================*/
-var EST = { estado: {}, abierto: null };
+var EST = { estado: {}, abierto: null, ronda: 1, RONDAS: 3 };
 
 EST.TIPOS = [
   { k: 'INSTRUCTIVO', t: 'Instructivo', d: 'Pasos del instructivo de cosecha' },
@@ -13,12 +14,19 @@ EST.TIPOS = [
 ];
 EST.RES = [{ v: 'C', t: 'Cumple', c: 'verde' }, { v: 'NC', t: 'No cumple', c: 'rojo' }, { v: 'NA', t: 'No aplica', c: 'gris' }];
 
-EST.claveBorrador = function () { return 'est.' + EVAL.ev.id; };
+// La ronda 1 conserva la clave de antes (borradores que ya estaban en el celular).
+EST.claveBorrador = function () { return 'est.' + EVAL.ev.id + (EST.ronda > 1 ? '.r' + EST.ronda : ''); };
+/** Rondas con algo guardado en Supabase, p. ej. [1, 2]. */
+EST.rondasGuardadas = function () {
+  var r = {};
+  EVAL.d.cump.forEach(function (c) { r[c.ronda || 1] = true; });
+  return Object.keys(r).map(Number).sort();
+};
 
 /** Estado inicial: lo guardado en Supabase y, encima, el borrador local sin subir. */
 EST.preparar = function () {
   var e = {};
-  EVAL.d.cump.forEach(function (c) {
+  EVAL.d.cump.filter(function (c) { return (c.ronda || 1) === EST.ronda; }).forEach(function (c) {
     e[c.item_id] = { resultado: c.resultado, observacion: c.observacion || '', practica_top: c.practica_top || '',
       fotos: (c.fotos || []).map(function (r) { return { ruta: r }; }) };
   });
@@ -42,6 +50,12 @@ EST.guardarBorrador = function () {
 };
 
 EST.pintar = function (cont) {
+  // Al abrir otra evaluación se muestra la última ronda guardada (o la 1).
+  if (EST._evRonda !== EVAL.ev.id) {
+    var g = EST.rondasGuardadas();
+    EST.ronda = g.length ? g[g.length - 1] : 1;
+    EST._evRonda = EVAL.ev.id;
+  }
   EST.preparar();
   EST.render(cont);
 };
@@ -51,7 +65,13 @@ EST.render = function (cont) {
   var scroll = DR.$('#contenido').scrollTop;
   var edita = TOP.puedeEditar(EVAL.ev), items = TOP.itemsDe(EVAL.ev.presentacion);
   var mat = EVAL.ev.material || EVAL.ev.presentacion;
-  var h = '<div class="aviso entra" style="margin-bottom:14px">' + DR.esc(TOP.materialTxt(mat)) + ': se evalúa el <b>' + TOP.familiaTxt(EVAL.ev.presentacion) + '</b>. Si el TOP lo hace distinto, ' +
+  var g = EST.rondasGuardadas(), hasta = Math.min(EST.RONDAS, Math.max(EST.ronda, (g.length ? g[g.length - 1] : 0) + (edita ? 1 : 0), 1));
+  var h = '<div class="top-rondas entra"><span class="ayuda-campo">Hasta ' + EST.RONDAS + ' veces por día:</span><div class="opciones">';
+  for (var n = 1; n <= hasta; n++) {
+    h += '<button type="button" class="opcion' + (EST.ronda === n ? ' activa' : '') + '" data-ronda="' + n + '">Ronda ' + n +
+      '<small>' + (g.indexOf(n) > -1 ? '✓' : 'nueva') + '</small></button>';
+  }
+  h += '</div></div><div class="aviso entra" style="margin-bottom:14px">' + DR.esc(TOP.materialTxt(mat)) + ': se evalúa el <b>' + TOP.familiaTxt(EVAL.ev.presentacion) + '</b>. Si el TOP lo hace distinto, ' +
     'anota <b>cómo lo hace</b>: esa práctica sustenta la actualización del estándar.</div>';
   EST.TIPOS.forEach(function (tp) {
     var lista = items.filter(function (i) { return i.tipo === tp.k; });
@@ -66,6 +86,15 @@ EST.render = function (cont) {
   else DR.entrarPaneles('#' + cont.id);
   EST._dibujado = EVAL.ev.id;
   EST.enlazar(cont, edita);
+  DR.$$('[data-ronda]', cont).forEach(function (b) {
+    b.onclick = function () {
+      var n = Number(b.getAttribute('data-ronda'));
+      if (n === EST.ronda) return;
+      if (EST.sucio) DR.toast('Los cambios de la ronda ' + EST.ronda + ' quedan como borrador en este celular.', 'info');
+      EST.ronda = n; EST.abierto = null;
+      EST.pintar(DR.$('#seccion'));
+    };
+  });
   FOTOS.pintar(cont);
   EST.pintarBarra();
   DR.$('#contenido').scrollTop = scroll;
@@ -137,32 +166,47 @@ EST.pintarBarra = function () {
   var b = DR.$('#estBarra');
   if (!b || !TOP.puedeEditar(EVAL.ev)) return;
   b.innerHTML = '<div class="top-guardar"><span>' + resp + ' de ' + items.length + ' ítems marcados' + (EST.sucio ? ' · <b>sin guardar</b>' : ' · guardado') + '</span>' +
-    '<button type="button" class="btn verde" id="btnGuardarEst"' + (EST.sucio ? '' : ' disabled') + '>Guardar estándares</button></div>';
+    '<button type="button" class="btn verde" id="btnGuardarEst"' + (EST.sucio ? '' : ' disabled') + '>Guardar ronda ' + EST.ronda + '</button></div>';
   DR.$('#btnGuardarEst').onclick = EST.guardar;
 };
 
 EST.guardar = function () {
-  var btn = DR.$('#btnGuardarEst'), ev = EVAL.ev;
+  var btn = DR.$('#btnGuardarEst'), ev = EVAL.ev, ronda = EST.ronda;
   btn.classList.add('cargando');
   btn.textContent = 'Guardando…';
   var ids = Object.keys(EST.estado);
   Promise.all(ids.map(function (k) {
     var x = EST.estado[k];
-    return FOTOS.subirLista(x.fotos || [], 'eval/' + ev.id + '/item-' + k).then(function (rutas) {
+    return FOTOS.subirLista(x.fotos || [], 'eval/' + ev.id + '/item-' + k + (ronda > 1 ? '-r' + ronda : '')).then(function (rutas) {
       return { item_id: Number(k), resultado: x.resultado || null, observacion: x.observacion || '', practica_top: x.practica_top || '', fotos: rutas };
     });
   })).then(function (filas) {
     filas = filas.filter(function (f) { return f.resultado || f.observacion || f.practica_top || f.fotos.length; });
-    return AT.rpc('rpc_top_guardar_cumplimiento', { p_eval: ev.id, p_items: filas });
+    return AT.rpc('rpc_top_guardar_cumplimiento', { p_eval: ev.id, p_items: filas, p_ronda: ronda });
   }).then(function () {
     TOP.escribir(EST.claveBorrador(), null);
     EST.sucio = false;
-    DR.toast('Estándares guardados.');
     DR.sonar(true);
     EVAL.recargar();
+    EST.ofrecerOtra(ronda);
   }).catch(function (e) {
     btn.classList.remove('cargando');
-    btn.textContent = 'Guardar estándares';
+    btn.textContent = 'Guardar ronda ' + ronda;
     DR.toast(e.message + ' El borrador queda en el celular.', 'error');
   });
+};
+
+/** Al guardar una ronda se ofrece la siguiente (hasta 3 por día). */
+EST.ofrecerOtra = function (ronda) {
+  if (ronda >= EST.RONDAS) { DR.toast('Ronda ' + ronda + ' guardada: ' + EST.RONDAS + ' de ' + EST.RONDAS + ' rondas del día completas.'); return; }
+  UI.abrirHoja('<h2>Ronda ' + ronda + ' guardada</h2><div class="sub">Los estándares se evalúan hasta ' + EST.RONDAS + ' veces por día. ' +
+    '¿Haces una más? Puedes empezarla ahora o más tarde desde «Ronda ' + (ronda + 1) + '».</div>' +
+    '<div class="acciones" style="margin-top:14px"><button type="button" class="btn verde" id="btnOtraRonda">Hacer la ronda ' + (ronda + 1) + ' de ' + EST.RONDAS + '</button>' +
+    '<button type="button" class="btn sec" id="btnRondaLuego">Más tarde</button></div>');
+  DR.$('#btnRondaLuego').onclick = function () { UI.cerrarHoja(); };
+  DR.$('#btnOtraRonda').onclick = function () {
+    UI.cerrarHoja();
+    EST.ronda = ronda + 1; EST.abierto = null;
+    if (EVAL.tab === 'estandares' && DR.$('#seccion')) { EST.pintar(DR.$('#seccion')); DR.$('#contenido').scrollTop = 0; }
+  };
 };

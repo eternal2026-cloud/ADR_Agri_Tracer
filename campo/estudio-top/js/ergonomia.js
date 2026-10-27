@@ -15,7 +15,7 @@ ERGO.pintar = function (cont) {
   Object.keys(ERGO.resp).forEach(function (c) { if (!ERGO.malo(c)) delete ERGO.resp[c]; });
   ERGO.sucio = !!b;
   var edita = TOP.puedeEditar(EVAL.ev), dis = edita ? '' : ' disabled';
-  var h = '<div class="aviso entra" style="margin-bottom:14px">Pregunta al cosechador y marca su respuesta. <b>NS</b> = no sabe / no contesta.</div>';
+  var h = '<div class="aviso entra" style="margin-bottom:14px"><b>1 vez por día.</b> Pregunta al cosechador y marca su respuesta. <b>NS</b> = no sabe / no contesta.</div>';
   TOP.ERGO.forEach(function (s, i) {
     h += '<section class="panel entra"><div class="panel-cab"><h2>' + DR.esc(s.t) + '</h2><span class="pill gris" data-ergo-conteo="' + i + '"></span></div>' +
       (s.nota ? '<div class="sub">' + DR.esc(s.nota) + '</div>' : '') +

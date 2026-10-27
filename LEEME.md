@@ -17,7 +17,7 @@ respaldado por **Supabase** (Postgres + Auth + Edge Functions + Vault + pg_cron)
   0020-0023: áreas propias de Cliente interno, 0024: accesos por usuario,
   0025: cada usuario ve sus encuestas —reemplazada por 0026—, 0026: Cliente interno
   por área evaluada, cultivo «-» en 5S, hasta 6 fotos y Excel de avance;
-  0046: Estudio de cosechador TOP; 0047: cosechadores por Excel, material y lotes en cosecha; 0048: encuesta de factores de rendimiento y borrado de evaluaciones; 0049: horario de acceso por módulo; 0050: el horario se define en Config › Accesos; 0051: Estudio TOP, checklist ergonómico solo con los problemas detectados).
+  0046: Estudio de cosechador TOP; 0047: cosechadores por Excel, material y lotes en cosecha; 0048: encuesta de factores de rendimiento y borrado de evaluaciones; 0049: horario de acceso por módulo; 0050: el horario se define en Config › Accesos; 0051: Estudio TOP, checklist ergonómico solo con los problemas detectados; 0052: Estudio TOP, jornada fija, etapas secuenciales con tiempo muerto, etapas nuevas con sustento y rondas).
 - **Edge Functions desplegadas** (código en `supabase/functions/`):
   - `admin-usuarios` — crear usuarios, restablecer contraseñas, cambiar rol, desactivar.
   - `sync-sheets` — espejo de auditoría hacia Google Sheets.
@@ -240,14 +240,21 @@ y «FORMATO REBA Y CHECKLIST ERGONOMÍA - COSECHA ARÁNDANO.xlsx».
   - *Material*: presentaciones de Tiempos de ciclo (Jarra 0.5 kg, Bandeja 2–5 kg, Bulk 3.5).
     `presentacion` guarda la familia del estándar: jarra → JARRA; bandeja y bulk → BANDEJA (granel).
   Secciones de la ficha:
-  - *Tiempos*: se toca la actividad y arranca su reloj, con segundos. **Varias etapas pueden
-    correr en paralelo** (cada una con su Terminar). Los relojes en curso viven
-    en el celular (`integra.top.reloj.<id>`, lista) y sobreviven a una recarga; sin señal la toma
-    queda en `integra.top.pend.<id>` y se sube al volver la conexión.
+  - *Tiempos* (0052): **Inicio y Fin de jornada son marcas fijas** de la evaluación
+    (`jornada_inicio` / `jornada_fin`, `rpc_top_guardar_jornada`), no actividades (3 y 11 quedan
+    inactivas). Dentro de la jornada las etapas son **secuenciales**: se inicia, se termina y se
+    inicia la siguiente. El lapso entre etapas (y antes de la primera) se abre solo como
+    **«Tiempo muerto»** (actividad 20, clase espera) con nota opcional; se cierra al iniciar la
+    etapa siguiente o el fin de jornada (menos de 5 s sin nota no se guarda). **Etapa nueva**:
+    el auxiliar crea una etapa que no está en la lista con su sustento obligatorio
+    (`rpc_top_crear_actividad`, ids desde 100); sale en Resumen y en la hoja «Etapas nuevas» del
+    Excel. Relojes en `integra.top.reloj.<id>`, jornada sin subir en `integra.top.jornada.<id>`,
+    tomas sin señal en `integra.top.pend.<id>`.
   - *Estándares*: C / NC / NA, observación, **«Cómo lo hace el TOP»** (estándar descubierto)
-    y hasta 3 fotos (bucket privado `estudio-top`). Borrador local hasta «Guardar».
+    y hasta 3 fotos (bucket privado `estudio-top`). Borrador local hasta «Guardar». **3 rondas por
+    día** (`top_cumplimiento.ronda`); al guardar una ronda se ofrece hacer la siguiente.
   - *REBA*: imágenes de la hoja (`campo/estudio-top/img/`), tablas A/B/C y nivel de riesgo;
-    el servidor recalcula el puntaje (`fn_top_reba_puntaje`). Varias posturas por evaluación.
+    el servidor recalcula el puntaje (`fn_top_reba_puntaje`). **Hasta 3 por día** (el servidor lo exige).
   - *Ergonomía*: checklist SI/NO/NS con diagrama corporal y momentos de dolor. Solo las secciones
     con problemas detectados (0051): 1. Puesto de trabajo, 2. Síntomas, 3. Fatiga física y
     8. Traumatismos repetidos; 4 a 7 se retiraron (también de las evaluaciones pasadas).

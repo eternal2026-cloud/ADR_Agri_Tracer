@@ -4,7 +4,12 @@
  * Supabase (migración 0046); REBA y el checklist ergonómico se definen aquí,
  * igual que en «FORMATO REBA Y CHECKLIST ERGONOMÍA - COSECHA ARÁNDANO.xlsx».
  * ==========================================================================*/
-var TOP = { actividades: [], items: [], listas: { fundo: [] } };
+var TOP = { actividades: [], todas: [], items: [], listas: { fundo: [] } };
+
+/** «Tiempo muerto» (0052): se abre solo entre el fin de una etapa y el inicio de la siguiente. */
+TOP.ID_MUERTO = 20;
+/** Inicio y Fin de jornada dejaron de ser actividades (0052): son marcas fijas de la evaluación. */
+TOP.ID_JORNADA = [3, 11];
 
 FOTOS.BUCKET = 'estudio-top';
 FOTOS.MAX = 3;
@@ -188,12 +193,14 @@ TOP.ergoTotal = function () { return TOP.ERGO.reduce(function (n, s) { return n 
 TOP.cargarCatalogos = function () {
   if (TOP._cat) return TOP._cat;
   TOP._cat = Promise.all([
-    sb.from('top_actividades').select('*').eq('activo', true).order('orden'),
+    sb.from('top_actividades').select('*').order('orden').order('id'),
     sb.from('top_estandar_items').select('*').eq('activo', true).order('presentacion').order('orden'),
     sb.from('listas_maestras').select('tipo,valor').in('tipo', ['fundo', 'presentacion']).eq('activo', true).order('orden').order('valor')
   ]).then(function (r) {
     r.forEach(function (x) { if (x.error) throw new Error(x.error.message); });
-    TOP.actividades = r[0].data;
+    // Todas para mostrar tomas antiguas; las activas para elegir.
+    TOP.todas = r[0].data;
+    TOP.actividades = r[0].data.filter(function (a) { return a.activo; });
     TOP.items = r[1].data;
     TOP.listas.fundo = r[2].data.filter(function (x) { return x.tipo === 'fundo'; }).map(function (x) { return x.valor; });
     // Materiales = presentaciones de Tiempos de ciclo (Jarra 0.5 kg, Bandeja 2-5 kg) + Bulk 3.5.
@@ -283,7 +290,7 @@ TOP.cargarCosechadores = function (forzar) {
 /** Sin tildes y en minúsculas, para buscar. */
 TOP.norm = function (s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); };
 
-TOP.actividad = function (id) { return TOP.actividades.filter(function (a) { return a.id === Number(id); })[0] || { nombre: '—', clase: 'soporte' }; };
+TOP.actividad = function (id) { return TOP.todas.filter(function (a) { return a.id === Number(id); })[0] || { nombre: '—', clase: 'soporte' }; };
 TOP.item = function (id) { return TOP.items.filter(function (a) { return a.id === Number(id); })[0]; };
 TOP.itemsDe = function (presentacion) { return TOP.items.filter(function (i) { return i.presentacion === presentacion; }); };
 

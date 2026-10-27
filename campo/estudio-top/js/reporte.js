@@ -56,13 +56,23 @@ REPORTE.excel = function (D, A) {
         return { act: x.actividad.nombre, clase: TOP.CLASES[x.actividad.clase].t, n: x.n, nEval: x.nEval, prom: minutos(x.prom), med: minutos(x.med), p25: minutos(x.p25),
           p75: minutos(x.p75), min: minutos(x.min), max: minutos(x.max), cv: Math.round(x.cv), est: minutos(x.estandar), estTxt: TOP.seg(x.estandar) };
       }));
-    hoja('Distribución jornada', colsBase.concat([['Productiva (min)', 'productiva', 14], ['Soporte (min)', 'soporte', 12], ['Espera (min)', 'espera', 12],
+    hoja('Distribución jornada', colsBase.concat([['Inicio jornada', 'jIni', 10], ['Fin jornada', 'jFin', 10], ['Jornada (min)', 'jMin', 12],
+      ['Tiempo muerto (min)', 'muerto', 13], ['Productiva (min)', 'productiva', 14], ['Soporte (min)', 'soporte', 12], ['Espera (min)', 'espera', 12],
       ['Personal (min)', 'personal', 12], ['Total medido (min)', 'total', 14], ['% productivo', 'pct', 11]]),
       A.jornadas.map(function (j) {
-        var f = base(j.ev);
+        var f = base(j.ev), e = j.ev;
+        f.jIni = TOP.horaSeg(e.jornada_inicio); f.jFin = e.jornada_fin ? TOP.horaSeg(e.jornada_fin) : '';
+        f.jMin = e.jornada_inicio && e.jornada_fin ? minutos((new Date(e.jornada_fin) - new Date(e.jornada_inicio)) / 1000) : null;
+        f.muerto = minutos(D.tiempos.filter(function (t) { return t.evaluacion_id === e.id && t.actividad_id === TOP.ID_MUERTO; })
+          .reduce(function (s, t) { return s + (t.duracion_seg || 0); }, 0));
         TOP.ORDEN_CLASES.forEach(function (c) { f[c] = minutos(j.tot[c]); });
         f.total = minutos(j.total); f.pct = Math.round(j.tot.productiva / j.total * 1000) / 10;
         return f;
+      }));
+    var nuevas = TOP.todas.filter(function (a) { return a.sustento; });
+    if (nuevas.length) hoja('Etapas nuevas', [['Etapa', 'nombre', 34], ['Clase', 'clase', 18], ['Sustento', 'sustento', 70], ['Creada por', 'quien', 24], ['Fecha', 'fecha', 12]],
+      nuevas.map(function (a) {
+        return { nombre: a.nombre, clase: TOP.CLASES[a.clase].t, sustento: a.sustento, quien: a.creado_txt, fecha: a.creado_en ? TOP.fecha(TOP.aLocal(a.creado_en)) : '' };
       }));
     hoja('Tomas', colsBase.concat([['Actividad', 'act', 36], ['Clase', 'clase', 16], ['Inicio', 'ini', 20], ['Fin', 'fin', 20], ['Duración (s)', 'seg', 11], ['Duración (m:ss)', 'mmss', 12], ['Nota', 'nota', 30]]),
       D.tiempos.slice().sort(function (a, b) { return a.inicio < b.inicio ? -1 : 1; }).map(function (t) {
@@ -77,10 +87,10 @@ REPORTE.excel = function (D, A) {
         return { tipo: x.item.tipo, pres: x.item.presentacion, num: x.item.numero, txt: x.item.descripcion, C: x.C, NC: x.NC, NA: x.NA,
           pct: x.pct === null ? null : Math.round(x.pct), prac: x.practicas.map(function (p) { return p.t + (p.n > 1 ? ' (' + p.n + ')' : ''); }).join(' | '), obs: x.obs.join(' | ') };
       }));
-    hoja('Estándares (detalle)', colsBase.concat([['Tipo', 'tipo', 13], ['Ítem', 'txt', 55], ['Resultado', 'res', 11], ['Cómo lo hace el TOP', 'prac', 45], ['Observación', 'obs', 40], ['Fotos', 'fotos', 8]]),
+    hoja('Estándares (detalle)', colsBase.concat([['Ronda', 'ronda', 7], ['Tipo', 'tipo', 13], ['Ítem', 'txt', 55], ['Resultado', 'res', 11], ['Cómo lo hace el TOP', 'prac', 45], ['Observación', 'obs', 40], ['Fotos', 'fotos', 8]]),
       D.cump.map(function (c) {
         var f = base(REPORTE.evalDe(D, c.evaluacion_id)), it = TOP.item(c.item_id) || {};
-        f.tipo = it.tipo; f.txt = it.descripcion; f.res = { C: 'Cumple', NC: 'No cumple', NA: 'No aplica' }[c.resultado] || ''; f.prac = c.practica_top; f.obs = c.observacion; f.fotos = (c.fotos || []).length;
+        f.ronda = c.ronda || 1; f.tipo = it.tipo; f.txt = it.descripcion; f.res = { C: 'Cumple', NC: 'No cumple', NA: 'No aplica' }[c.resultado] || ''; f.prac = c.practica_top; f.obs = c.observacion; f.fotos = (c.fotos || []).length;
         return f;
       }));
     hoja('REBA', colsBase.concat([['Actividad', 'act', 30], ['Momento', 'momento', 24], ['Cuello', 'cuello', 7], ['Cuello +1', 'cuello_mod', 8], ['Tronco', 'tronco', 7], ['Tronco +1', 'tronco_mod', 8],
@@ -219,7 +229,7 @@ REPORTE.pdf = function (D, A) {
 
     titulo('1. Objetivo y metodología');
     parrafo('Actualizar los estándares de cosecha a partir del método del personal TOP, con un sustento medible. A cada cosechador TOP se le observa durante su jornada y se registra:');
-    parrafo('a) Tiempo por actividad (inicio y fin con segundos; varias etapas pueden medirse en paralelo) de las ' + TOP.actividades.length + ' actividades del seguimiento al cosechador, clasificadas en productiva, soporte necesario, espera/eliminable y personal.');
+    parrafo('a) Tiempo por actividad (inicio y fin con segundos; dentro de una jornada con inicio y fin fijos; las etapas van una tras otra y el lapso entre ellas se registra como tiempo muerto) de las ' + TOP.actividades.length + ' actividades del seguimiento al cosechador, clasificadas en productiva, soporte necesario, espera/eliminable y personal.');
     parrafo('b) Cumplimiento (cumple / no cumple / no aplica) del instructivo, la LUP y el formato de puesto de trabajo de su presentación, anotando cómo lo hace el TOP cuando difiere del estándar.');
     parrafo('c) Evaluación postural REBA (tablas A, B y C) y checklist ergonómico de síntomas, fatiga, carga mental, ritmo y jornada.');
     parrafo('d) Encuesta de factores de rendimiento (1 por cosechador y día): experiencia, método, presentación, tiempo perdido, aprendizaje, trucos y mejoras.');

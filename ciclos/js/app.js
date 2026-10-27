@@ -113,7 +113,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (perfil.debe_cambiar_password) { location.href = '../'; return; }
     // Sin resumen ni captura asignados (el admin siempre entra por Config): de vuelta a la portada.
     if (!DR.puedeVer('resumen') && !DR.puedeVer('captura')) { location.href = '../#campo'; return; }
-    // Horario del usuario para arándano (Usuarios › Accesos); con un ciclo sin guardar solo avisa.
+    // Horario de arándano (Config › Accesos); con un ciclo sin guardar solo avisa.
     if (AT.vigilarHorario && !AT.vigilarHorario('campo.arandano', '../#campo', function () { return DR.vista === 'captura' && (CAPTURA.sucio || CAPTURA.guardando); })) return;
     pintarBarraSup();
     DR.$$('.nav-btn').forEach(function (b) { b.addEventListener('click', function () { DR.ir(b.getAttribute('data-vista')); }); });

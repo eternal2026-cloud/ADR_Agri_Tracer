@@ -8,7 +8,7 @@ respaldado por **Supabase** (Postgres + Auth + Edge Functions + Vault + pg_cron)
 ## Estado actual
 
 - **Proyecto Supabase** `agritracer-don-ricardo` (ref `ptsvriudoilsyofgccsb`) con
-  migraciones `supabase/migrations/0001..0049` aplicadas (0012: Auditoría 5S,
+  migraciones `supabase/migrations/0001..0050` aplicadas (0012: Auditoría 5S,
   0013: Auditoría 5S por cultivo, 0014: observaciones 5S por área,
   0015: Revisión del plan de mantenimiento, 0016: Satisfacción del cliente
   interno y cultivo en los tiempos de ciclo, 0017: acceso por correo —retirado
@@ -17,7 +17,7 @@ respaldado por **Supabase** (Postgres + Auth + Edge Functions + Vault + pg_cron)
   0020-0023: áreas propias de Cliente interno, 0024: accesos por usuario,
   0025: cada usuario ve sus encuestas —reemplazada por 0026—, 0026: Cliente interno
   por área evaluada, cultivo «-» en 5S, hasta 6 fotos y Excel de avance;
-  0046: Estudio de cosechador TOP; 0047: cosechadores por Excel, material y lotes en cosecha; 0048: encuesta de factores de rendimiento y borrado de evaluaciones; 0049: horario de acceso por usuario y módulo).
+  0046: Estudio de cosechador TOP; 0047: cosechadores por Excel, material y lotes en cosecha; 0048: encuesta de factores de rendimiento y borrado de evaluaciones; 0049: horario de acceso por módulo; 0050: el horario se define en Config › Accesos).
 - **Edge Functions desplegadas** (código en `supabase/functions/`):
   - `admin-usuarios` — crear usuarios, restablecer contraseñas, cambiar rol, desactivar.
   - `sync-sheets` — espejo de auditoría hacia Google Sheets.
@@ -118,18 +118,18 @@ incluidos los módulos que se agreguen después.
   ciclos, 5S, mantenimiento y cliente interno); la lectura no se restringe en la base.
 - Módulo nuevo: agregarlo a `AT.ACCESOS` y ponerle `acceso: '…'` a su tarjeta en `index.html`.
 
-**Horario por módulo** (migración 0049): en la misma hoja de *Accesos*, bajo cada módulo
-asignado, «Todo el día» o «⏰ Con horario» con hora de inicio y fin (hora de Perú). Al dar
-Arándano o Uva por primera vez se pone solo el horario sugerido (`horario` en `AT.ACCESOS`):
-**Arándano 07:00–18:00 · Uva 06:00–18:00**; el admin puede cambiarlo o quitarlo.
+**Horario de uso** (migraciones 0049 y 0050): pestaña **Config › Accesos**. Por cada módulo,
+«Todo el día» o «⏰ Con horario» con hora de inicio y fin (hora de Perú); vale para todo el
+personal (quién ve cada módulo se sigue eligiendo en Usuarios › Accesos). Al activar el horario
+se propone el sugerido (`horario` en `AT.ACCESOS`): **Arándano 07:00–18:00 · Uva 06:00–18:00**.
 
-- `perfiles.horarios`: `{ "campo.arandano": { "desde": "07:00", "hasta": "18:00" } }`;
-  `NULL` = todo el día. Desde > hasta cruza la medianoche. Los administradores no tienen horario.
+- `parametros.HORARIOS_ACCESO` (texto JSON): `{ "campo.arandano": { "desde": "07:00", "hasta": "18:00" } }`;
+  módulo ausente = todo el día. Desde > hasta cruza la medianoche. Los administradores no tienen horario.
 - Fuera de horario la portada muestra el acceso cerrado («desde 07:00») y el módulo vuelve a
   la portada (`AT.vigilarHorario`, revisa cada minuto). Si el horario termina con un ciclo sin
   guardar, solo avisa: la base acepta registros hasta 30 min después del cierre
   (`fn_fuera_de_horario` dentro de `fn_exigir_acceso`).
-- Reubicación no se limita por horario (abre sin sesión).
+- Reubicación no se limita por horario (abre sin sesión). `perfiles.horarios` (0049) quedó sin uso.
 
 **Fundos asignados** (migración 0018): al crear el usuario o con el botón *Fundos*
 se marcan uno o más fundos. En Captura solo verá y podrá elegir esos fundos, y

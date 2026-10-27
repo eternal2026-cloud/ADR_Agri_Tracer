@@ -814,7 +814,7 @@ td.mp-sangria{padding-left:26px}
 .campo-volver svg{width:18px;height:18px}
 .acceso-par{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
 .acceso-par .btn{padding:10px 12px;font-size:13.5px}
-/* Horario por usuario (Usuarios › Accesos): acceso visible pero cerrado fuera de horario */
+/* Horario por módulo (Config › Accesos): acceso visible pero cerrado fuera de horario */
 .acceso-par .btn.deshabilitado{opacity:.55;cursor:not-allowed;text-align:center}
 .modulo-card span.fuera-horario,.horario-linea{font-size:12.5px;color:var(--dr-naranja);font-weight:500;margin-top:6px}
 .horario-linea{color:var(--texto-3)}

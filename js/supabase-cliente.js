@@ -40,7 +40,7 @@ AT.cargarPerfil = function () {
     if (r.error || !r.data) throw new Error('No se encontró el perfil de este usuario.');
     if (!r.data.activo) throw new Error('Este usuario está desactivado. Contacta al administrador.');
     AT.perfil = r.data;
-    return r.data;
+    return AT.cargarHorarios().then(function () { return r.data; });
   });
 };
 
@@ -67,7 +67,7 @@ AT.puedeCapturar = function () { return !!(AT.perfil && (AT.perfil.rol === 'admi
  * Accesos por usuario (perfiles.accesos, migración 0024): grupos › módulos › funciones.
  * Claves grupo.modulo.funcion. registra: la función guarda datos (necesita rol Captura).
  * porDefecto: se marca sola al dar cualquier otra función del módulo (el admin puede quitarla).
- * horario (módulo): horario sugerido al limitarlo por horas en Usuarios › Accesos (perfiles.horarios, 0049).
+ * horario (módulo): horario sugerido al activarlo en Config › Accesos (parametros.HORARIOS_ACCESO, 0050).
  * sinHorario: el módulo no se puede limitar por horas (Reubicación abre sin sesión).
  * Al agregar un módulo nuevo, sumarlo aquí; quien tiene acceso completo lo ve solo.
  */
@@ -110,16 +110,23 @@ AT.tieneAcceso = function (clave, perfil) {
 };
 
 /**
- * Horario por módulo (perfiles.horarios = { 'campo.arandano': { desde: '07:00', hasta: '18:00' } }, 0049).
+ * Horario por módulo, igual para todo el personal (Config › Accesos; parametros.HORARIOS_ACCESO, 0050):
+ * { 'campo.arandano': { desde: '07:00', hasta: '18:00' } }. Módulo ausente = todo el día.
  * Mismo criterio que fn_fuera_de_horario: hora de Lima; desde > hasta cruza la medianoche; admin sin horario.
  * La base da 30 min de tolerancia al registrar, para que suba lo hecho justo antes del cierre.
  */
+AT.horarios = {};
+AT.cargarHorarios = function () {
+  return sb.from('parametros').select('valor').eq('clave', 'HORARIOS_ACCESO').maybeSingle().then(function (r) {
+    try { AT.horarios = (r.data && JSON.parse(r.data.valor)) || {}; } catch (e) { AT.horarios = {}; }
+  }, function () { AT.horarios = {}; });
+};
 AT.horarioDe = function (clave, perfil) {
-  var p = perfil || AT.perfil;
-  if (!p || p.rol === 'admin' || !p.horarios) return null;
+  var p = perfil || AT.perfil, hs = AT.horarios || {};
+  if (!p || p.rol === 'admin') return null;
   var r = null;
-  Object.keys(p.horarios).forEach(function (k) {
-    var h = p.horarios[k];
+  Object.keys(hs).forEach(function (k) {
+    var h = hs[k];
     if ((clave === k || clave.indexOf(k + '.') === 0) && h && h.desde && h.hasta && h.desde !== h.hasta) r = h;
   });
   return r;

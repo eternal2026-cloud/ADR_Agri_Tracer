@@ -11,6 +11,8 @@ ERGO.pintar = function (cont) {
   var g = EVAL.d.ergo || {}, b = TOP.leer(ERGO.clave(), null);
   ERGO.resp = JSON.parse(JSON.stringify((b || g).respuestas || {}));
   ERGO.dolor = JSON.parse(JSON.stringify((b || g).dolor || {}));
+  // Un borrador viejo puede traer preguntas de secciones retiradas (4 a 7): no se suben.
+  Object.keys(ERGO.resp).forEach(function (c) { if (!ERGO.malo(c)) delete ERGO.resp[c]; });
   ERGO.sucio = !!b;
   var edita = TOP.puedeEditar(EVAL.ev), dis = edita ? '' : ' disabled';
   var h = '<div class="aviso entra" style="margin-bottom:14px">Pregunta al cosechador y marca su respuesta. <b>NS</b> = no sabe / no contesta.</div>';

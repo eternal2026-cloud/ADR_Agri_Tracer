@@ -8,7 +8,7 @@ respaldado por **Supabase** (Postgres + Auth + Edge Functions + Vault + pg_cron)
 ## Estado actual
 
 - **Proyecto Supabase** `agritracer-don-ricardo` (ref `ptsvriudoilsyofgccsb`) con
-  migraciones `supabase/migrations/0001..0050` aplicadas (0012: Auditoría 5S,
+  migraciones `supabase/migrations/0001..0051` aplicadas (0012: Auditoría 5S,
   0013: Auditoría 5S por cultivo, 0014: observaciones 5S por área,
   0015: Revisión del plan de mantenimiento, 0016: Satisfacción del cliente
   interno y cultivo en los tiempos de ciclo, 0017: acceso por correo —retirado
@@ -17,7 +17,7 @@ respaldado por **Supabase** (Postgres + Auth + Edge Functions + Vault + pg_cron)
   0020-0023: áreas propias de Cliente interno, 0024: accesos por usuario,
   0025: cada usuario ve sus encuestas —reemplazada por 0026—, 0026: Cliente interno
   por área evaluada, cultivo «-» en 5S, hasta 6 fotos y Excel de avance;
-  0046: Estudio de cosechador TOP; 0047: cosechadores por Excel, material y lotes en cosecha; 0048: encuesta de factores de rendimiento y borrado de evaluaciones; 0049: horario de acceso por módulo; 0050: el horario se define en Config › Accesos).
+  0046: Estudio de cosechador TOP; 0047: cosechadores por Excel, material y lotes en cosecha; 0048: encuesta de factores de rendimiento y borrado de evaluaciones; 0049: horario de acceso por módulo; 0050: el horario se define en Config › Accesos; 0051: Estudio TOP, checklist ergonómico solo con los problemas detectados).
 - **Edge Functions desplegadas** (código en `supabase/functions/`):
   - `admin-usuarios` — crear usuarios, restablecer contraseñas, cambiar rol, desactivar.
   - `sync-sheets` — espejo de auditoría hacia Google Sheets.
@@ -240,14 +240,17 @@ y «FORMATO REBA Y CHECKLIST ERGONOMÍA - COSECHA ARÁNDANO.xlsx».
   - *Material*: presentaciones de Tiempos de ciclo (Jarra 0.5 kg, Bandeja 2–5 kg, Bulk 3.5).
     `presentacion` guarda la familia del estándar: jarra → JARRA; bandeja y bulk → BANDEJA (granel).
   Secciones de la ficha:
-  - *Tiempos*: actividad aislada → Iniciar → Terminar, con segundos. El reloj en curso vive
-    en el celular (`integra.top.reloj.<id>`) y sobrevive a una recarga; sin señal la toma
+  - *Tiempos*: se toca la actividad y arranca su reloj, con segundos. **Varias etapas pueden
+    correr en paralelo** (cada una con su Terminar). Los relojes en curso viven
+    en el celular (`integra.top.reloj.<id>`, lista) y sobreviven a una recarga; sin señal la toma
     queda en `integra.top.pend.<id>` y se sube al volver la conexión.
   - *Estándares*: C / NC / NA, observación, **«Cómo lo hace el TOP»** (estándar descubierto)
     y hasta 3 fotos (bucket privado `estudio-top`). Borrador local hasta «Guardar».
   - *REBA*: imágenes de la hoja (`campo/estudio-top/img/`), tablas A/B/C y nivel de riesgo;
     el servidor recalcula el puntaje (`fn_top_reba_puntaje`). Varias posturas por evaluación.
-  - *Ergonomía*: checklist SI/NO/NS con diagrama corporal y momentos de dolor.
+  - *Ergonomía*: checklist SI/NO/NS con diagrama corporal y momentos de dolor. Solo las secciones
+    con problemas detectados (0051): 1. Puesto de trabajo, 2. Síntomas, 3. Fatiga física y
+    8. Traumatismos repetidos; 4 a 7 se retiraron (también de las evaluaciones pasadas).
   - *Encuesta* (0048): «ENCUESTA AL COSECHADOR · FACTORES DE RENDIMIENTO», 10 preguntas con
     toques y palabras clave. Una por evaluación; como hay una evaluación por cosechador y día
     (índice `top_evaluaciones_cosechador_dia`), la encuesta queda 1 vez por día. Alimenta el

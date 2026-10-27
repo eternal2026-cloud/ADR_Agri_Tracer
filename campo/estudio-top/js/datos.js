@@ -169,31 +169,8 @@ TOP.ERGO = [
   { t: '3. Fatiga física', nota: 'Los esfuerzos realizados en el desarrollo de su trabajo son adecuados…', items: [
     ['3.1', '¿A su capacidad física?', 'NO'], ['3.2', '¿A la temperatura ambiental?', 'NO'], ['3.3', '¿A su edad?', 'NO'],
     ['3.4', '¿A su entrenamiento?', 'NO'], ['3.5', '¿Existen pausas establecidas?', 'NO']] },
-  { t: '4. Carga mental', nota: 'Desde el punto de vista de la fatiga nerviosa.', items: [
-    ['4.1', '¿Considera que su ritmo habitual de trabajo es adecuado?', 'NO'],
-    ['4.2', '¿Cree que la actividad que se le exige es superior a la que puede realizar?', 'SI'],
-    ['4.3', '¿La recuperación de la fatiga entre una jornada y la siguiente es suficiente?', 'NO'],
-    ['4.4', '¿Su trabajo le permite desviar la atención, por unos instantes, para hacer o pensar otras cosas?', 'NO']] },
-  { t: '5. Ritmo', items: [
-    ['5.1', '¿Cree que el tiempo asignado a la tarea que realiza es el suficiente?', 'NO'],
-    ['5.2', '¿Puede abandonar su trabajo por unos minutos sin necesidad de que le sustituyan?', 'NO'],
-    ['5.3', '¿Existen comodines para sustituir cuando no se puede abandonar el puesto?', 'NO'],
-    ['5.4', '¿Puede variar el ritmo de trabajo?', 'NO']] },
-  { t: '6. Automatización', items: [
-    ['6.1', '¿Su trabajo le permite aplicar sus habilidades?', 'NO'],
-    ['6.2', '¿Su trabajo le permite aplicar sus conocimientos?', 'NO'],
-    ['6.3', '¿Puede organizar el trabajo a su manera (p. ej. modificar el orden de las operaciones)?', 'NO'],
-    ['6.4', '¿Puede intervenir en caso de error o incidente, para controlar y corregir su trabajo?', 'NO'],
-    ['6.5', '¿Considera que su trabajo es variado?', 'NO'],
-    ['6.6', '¿Están agotadas todas las posibilidades de hacer el trabajo más variado y estimulante?', 'SI'],
-    ['6.7', '¿Puede rotar con otros puestos de trabajo?', 'NO']] },
-  { t: '7. Jornada', items: [
-    ['7.1', '¿El número y la duración total de las pausas es suficiente?', 'NO'],
-    ['7.2', '¿Puede distribuir usted mismo estas pausas a lo largo de la jornada?', 'NO'],
-    ['7.3.1', 'Considera adecuada la distribución del horario de trabajo', 'NO'],
-    ['7.3.2', 'Considera adecuada la distribución de las horas de descanso', 'NO'],
-    ['7.3.3', 'Considera adecuada la distribución de las horas extra', 'NO'],
-    ['7.3.4', 'Considera adecuada la distribución de las pausas', 'NO']] },
+  // 4. Carga mental, 5. Ritmo, 6. Automatización y 7. Jornada se retiraron (0051): el seguimiento
+  // se centra en los problemas detectados. Se conserva la numeración de la hoja en papel.
   { t: '8. Traumatismos repetidos', items: [
     ['8.1', '¿Durante el día ha tenido sensaciones repetitivas de pesadez, calambres, pinchazos u hormigueo en una o ambas manos?', 'SI'],
     ['8.2', '¿Durante el día ha tenido sensaciones repetidas de hinchazón o molestias en algún antebrazo o codo?', 'SI'],

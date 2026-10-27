@@ -93,6 +93,14 @@ button.top-cos:active{transform:scale(.98)}
 .top-reloj-cifra{font-size:64px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--c);margin:6px 0 2px;line-height:1.1}
 .top-reloj .acciones{justify-content:center}
 .top-reloj .btn.grande{max-width:360px}
+/* varias etapas en paralelo: relojes más compactos, en dos columnas si hay ancho */
+.top-relojes.varios{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-bottom:14px}
+.top-relojes.varios .top-reloj{margin:0;padding:12px 14px}
+.top-relojes.varios .top-reloj h2{font-size:17px;margin-top:4px}
+.top-relojes.varios .top-reloj-cifra{font-size:42px}
+.top-relojes.varios .top-reloj .acciones{margin-top:8px}
+.top-act.en-curso[disabled]{opacity:1;border-color:var(--c);box-shadow:inset 0 0 0 1px var(--c)}
+.top-act small{display:block;font-size:11.5px;color:var(--c);font-weight:600;margin-top:2px}
 .top-clase-tit{display:flex;align-items:center;gap:8px;font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--texto-3);margin:14px 0 8px;font-weight:500}
 .top-clase-tit::before{content:'';width:10px;height:10px;border-radius:3px;background:var(--c)}
 .top-acts{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}

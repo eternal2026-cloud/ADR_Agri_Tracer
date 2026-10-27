@@ -219,7 +219,7 @@ REPORTE.pdf = function (D, A) {
 
     titulo('1. Objetivo y metodología');
     parrafo('Actualizar los estándares de cosecha a partir del método del personal TOP, con un sustento medible. A cada cosechador TOP se le observa durante su jornada y se registra:');
-    parrafo('a) Tiempo por actividad aislada (inicio y fin con segundos) de las ' + TOP.actividades.length + ' actividades del seguimiento al cosechador, clasificadas en productiva, soporte necesario, espera/eliminable y personal.');
+    parrafo('a) Tiempo por actividad (inicio y fin con segundos; varias etapas pueden medirse en paralelo) de las ' + TOP.actividades.length + ' actividades del seguimiento al cosechador, clasificadas en productiva, soporte necesario, espera/eliminable y personal.');
     parrafo('b) Cumplimiento (cumple / no cumple / no aplica) del instructivo, la LUP y el formato de puesto de trabajo de su presentación, anotando cómo lo hace el TOP cuando difiere del estándar.');
     parrafo('c) Evaluación postural REBA (tablas A, B y C) y checklist ergonómico de síntomas, fatiga, carga mental, ritmo y jornada.');
     parrafo('d) Encuesta de factores de rendimiento (1 por cosechador y día): experiencia, método, presentación, tiempo perdido, aprendizaje, trucos y mejoras.');

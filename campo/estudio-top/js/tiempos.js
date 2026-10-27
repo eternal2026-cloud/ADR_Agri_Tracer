@@ -1,42 +1,52 @@
 /* ============================================================================
- * tiempos.js — TOMA DE TIEMPO POR ACTIVIDAD AISLADA
- * Se toca la actividad → Iniciar → Terminar. Una sola actividad abierta a la vez.
- * El reloj en curso vive en localStorage (no se pierde al cerrar la app) y la
- * toma se guarda con segundos. Sin señal, queda en «pendientes» y se reintenta.
+ * tiempos.js — TOMA DE TIEMPO POR ACTIVIDAD (ETAPAS EN PARALELO)
+ * Se toca la actividad → arranca su reloj. Pueden correr varias a la vez
+ * (p. ej. cosecha y traslado se solapan); cada una se termina por separado.
+ * Los relojes en curso viven en localStorage (no se pierden al cerrar la app) y
+ * cada toma se guarda con segundos. Sin señal, queda en «pendientes» y se reintenta.
  * ==========================================================================*/
-var TIEMPOS = {};
+var TIEMPOS = { _ini: {} };
 
 TIEMPOS.clave = function () { return 'reloj.' + EVAL.ev.id; };
 TIEMPOS.clavePend = function () { return 'pend.' + EVAL.ev.id; };
-TIEMPOS.reloj = function () { return TOP.leer(TIEMPOS.clave(), null); };
+/** Relojes en curso: [{ actividad_id, inicio, id? }]. Antes se guardaba uno solo (objeto). */
+TIEMPOS.relojes = function () {
+  var r = TOP.leer(TIEMPOS.clave(), null);
+  return !r ? [] : Array.isArray(r) ? r : [r];
+};
+TIEMPOS.guardarRelojes = function (l) { TOP.escribir(TIEMPOS.clave(), l.length ? l : null); };
 TIEMPOS.pendientes = function () { return TOP.leer(TIEMPOS.clavePend(), []); };
 
 TIEMPOS.pintar = function (cont) {
   clearInterval(TIEMPOS._t);
-  var ev = EVAL.ev, edita = TOP.puedeEditar(ev), r = TIEMPOS.reloj(), pend = TIEMPOS.pendientes();
+  var ev = EVAL.ev, edita = TOP.puedeEditar(ev), rs = TIEMPOS.relojes(), pend = TIEMPOS.pendientes();
+  var corriendo = rs.map(function (r) { return r.actividad_id; });
   var h = '';
-  if (r) {
-    var a = TOP.actividad(r.actividad_id), cl = TOP.CLASES[a.clase];
-    h += '<section class="panel entra top-reloj" style="--c:' + cl.c + '"><div class="top-reloj-cab"><span class="pill gris">' + DR.esc(cl.t) + '</span>' +
-      '<span>Inició ' + TOP.horaSeg(r.inicio) + '</span></div><h2>' + DR.esc(a.nombre) + '</h2>' +
-      '<div class="top-reloj-cifra" id="relojCifra">0:00</div>' +
-      '<div class="acciones"><button type="button" class="btn grande verde" id="btnTerminar">Terminar</button>' +
-      '<button type="button" class="btn sec" id="btnCancelarReloj">Descartar</button></div></section>';
+  if (rs.length) {
+    h += '<div class="top-relojes' + (rs.length > 1 ? ' varios' : '') + '">' + rs.map(function (r) {
+      var a = TOP.actividad(r.actividad_id), cl = TOP.CLASES[a.clase];
+      return '<section class="panel entra top-reloj" style="--c:' + cl.c + '"><div class="top-reloj-cab"><span class="pill gris">' + DR.esc(cl.t) + '</span>' +
+        '<span>Inició ' + TOP.horaSeg(r.inicio) + '</span></div><h2>' + DR.esc(a.nombre) + '</h2>' +
+        '<div class="top-reloj-cifra" data-cifra="' + DR.esc(r.inicio) + '">0:00</div>' +
+        '<div class="acciones"><button type="button" class="btn grande verde" data-terminar="' + DR.esc(r.inicio) + '">Terminar</button>' +
+        '<button type="button" class="btn sec" data-descartar="' + DR.esc(r.inicio) + '">Descartar</button></div></section>';
+    }).join('') + '</div>';
   }
   if (pend.length) {
     h += '<div class="aviso alerta entra" style="margin-bottom:14px"><b>' + pend.length + ' toma(s) sin subir</b> (sin señal). ' +
       '<button type="button" class="btn mini azul" id="btnReintentar">Reintentar ahora</button></div>';
   }
   if (edita) {
-    h += UI.panel(r ? 'Actividades' : 'Toca la actividad para iniciar', r ? 'Termina la actividad en curso para iniciar otra.' : 'Cada toma es independiente: inicio y fin con segundos.',
+    h += UI.panel(rs.length ? 'Iniciar otra etapa en paralelo' : 'Toca la actividad para iniciar',
+      rs.length ? 'Las etapas en curso siguen corriendo; termina cada una cuando acabe.' : 'Puedes medir varias etapas a la vez: cada una tiene su propio reloj, con segundos.',
       TOP.ORDEN_CLASES.map(function (c) {
         var acts = TOP.actividades.filter(function (a2) { return a2.clase === c; });
         // Cosecha (productiva) va sola y grande: es la toma más frecuente.
         return '<div class="top-clase-tit" style="--c:' + TOP.CLASES[c].c + '">' + DR.esc(TOP.CLASES[c].t) + '</div><div class="top-acts' + (c === 'productiva' ? ' grande' : '') + '">' +
           acts.map(function (a2) {
-            var n = EVAL.d.tiempos.filter(function (t) { return t.actividad_id === a2.id; }).length;
-            return '<button type="button" class="top-act" style="--c:' + TOP.CLASES[c].c + '" data-act="' + a2.id + '"' + (r ? ' disabled' : '') + '>' +
-              DR.esc(a2.nombre) + (n ? '<b>' + n + '</b>' : '') + '</button>';
+            var n = EVAL.d.tiempos.filter(function (t) { return t.actividad_id === a2.id; }).length, on = corriendo.indexOf(a2.id) > -1;
+            return '<button type="button" class="top-act' + (on ? ' en-curso' : '') + '" style="--c:' + TOP.CLASES[c].c + '" data-act="' + a2.id + '"' + (on ? ' disabled' : '') + '>' +
+              DR.esc(a2.nombre) + (on ? '<small>en curso</small>' : '') + (n ? '<b>' + n + '</b>' : '') + '</button>';
           }).join('') + '</div>';
       }).join('') + '<div class="acciones"><button type="button" class="btn sec chico" id="btnManual">' + DR.ICONOS.mas + 'Registrar a mano</button></div>');
   }
@@ -54,19 +64,22 @@ TIEMPOS.pintar = function (cont) {
   cont.innerHTML = h;
   DR.entrarPaneles('#' + cont.id);
 
-  if (r) {
-    var cifra = DR.$('#relojCifra'), ini = new Date(r.inicio).getTime();
-    var tic = function () { if (cifra) cifra.textContent = TOP.seg((Date.now() - ini) / 1000); };
+  if (rs.length) {
+    var tic = function () {
+      DR.$$('[data-cifra]', cont).forEach(function (el) { el.textContent = TOP.seg((Date.now() - new Date(el.getAttribute('data-cifra')).getTime()) / 1000); });
+    };
     tic();
     TIEMPOS._t = setInterval(tic, 1000);
-    DR.$('#btnTerminar').onclick = function () { TIEMPOS.terminar(this); };
-    DR.$('#btnCancelarReloj').onclick = function () {
-      if (!window.confirm('¿Descartar esta toma? No se guardará.')) return;
-      var rr = TIEMPOS.reloj();
-      TOP.escribir(TIEMPOS.clave(), null);
-      if (rr && rr.id) AT.rpc('rpc_top_borrar_tiempo', { p_id: rr.id }).then(EVAL.recargar).catch(function () { EVAL.recargar(); });
-      else TIEMPOS.pintar(cont);
-    };
+    DR.$$('[data-terminar]', cont).forEach(function (b) { b.onclick = function () { TIEMPOS.terminar(this.getAttribute('data-terminar'), this); }; });
+    DR.$$('[data-descartar]', cont).forEach(function (b) {
+      b.onclick = function () {
+        var ini = this.getAttribute('data-descartar'), l = TIEMPOS.relojes(), rr = l.filter(function (x) { return x.inicio === ini; })[0];
+        if (!rr || !window.confirm('¿Descartar la toma de «' + TOP.actividad(rr.actividad_id).nombre + '»? No se guardará.')) return;
+        TIEMPOS.guardarRelojes(l.filter(function (x) { return x.inicio !== ini; }));
+        if (rr.id) AT.rpc('rpc_top_borrar_tiempo', { p_id: rr.id }).then(EVAL.recargar).catch(function () { EVAL.recargar(); });
+        else TIEMPOS.pintar(cont);
+      };
+    });
   }
   DR.$$('[data-act]', cont).forEach(function (b) { b.onclick = function () { TIEMPOS.iniciar(Number(this.getAttribute('data-act'))); }; });
   DR.$$('[data-toma]', cont).forEach(function (b) {
@@ -76,30 +89,36 @@ TIEMPOS.pintar = function (cont) {
   if (DR.$('#btnReintentar')) DR.$('#btnReintentar').onclick = function () { TIEMPOS.subirPendientes(true); };
 };
 
-/** Inicia el reloj: primero en el celular (al instante) y luego crea la fila abierta en Supabase. */
+/** Inicia un reloj (sin detener los que ya corren): primero en el celular y luego crea la fila abierta en Supabase. */
 TIEMPOS.iniciar = function (actividadId) {
-  if (TIEMPOS.reloj()) { DR.toast('Termina primero la actividad en curso.', 'error'); return; }
+  var l = TIEMPOS.relojes();
+  if (l.some(function (x) { return x.actividad_id === actividadId; })) { DR.toast('Esa etapa ya está corriendo.', 'error'); return; }
   DR.desbloquearAudio();
   var r = { actividad_id: actividadId, inicio: new Date().toISOString() };
-  TOP.escribir(TIEMPOS.clave(), r);
+  // El inicio identifica cada reloj: dos toques en el mismo milisegundo se separan 1 ms.
+  while (l.some(function (x) { return x.inicio === r.inicio; })) r.inicio = new Date(new Date(r.inicio).getTime() + 1).toISOString();
+  l.push(r);
+  TIEMPOS.guardarRelojes(l);
   DR.vibrar(30); DR.sonar(true);
   TIEMPOS.pintar(DR.$('#seccion'));
   // Si se termina antes de que responda el servidor, terminar() espera este id para no duplicar la toma.
-  TIEMPOS._ini = { inicio: r.inicio, prom: AT.rpc('rpc_top_guardar_tiempo', { p: { evaluacion_id: EVAL.ev.id, actividad_id: actividadId, inicio: r.inicio } }).then(function (fila) {
-    var actual = TIEMPOS.reloj();
-    if (actual && actual.inicio === r.inicio) { actual.id = fila.id; TOP.escribir(TIEMPOS.clave(), actual); }
+  TIEMPOS._ini[r.inicio] = AT.rpc('rpc_top_guardar_tiempo', { p: { evaluacion_id: EVAL.ev.id, actividad_id: actividadId, inicio: r.inicio } }).then(function (fila) {
+    var actual = TIEMPOS.relojes();
+    actual.forEach(function (x) { if (x.inicio === r.inicio) x.id = fila.id; });
+    TIEMPOS.guardarRelojes(actual);
     return fila.id;
-  }).catch(function () { return null; /* sin señal: se guardará completa al terminar */ }) };
+  }).catch(function () { return null; /* sin señal: se guardará completa al terminar */ });
 };
 
-TIEMPOS.terminar = function (btn) {
-  var r = TIEMPOS.reloj();
+TIEMPOS.terminar = function (inicio, btn) {
+  var l = TIEMPOS.relojes(), r = l.filter(function (x) { return x.inicio === inicio; })[0];
   if (!r) return;
   var p = { id: r.id || null, evaluacion_id: EVAL.ev.id, actividad_id: r.actividad_id, inicio: r.inicio, fin: new Date().toISOString() };
-  TOP.escribir(TIEMPOS.clave(), null);
+  TIEMPOS.guardarRelojes(l.filter(function (x) { return x.inicio !== inicio; }));
   DR.vibrar([30, 40, 30]); DR.sonar(true);
   if (btn) btn.classList.add('cargando');
-  var idInicio = !p.id && TIEMPOS._ini && TIEMPOS._ini.inicio === r.inicio ? TIEMPOS._ini.prom : Promise.resolve(p.id);
+  var idInicio = !p.id && TIEMPOS._ini[r.inicio] ? TIEMPOS._ini[r.inicio] : Promise.resolve(p.id);
+  delete TIEMPOS._ini[r.inicio];
   idInicio.then(function (id) {
     p.id = id || null;
     return AT.rpc('rpc_top_guardar_tiempo', { p: p });

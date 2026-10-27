@@ -111,9 +111,48 @@ EVAL.abrir = function (id, cont) {
     if (location.hash !== '#evaluar/' + id) return;   // ya se fue a otra pantalla
     EVAL.ev = r[0].data;
     EVAL.d = { tiempos: r[1].data, cump: r[2].data, reba: r[3].data, ergo: r[4].data, enc: r[5].data };
+    var m = EVAL.reanudar();
     EVAL.pintarFicha(cont);
+    if (m && m.reba && EVAL.tab === 'reba') EVAL.reabrirReba(m.reba);
+    if (m && m.abierto && EVAL.tab === 'estandares') {
+      var it = DR.$('[data-item="' + m.abierto + '"]');
+      if (it) it.scrollIntoView({ block: 'center' });
+    }
     TIEMPOS.subirPendientes(false);
   });
+};
+
+/* ------------------------------------------------ volver de la cámara
+ * En celulares con poca memoria Android cierra Chrome mientras la cámara está abierta
+ * («Memoria insuficiente para completar la operación anterior») y la página se recarga.
+ * Antes de abrir la cámara se recuerda dónde estaba; al recargar se vuelve ahí. */
+EVAL.REANUDAR = 'top.reanudar';
+FOTOS.alAbrir = function () {
+  if (!EVAL.ev) return;
+  TOP.escribir(EVAL.REANUDAR, { hash: location.hash, tab: EVAL.tab, ronda: EST.ronda, abierto: EST.abierto,
+    reba: EVAL.tab === 'reba' && REBA.r ? (REBA.r.id || 'nuevo') : null, t: Date.now() });
+};
+// La foto llegó sin que se cerrara la página: la marca ya no hace falta.
+FOTOS.alVolver = function () { TOP.escribir(EVAL.REANUDAR, null); };
+/** Si hay una marca reciente para esta evaluación, deja la ficha como estaba (pestaña, ronda, ítem). */
+EVAL.reanudar = function () {
+  var m = TOP.leer(EVAL.REANUDAR, null);
+  if (!m) return null;
+  TOP.escribir(EVAL.REANUDAR, null);
+  if (m.hash !== location.hash || Date.now() - m.t > 15 * 60000 || EVAL.tab !== 'tiempos') return null;
+  EVAL.tab = m.tab || 'tiempos';
+  if (EVAL.tab === 'estandares') { EST.ronda = m.ronda || 1; EST._evRonda = EVAL.ev.id; EST.abierto = m.abierto; }
+  DR.toast('Volviste a donde estabas. Si la cámara cierra Integra, toma la foto con la cámara del celular y súbela con «Galería».', 'info');
+  return m;
+};
+EVAL.reabrirReba = function (cual) {
+  var s = DR.$('#seccion');
+  if (cual === 'nuevo') { REBA.abrir(TOP.leer('reba.' + EVAL.ev.id, null) || TOP.REBA_VACIO(), s); return; }
+  var r = EVAL.d.reba.filter(function (x) { return x.id === cual; })[0];
+  if (!r) return;
+  var copia = JSON.parse(JSON.stringify(r));
+  copia.fotos = (r.fotos || []).map(function (f) { return { ruta: f }; });
+  REBA.abrir(copia, s);
 };
 
 EVAL.recargar = function () {

@@ -603,6 +603,10 @@ tr.fila-cerca td{background:#23170E}
 .foto-quitar{position:absolute;top:3px;right:3px;width:26px;height:26px;border:0;border-radius:50%;background:rgba(10,8,6,.82);color:#fff;font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .foto-carga.chica{padding:8px 12px}
 .foto-carga.oculto{display:none}
+.foto-botones{display:flex;gap:8px;align-items:stretch}
+.foto-botones .foto-carga{flex:1;min-width:0}
+.foto-galeria-btn{display:flex;align-items:center;justify-content:center;padding:8px 14px;border:1.5px solid #5A4C40;border-radius:14px;background:#130F0C;color:var(--texto-2);font-size:13.5px;font-weight:500;cursor:pointer;text-transform:none;letter-spacing:normal}
+.foto-galeria-btn input{display:none}
 .foto-galeria,.foto-celda,.foto-grupo{display:flex;flex-wrap:wrap;gap:4px}
 .foto-celda img{width:46px;height:46px;border-radius:7px;object-fit:cover;background:#130F0C;border:1px solid var(--borde);cursor:zoom-in}
 .foto-grupo img{flex:1 1 44%;aspect-ratio:1;border-radius:14px;object-fit:cover;background:#130F0C;border:1px solid var(--borde);cursor:zoom-in}

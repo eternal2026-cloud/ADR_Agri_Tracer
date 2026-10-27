@@ -57,7 +57,9 @@ DR.vigilarVersion = function () {
     DR.firmaVersion().then(function (f) {
       if (!f || f === base) return;
       // El reloj vive en localStorage y sobrevive la recarga; solo se espera si hay una hoja abierta.
-      var ocupado = DR.$('#hoja') && !DR.$('#hoja').classList.contains('oculto');
+      // Tampoco al volver de la cámara: se perdería la foto recién tomada.
+      var marca = TOP.leer(EVAL.REANUDAR, null);
+      var ocupado = (DR.$('#hoja') && !DR.$('#hoja').classList.contains('oculto')) || (marca && Date.now() - marca.t < 5 * 60000);
       if (!ocupado) { location.reload(); return; }
       if (!pendiente) { pendiente = true; DR.toast('Hay una versión nueva de Integra: se actualizará en un momento.', 'info'); }
     }).catch(function () { /* sin señal: se reintenta */ });

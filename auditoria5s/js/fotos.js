@@ -14,13 +14,22 @@ FOTOS.campoHtml = function (id, titulo, detalle) {
     '<span class="foto-prev">' + FOTOS.ICONO + '</span><span class="foto-txt"><b>' + titulo + '</b><span>' + detalle + '</span></span></label>';
 };
 
-/** Campo de varias fotos (hasta max): galería con las elegidas + botón para agregar. */
+/** Campo de varias fotos (hasta max): galería con las elegidas + botón para agregar.
+    «Galería» (sin capture) sirve en celulares con poca memoria, donde Android cierra el
+    navegador mientras la cámara está abierta: se toma la foto aparte y se elige aquí. */
 FOTOS.campoMultiHtml = function (id, titulo, detalle, max) {
   return '<div class="foto-multi" id="' + id + 'Zona" data-max="' + (max || FOTOS.MAX) + '">' +
     '<div class="foto-lista" id="' + id + 'Lista"></div>' +
-    '<label class="foto-carga chica" id="' + id + 'Btn"><input type="file" accept="image/*" capture="environment" multiple id="' + id + '">' +
-    '<span class="foto-prev">' + FOTOS.ICONO + '</span><span class="foto-txt"><b>' + titulo + '</b><span>' + detalle + '</span></span></label></div>';
+    '<div class="foto-botones" id="' + id + 'Btn"><label class="foto-carga chica"><input type="file" accept="image/*" capture="environment" multiple id="' + id + '">' +
+    '<span class="foto-prev">' + FOTOS.ICONO + '</span><span class="foto-txt"><b>' + titulo + '</b><span>' + detalle + '</span></span></label>' +
+    '<label class="foto-galeria-btn"><input type="file" accept="image/*" multiple id="' + id + 'Gal">Galería</label></div></div>';
 };
+
+/** Gancho opcional: se llama justo antes de abrir la cámara o la galería (p. ej. para
+    recordar la pantalla por si Android cierra el navegador). */
+FOTOS.alAbrir = null;
+/** Gancho opcional: se llama cuando llega la foto elegida. */
+FOTOS.alVolver = null;
 
 /** Enlaza un campo multi-foto a una lista de estados [{blob|ruta, url}]; alCambiar() tras cada cambio. */
 FOTOS.enlazarLista = function (id, lista, max, alCambiar) {
@@ -50,7 +59,8 @@ FOTOS.enlazarLista = function (id, lista, max, alCambiar) {
     });
   };
 
-  inp.onchange = function () {
+  var elegir = function () {
+    if (FOTOS.alVolver) FOTOS.alVolver();
     var archivos = Array.prototype.slice.call(this.files || []).slice(0, Math.max(0, max - lista.length));
     this.value = '';
     if (!archivos.length) return;
@@ -67,6 +77,11 @@ FOTOS.enlazarLista = function (id, lista, max, alCambiar) {
       DR.toast(e.message, 'error');
     });
   };
+  [inp, DR.$('#' + id + 'Gal')].forEach(function (i) {
+    if (!i) return;
+    i.onchange = elegir;
+    i.onclick = function () { if (FOTOS.alAbrir) FOTOS.alAbrir(id); };
+  });
   pintar();
 };
 

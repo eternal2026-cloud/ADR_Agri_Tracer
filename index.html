@@ -101,7 +101,7 @@ var ICO = {
  * Portada por grupos, en el orden del organigrama de Ingeniería de Procesos:
  * Ingeniería · Campo, Ingeniería · Planta y Gestión de Procesos.
  * «Toma de tiempos campo» abre la sub-vista #campo con un acceso por cultivo:
- * Arándano (los tiempos de ciclo actuales) y Uva (en definición).
+ * Arándano (los tiempos de ciclo actuales) y Uva (tiempo de ciclo como la APK, campo/uva/).
  * Usuarios y configuración es un apartado propio, solo para administradores.
  * acceso: clave (o lista de claves) de AT.ACCESOS; la tarjeta solo aparece si el usuario tiene alguna asignada.
  * Fuera del horario del módulo (Config › Accesos, AT.horarioDe) el acceso se ve pero no abre.
@@ -112,13 +112,15 @@ var TODOS = ['admin', 'captura', 'visor'];
 var GRUPOS = [
   { id: 'campo', titulo: 'Ingeniería · Campo', sub: 'Tiempos en campo y estudio del personal TOP', modulos: [
     { href: '#campo', color: '#0097CE', nombre: 'Toma de tiempos campo', icono: ICO.cronometro,
-      sub: 'Arándano (tiempos de ciclo de cosecha) · Uva (en definición)', roles: TODOS, acceso: ['campo.arandano', 'campo.uva'] },
+      sub: 'Arándano (tiempos de ciclo de cosecha) · Uva (tiempo de ciclo, igual que la APK)', roles: TODOS, acceso: ['campo.arandano', 'campo.uva'] },
     { href: 'campo/estudio-top/', color: '#76B729', nombre: 'Estudio de cosechador TOP', icono: ICO.estrella,
       sub: 'Tiempos por actividad, estándares, REBA y ergonomía para actualizar el estándar de cosecha', roles: TODOS, acceso: 'campo.top' }
   ] },
   { id: 'planta', titulo: 'Ingeniería · Planta', sub: 'Operación en planta', modulos: [
     { href: 'reubicacion/', color: '#EF7C3B', nombre: 'Reubicación de personal', icono: ICO.personas,
-      sub: 'Escanear fotocheck, buscar personal y actualizar la lista', roles: TODOS, acceso: 'planta.reubicacion' }
+      sub: 'Escanear fotocheck, buscar personal y actualizar la lista', roles: TODOS, acceso: 'planta.reubicacion' },
+    { href: 'planta/uva-recepcion/', color: '#7A3E8E', nombre: 'Recepción Uva', icono: ICO.cronometro,
+      sub: 'Continúa por la placa el ciclo de campo de hoy: llegada, recepción, descarga y abastecimiento a líneas', roles: TODOS, acceso: 'planta.uva' }
   ] },
   { id: 'gestion', titulo: 'Gestión de Procesos', sub: '5S, mantenimiento y cliente interno', modulos: [
     { href: 'auditoria5s/', color: '#D9622B', nombre: 'Auditoría 5S', icono: ICO.auditoria,
@@ -141,8 +143,8 @@ var CAMPO = [
       { href: 'ciclos/#captura', t: 'Captura de tiempos', clase: 'verde', roles: ['admin', 'captura'], acceso: 'campo.arandano.captura' },
       { href: 'ciclos/#resumen', t: 'Resumen de tiempos', clase: 'azul', roles: TODOS, acceso: 'campo.arandano.resumen' }
     ] },
-  { id: 'uva', nombre: 'Uva', color: '#7A3E8E', sub: 'Toma de tiempos para uva: en definición.',
-    accesos: [{ href: 'campo/uva/', t: 'Ver avance', clase: 'sec', roles: TODOS, acceso: 'campo.uva' }] }
+  { id: 'uva', nombre: 'Uva', color: '#7A3E8E', sub: 'Tiempo de ciclo por pallet (8 etapas, igual que la APK). Funciona sin señal y se suma con la APK.',
+    accesos: [{ href: 'campo/uva/', t: 'Tiempo de ciclo Uva', clase: 'verde', roles: TODOS, acceso: 'campo.uva' }] }
 ];
 
 function mostrarErrorLogin(msg) { var el = DR.$('#loginError'); el.textContent = msg; el.classList.remove('oculto'); }

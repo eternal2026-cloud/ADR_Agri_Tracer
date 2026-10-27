@@ -77,14 +77,16 @@ AT.ACCESOS = [
       { id: 'campo.arandano.captura', t: 'Captura de tiempos', registra: true },
       { id: 'campo.arandano.resumen', t: 'Resumen de tiempos' }] },
     { id: 'campo.uva', t: 'Toma de tiempos · Uva', horario: ['06:00', '18:00'], funciones: [
-      { id: 'campo.uva', t: 'Uva (en definición)' }] },
+      { id: 'campo.uva.registrar', t: 'Tiempo de ciclo Uva (como la APK)', registra: true }] },
     { id: 'campo.top', t: 'Estudio de cosechador TOP', funciones: [
       { id: 'campo.top.evaluar', t: 'Evaluar (tiempos, estándares, REBA)', registra: true },
       { id: 'campo.top.resumen', t: 'Resumen e informe' },
       { id: 'campo.top.propuesta', t: 'Propuesta de estándar' }] }] },
   { id: 'planta', t: 'Ingeniería · Planta', modulos: [
     { id: 'planta.reubicacion', t: 'Reubicación de personal', sinHorario: true, funciones: [
-      { id: 'planta.reubicacion', t: 'Reubicación de personal' }] }] },
+      { id: 'planta.reubicacion', t: 'Reubicación de personal' }] },
+    { id: 'planta.uva', t: 'Recepción Uva (tiempo de ciclo en planta)', horario: ['06:00', '23:00'], funciones: [
+      { id: 'planta.uva.recepcion', t: 'Llegada, recepción, descarga y abastecimiento', registra: true }] }] },
   { id: 'gestion', t: 'Gestión de Procesos', modulos: [
     { id: 'gestion.5s', t: 'Auditoría 5S', funciones: [
       { id: 'gestion.5s.auditar', t: 'Auditar', registra: true },

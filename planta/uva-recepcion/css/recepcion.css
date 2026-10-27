@@ -1,0 +1,35 @@
+/* Recepción Uva (planta): tarjetas por placa, 5 marcas y tramos. Usa los colores de estilos.css. */
+#contenido{padding-bottom:calc(var(--seguro-inf) + 40px)}
+.pl-buscar{display:grid;grid-template-columns:1fr auto;gap:8px;margin:14px 0 10px}
+.pl-buscar input{text-transform:uppercase;font-size:18px;letter-spacing:.06em}
+.pl-nuevo{width:100%;margin-bottom:6px}
+.pl-titulo{margin:22px 2px 8px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--texto-3);font-weight:600}
+.pl-tarjeta{display:block;background:var(--panel);border:1px solid var(--borde);border-radius:var(--radio);padding:14px 14px 12px;margin-bottom:10px;color:inherit;text-decoration:none}
+.pl-tarjeta .btn{margin-top:10px;width:100%}
+.pl-tarjeta-cab{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.pl-placa{font-size:22px;letter-spacing:.08em;font-weight:700;font-variant-numeric:tabular-nums}
+.pl-placa.grande{font-size:30px}
+.pl-dato{margin-top:6px;font-size:15px;color:var(--texto)}
+.pl-sub{margin-top:4px;font-size:13px;color:var(--texto-3)}
+.pl-prog{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:10px}
+.pl-prog i{display:block;height:6px;border-radius:3px;background:var(--panel-2);border:1px solid var(--borde)}
+.pl-marcas{display:flex;flex-direction:column;gap:10px}
+.pl-marca{border:1px solid var(--borde);border-left:4px solid var(--borde);border-radius:12px;padding:10px 12px;background:var(--panel-2)}
+.pl-marca.hecha{border-left-color:var(--c)}
+.pl-marca.actual{border-color:var(--c);box-shadow:0 0 0 2px color-mix(in srgb,var(--c) 30%,transparent)}
+.pl-marca-cab{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px}
+.pl-marca-cab small{display:block;color:var(--texto-3);font-size:12.5px;margin-top:2px}
+.pl-n{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:13px;background:var(--c);color:#fff}
+.pl-hora{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.pl-marca-btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.pl-marca-btns .btn{flex:1 1 auto}
+.pl-tramos div,.pl-campo div{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--borde);font-size:14.5px}
+.pl-tramos div:last-child,.pl-campo div:last-child{border-bottom:0}
+.pl-tramos .total{font-weight:700;color:var(--dr-verde)}
+.pl-campo span{flex:1}
+.pl-campo b{font-weight:500;font-variant-numeric:tabular-nums}
+.pl-campo em{font-style:normal;min-width:76px;text-align:right;color:var(--texto-2)}
+.chk{display:flex;align-items:center;gap:10px;margin:12px 0;text-transform:none;letter-spacing:0;font-size:14.5px;color:var(--texto-2)}
+.chk input{width:22px;height:22px;flex:0 0 auto}
+#hojaTarjeta h3{margin-bottom:8px}
+#hojaTarjeta .campo{margin-bottom:12px}

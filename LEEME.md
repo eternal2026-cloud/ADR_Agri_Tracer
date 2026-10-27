@@ -8,7 +8,7 @@ respaldado por **Supabase** (Postgres + Auth + Edge Functions + Vault + pg_cron)
 ## Estado actual
 
 - **Proyecto Supabase** `agritracer-don-ricardo` (ref `ptsvriudoilsyofgccsb`) con
-  migraciones `supabase/migrations/0001..0051` aplicadas (0012: Auditoría 5S,
+  migraciones `supabase/migrations/0001..0053` aplicadas (0012: Auditoría 5S,
   0013: Auditoría 5S por cultivo, 0014: observaciones 5S por área,
   0015: Revisión del plan de mantenimiento, 0016: Satisfacción del cliente
   interno y cultivo en los tiempos de ciclo, 0017: acceso por correo —retirado
@@ -17,7 +17,7 @@ respaldado por **Supabase** (Postgres + Auth + Edge Functions + Vault + pg_cron)
   0020-0023: áreas propias de Cliente interno, 0024: accesos por usuario,
   0025: cada usuario ve sus encuestas —reemplazada por 0026—, 0026: Cliente interno
   por área evaluada, cultivo «-» en 5S, hasta 6 fotos y Excel de avance;
-  0046: Estudio de cosechador TOP; 0047: cosechadores por Excel, material y lotes en cosecha; 0048: encuesta de factores de rendimiento y borrado de evaluaciones; 0049: horario de acceso por módulo; 0050: el horario se define en Config › Accesos; 0051: Estudio TOP, checklist ergonómico solo con los problemas detectados; 0052: Estudio TOP, jornada fija, etapas secuenciales con tiempo muerto, etapas nuevas con sustento y rondas).
+  0046: Estudio de cosechador TOP; 0047: cosechadores por Excel, material y lotes en cosecha; 0048: encuesta de factores de rendimiento y borrado de evaluaciones; 0049: horario de acceso por módulo; 0050: el horario se define en Config › Accesos; 0051: Estudio TOP, checklist ergonómico solo con los problemas detectados; 0052: Estudio TOP, jornada fija, etapas secuenciales con tiempo muerto, etapas nuevas con sustento y rondas; 0053: Tiempo de ciclo Uva unificado APK + Integra + Planta).
 - **Edge Functions desplegadas** (código en `supabase/functions/`):
   - `admin-usuarios` — crear usuarios, restablecer contraseñas, cambiar rol, desactivar.
   - `sync-sheets` — espejo de auditoría hacia Google Sheets.
@@ -221,6 +221,34 @@ Protecciones en la base de datos (migración 0011):
   (306 ciclos corregidos el 23/10, respaldo en `ciclos_lote_respaldo_0045`) y un trigger lo
   normaliza al guardar. Google Sheets se reescribe completo en cada sync, así que `Ciclos_BD`
   quedó corregido hacia el pasado tras el sync forzado.
+
+## Tiempo de ciclo Uva unificado (APK + Integra + Planta, migración 0053)
+
+- **Una sola base** `uva_ciclos` (un registro por pallet, ID del celular): `UV-EQ-…` viene de la APK
+  Android (`Tiempo_Ciclo_Uva`), `UV-IN-…` de Integra (`campo/uva/`, iPhone y web) y `UV-PL-…` se inicia
+  en planta (`planta/uva-recepcion/`). Upsert por ID: nunca se duplica ni choca.
+- **Las dos apps siguen válidas**: la APK sigue guardando en su Google Sheet y su dashboard igual. Su
+  Apps Script (`Code.gs`) además reenvía el mismo paquete a `rpc_uva_desde_apk` (token de Vault
+  `uva_apk_token`; el admin lo ve en `campo/uva/` › Config). Si Integra no responde queda en la hoja
+  «Integra pendientes» y se reintenta cada 5 min; la APK no se entera. Menú: Configurar Integra…,
+  Enviar todo a Integra.
+- **Dueño de cada dato**: la parte de campo solo la escribe su origen (una subida tardía de la APK no
+  borra lo de planta); la parte de planta solo Planta. Borrar en campo un ciclo ya continuado en planta
+  no lo borra.
+- **`campo/uva/`** es la APK portada tal cual (mismo `datos.js`, `registrar.js`, metas y cálculos);
+  cambian `integra.js` (en lugar de `sheets.js`: `rpc_uva_guardar_campo` con el mismo paquete),
+  `permisos.js` (catálogo de `uva_catalogo` + `parametros.UVA_CONFIG` vía `rpc_uva_config`) y el
+  arranque (sesión de Integra; sin señal entra con el último perfil guardado). Service worker propio
+  (`campo/uva/sw.js`) para abrir sin señal.
+- **Planta** (`planta/uva-recepcion/`, acceso `planta.uva`): busca por placa los ciclos de campo **del
+  mismo día** con placa y los **continúa** (`rpc_uva_planta_iniciar`), o inicia uno nuevo. 5 marcas
+  en secuencia: llegada del camión → recepción → inicio descarga → fin descarga → inicio
+  abastecimiento; planta, línea, causa y comentario por marca. Cola sin señal en `localStorage`.
+- **Ámbito**: `Campo` (no continuado), `Ciclo completo` (continuado en planta), `Planta` (iniciado en planta).
+- **Sheets** (`sync-sheets` v13): `UVA_Registros` (mismas columnas y orden que `Registros` de la APK +
+  columnas de planta) y `UVA_Etapas` (8 etapas + 5 de planta, N° 9–13). Solo van los de Integra y los de
+  la APK continuados en planta (mismo ID). En el dashboard de la APK, si existe una pestaña
+  `UVA_Registros` (IMPORTRANGE) `datosDashboard` la suma y, si un ID está en ambas, vale la de Integra.
 
 ## Estudio de cosechador TOP (módulo `campo/estudio-top/`, migración 0046)
 

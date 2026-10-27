@@ -4,7 +4,7 @@
  * Configuración → Google Sheets (JWT de su sesión). Sobrescribe solo sus
  * pestañas: Ciclos_BD, Resumen_Semanal, Personal_Reubicacion,
  * Auditoria_Escaneos, 5S_BD, 5S_Observaciones, 5S_Resumen, PM_Revisiones,
- * PM_Hallazgos, PM_Resultados, SCI_BD, SCI_Resultados y Sync_Info;
+ * PM_Hallazgos, PM_Resultados, SCI_BD, SCI_Resultados, UVA_Registros, UVA_Etapas y Sync_Info;
  * cualquier otra pestaña de la hoja se respeta.
  * La clave de la cuenta de servicio vive en Vault, nunca en el código.
  * ==========================================================================*/
@@ -119,7 +119,8 @@ async function gapi(token: string, saEmail: string, metodo: string, ruta: string
 }
 
 /** formulas: la pestaña se escribe con USER_ENTERED (miniaturas =IMAGE); altoFila y anchos en píxeles. */
-type Pestana = { titulo: string; valores: unknown[][]; formulas?: boolean; altoFila?: number; anchos?: [number, number][]; duraciones?: number[] };
+/** formatos: [columna, tipo de Sheets (DATE, TIME, DATE_TIME), patrón] para números de fecha/hora (UVA_*). */
+type Pestana = { titulo: string; valores: unknown[][]; formulas?: boolean; altoFila?: number; anchos?: [number, number][]; duraciones?: number[]; formatos?: [number, string, string][] };
 
 async function escribirHoja(token: string, saEmail: string, id: string, pestanas: Pestana[]): Promise<string> {
   const meta = await gapi(token, saEmail, 'GET', `${id}?fields=properties.title,sheets.properties(sheetId,title,gridProperties(rowCount,columnCount))`);
@@ -166,6 +167,15 @@ async function escribirHoja(token: string, saEmail: string, id: string, pestanas
         repeatCell: {
           range: { sheetId: pr.sheetId, startRowIndex: 1, startColumnIndex: col, endColumnIndex: col + 1 },
           cell: { userEnteredFormat: { numberFormat: { type: 'TIME', pattern: '[m]:ss' } } },
+          fields: 'userEnteredFormat.numberFormat',
+        },
+      });
+    }
+    for (const [col, tipo, patron] of p.formatos || []) {
+      requests.push({
+        repeatCell: {
+          range: { sheetId: pr.sheetId, startRowIndex: 1, startColumnIndex: col, endColumnIndex: col + 1 },
+          cell: { userEnteredFormat: { numberFormat: { type: tipo, pattern: patron } } },
           fields: 'userEnteredFormat.numberFormat',
         },
       });
@@ -456,6 +466,136 @@ function pestanasSCI(d: SCIDatos | null): Pestana[] {
   ];
 }
 
+/* ------------------------------------------------------------ Tiempo de ciclo Uva (APK + Integra + Planta)
+ * Misma estructura que la hoja «Registros» / «Etapas» del Apps Script de la APK (Code.gs: BASE + BD + EXTRA,
+ * mismas columnas y orden) + columnas de planta al final. Solo van los registros de Integra (campo y planta)
+ * y los de la APK que Planta continuó (ámbito «Ciclo completo», mismo ID): los demás de la APK ya están en su
+ * hoja. En el dashboard: Registros de la APK + UVA_Registros; si un ID está en ambas, vale el de UVA_Registros.
+ * Fechas y horas van como números de fecha de Sheets (hora de Lima), igual que las escribe el Apps Script. */
+type UvaDatos = { filas: Fila[]; traslados: Fila[] };
+
+async function leerUva(sb: SupabaseClient, parametros: Record<string, string>): Promise<UvaDatos> {
+  const todas = await leerTodo(sb, 'uva_ciclos', [['fecha', true], ['creado_en', true]]);
+  const filas = todas.filter((f) => !f.eliminado && (f.origen !== 'apk' || f.vinculado));
+  let traslados: Fila[] = [];
+  try { traslados = JSON.parse(parametros.UVA_CONFIG || '{}').traslados || []; } catch (_) { /* sin estándares */ }
+  return { filas, traslados };
+}
+
+/** ISO → número de fecha de Sheets en hora de Lima (UTC−5, sin horario de verano). */
+const serialFH = (v: unknown) => {
+  if (v === null || v === undefined || v === '') return '';
+  const t = Date.parse(String(v));
+  return isNaN(t) ? '' : (t - 5 * 3600e3) / 864e5 + 25569;
+};
+const serialF = (v: unknown) => {
+  const m = String(v || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) / 864e5 + 25569 : '';
+};
+const vNum = (v: unknown) => (v === null || v === undefined || v === '' || isNaN(Number(v))) ? (v ?? '') : Number(v);
+const MU = (v: unknown) => String(v ?? '').replace(/\s+/g, ' ').trim().toUpperCase();
+
+/** Estándar más específico (fundo > planta > zona), igual que estandarDe_ de Code.gs. */
+function estandarUva(lista: Fila[], zona: string, fundo: string, planta: string): number | null {
+  let mejor: number | null = null, n = -1;
+  for (const t of lista) {
+    const z = MU(t.zona), f = MU(t.fundo), p = MU(t.planta);
+    if ((z && z !== zona) || (f && f !== fundo) || (p && p !== planta) || !(Number(t.min) > 0)) continue;
+    const k = (f ? 4 : 0) + (p ? 2 : 0) + (z ? 1 : 0);
+    if (k > n) { n = k; mejor = Number(t.min); }
+  }
+  return mejor;
+}
+
+const UVA_BASE = ['ID', 'Registrado por', 'Equipo'];
+const UVA_BD = ['SEMANA', 'FECHA', 'CAMPAÑA', 'ZONA', 'FUNDO', 'LOTE', 'SUBLOTE', 'PASADA', 'COLOR', 'VARIEDAD', 'GRUPO',
+  'INICIO COSECHA', 'FIN COSECHA', 'T. Cosecha', 'T. espera traslado de jaba', 'INICIO TRASLADO DE JABA', 'FIN TRASLADO DE JABA', 'T. traslado jaba a pallet',
+  'INICIO ARMADO PALLET', 'FIN ARMADO PALLET', 'N° JABAS', 'T. armado pallet', 'T. espera lecturado', 'INICIO LECTURADO', 'FIN LECTURADO', 'T. Lecturado',
+  'T. espera enzunchado', 'INICIO ENZUNCHADO', 'FIN ENZUNCHADO', 'T. enzunchado', 'N° de zunchos', 'T. espera portabin', 'INICIO PORTABIN', 'FIN PORTABIN', 'T. portabin',
+  'T. espera carga', 'Placa de camión', 'INICIO CARGA', 'FIN CARGA', 'T. carga', 'N° pallet totales', 'N° de pallet cargados', 'T. espera traslado',
+  'T. CONFORMACIÓN DE CARGA', 'INICIO TRASLADO', 'FIN TRASLADO', 'T. traslado', 'PLANTA'];
+const UVA_EXTRA = ['T. CICLO TOTAL', 'Meta ciclo (min)', 'En meta', 'Atípico', 'Min. esperas', 'Etapa más lenta', 'Mayor espera antes de', 'Pallet',
+  'Observación', 'Creado', 'Modificado', 'Recibido', 'Estado', 'Etapa actual', 'Situación', 'Desde',
+  'Ámbito', 'Permisos (perfil · versión)', 'Trazabilidad permisos', 'Estándar traslado (min)', 'Traslado sobre estándar'];
+const UVA_PLANTA = ['Origen', 'HORA LLEGADA CAMIÓN', 'HORA RECEPCIÓN', 'T. espera recepción', 'INICIO DESCARGA', 'T. espera descarga',
+  'FIN DESCARGA', 'T. descarga', 'INICIO ABASTECIMIENTO', 'T. espera abastecimiento', 'LÍNEA ABASTECIMIENTO', 'PLANTA RECEPCIÓN',
+  'T. EN PLANTA', 'T. fin carga → llegada planta', 'T. CICLO COMPLETO', 'Registrado en planta por', 'Observación planta', 'Causas planta'];
+const UVA_ETAPAS = ['Semana', 'Fecha', 'Zona', 'Fundo', 'Lote', 'Variedad', 'Grupo', 'Planta', 'Estado', 'N°', 'Etapa', 'Inicio', 'Fin',
+  'Minutos', 'Espera previa (min)', 'Meta (min)', 'En meta', 'Causa de demora', 'Comentario', 'Hora editada', 'Recibido'];
+/** Marcas de planta como «etapas» 9…13 de la hoja Etapas: [nombre, desde, hasta, tramo, clave de detalle]. */
+const UVA_ETAPAS_PLANTA: [string, string, string, string, string][] = [
+  ['Llegada del camión a planta', 'fin_carga', 'hora_llegada', 't_llegada_desde_carga', 'lleg'],
+  ['Espera de recepción', 'hora_llegada', 'hora_recepcion', 't_espera_recepcion', 'rec'],
+  ['Espera de descarga', 'hora_recepcion', 'ini_descarga', 't_espera_descarga', 'idesc'],
+  ['Descarga', 'ini_descarga', 'fin_descarga', 't_descarga', 'fdesc'],
+  ['Espera de abastecimiento a línea', 'fin_descarga', 'ini_abastecimiento', 't_espera_abastecimiento', 'abast'],
+];
+
+function pestanasUva(d: UvaDatos | null): Pestana[] {
+  if (!d) return [];
+  const cabReg = [...UVA_BASE, ...UVA_BD, ...UVA_EXTRA, ...UVA_PLANTA];
+  const cabEta = [...UVA_BASE, ...UVA_ETAPAS];
+  const regs: unknown[][] = [cabReg];
+  const etas: unknown[][] = [cabEta];
+  const origenTxt = (o: string) => o === 'apk' ? 'APK' : o === 'integra' ? 'Integra' : 'Planta';
+  const H = serialFH;
+  for (const f of d.filas) {
+    const r: Fila = f.registro || {};
+    const et: Fila[] = Array.isArray(f.etapas) ? [...f.etapas].sort((a, b) => Number(a.n) - Number(b.n)) : [];
+    const E = (i: number): Fila => et.find((x) => Number(x.n) === i + 1) || {};
+    const zona = MU(f.zona || r.zona), fundo = MU(f.fundo || r.fundo), planta = MU(f.planta || r.planta || f.planta_destino);
+    const esPlanta = f.origen === 'planta';
+    const base = [f.id, esPlanta ? (f.planta_usuario || f.registrador || '') : (f.registrador || ''), esPlanta ? 'INTEGRA-PLANTA' : (f.dispositivo || '')];
+    const bd = [vNum(f.semana ?? r.semana), serialF(f.fecha || r.fecha), r.campana || f.campana || '', zona, fundo, r.lote || f.lote || '', r.sublote || '',
+      vNum(r.pasada), r.color || '', r.variedad || f.variedad || '', r.grupo || f.grupo || '',
+      H(E(0).inicio), H(E(0).fin), vNum(E(0).minutos), vNum(E(1).espera), H(E(1).inicio), H(E(1).fin), vNum(E(1).minutos),
+      H(E(2).inicio), H(E(2).fin), vNum(r.jabas), vNum(E(2).minutos), vNum(E(3).espera), H(E(3).inicio), H(E(3).fin), vNum(E(3).minutos),
+      vNum(E(4).espera), H(E(4).inicio), H(E(4).fin), vNum(E(4).minutos), vNum(r.zunchos), vNum(E(5).espera), H(E(5).inicio), H(E(5).fin), vNum(E(5).minutos),
+      vNum(E(6).espera), f.placa || r.placa || '', H(E(6).inicio), H(E(6).fin), vNum(E(6).minutos), vNum(r.palletsTot), vNum(r.palletsCarg), vNum(E(7).espera),
+      vNum(r.minConformacion), H(E(7).inicio), H(E(7).fin), vNum(E(7).minutos), planta];
+    const std = esPlanta ? null : estandarUva(d.traslados, zona, fundo, planta);
+    const tTra = E(7).minutos;
+    const traza = f.origen === 'integra' ? 'INTEGRA' : esPlanta ? '' :
+      !r.permisosVersion ? 'SIN PERMISOS' : (r.permisosHash !== r.permisosFirma ? 'EDITADO EN EL EQUIPO' : 'OK');
+    const extra = [vNum(r.minTotal), vNum(r.metaTotal), r.enMeta || '', r.atipico || '', vNum(r.minEsperas), r.lenta || '', r.mayorEspera || '', r.pallet || f.pallet || '',
+      r.observacion || '', H(r.creado || f.planta_inicio), H(r.modificado || f.planta_actualizado), H(f.campo_recibido || f.planta_actualizado),
+      esPlanta ? (f.estado || 'En proceso') : (r.estado || 'Cerrado'), r.etapaActual || '', r.situacion || '', H(r.desde),
+      f.ambito, f.origen === 'integra' ? 'Integra' : (r.permisosVersion ? (r.permisosPerfil || 'Sin nombre') + ' · v' + r.permisosVersion : ''), traza,
+      std ?? '', std && tTra !== '' && tTra !== null && tTra !== undefined ? (Number(tTra) > std ? 'Sí' : 'No') : ''];
+    const det: Fila = f.planta_detalle || {};
+    const causas = UVA_ETAPAS_PLANTA.map(([n, , , , k]) => det[k] && (det[k].causa || det[k].com) ? n + ': ' + [det[k].causa, det[k].com].filter(Boolean).join(' - ') : '')
+      .filter(Boolean).join(' | ');
+    const pl = [origenTxt(f.origen), H(f.hora_llegada), H(f.hora_recepcion), vNum(f.t_espera_recepcion), H(f.ini_descarga), vNum(f.t_espera_descarga),
+      H(f.fin_descarga), vNum(f.t_descarga), H(f.ini_abastecimiento), vNum(f.t_espera_abastecimiento), f.linea || '', MU(f.planta_destino),
+      vNum(f.t_en_planta), vNum(f.t_llegada_desde_carga), vNum(f.t_ciclo_completo), f.planta_usuario || '', f.planta_obs || '', causas];
+    regs.push([...base, ...bd, ...extra, ...pl]);
+
+    const comun = (n: unknown, etapa: string) => [...base, vNum(f.semana ?? r.semana), serialF(f.fecha || r.fecha), zona, fundo, r.lote || f.lote || '',
+      r.variedad || f.variedad || '', r.grupo || f.grupo || '', planta, esPlanta ? (f.estado || '') : (r.estado || 'Cerrado'), n, etapa];
+    for (const x of et) {
+      etas.push([...comun(vNum(x.n), x.etapa || ''), H(x.inicio), H(x.fin), vNum(x.minutos), vNum(x.espera), vNum(x.meta), x.enMeta || '',
+        x.causa || '', x.comentario || '', x.editado || '', H(f.campo_recibido)]);
+    }
+    if (f.vinculado || esPlanta) {
+      UVA_ETAPAS_PLANTA.forEach(([nombre, desde, hasta, tramo, k], i) => {
+        const dk: Fila = det[k] || {};
+        etas.push([...comun(9 + i, nombre), H(f[desde]), H(f[hasta]), vNum(f[tramo]), '', '', '',
+          dk.causa || '', dk.com || '', dk.editado ? 'Sí' : '', H(f.planta_actualizado)]);
+      });
+    }
+  }
+  const fmt = (cab: string[]): [number, string, string][] => cab.map((c, i): [number, string, string] | null => {
+    if (c === 'FECHA' || c === 'Fecha') return [i, 'DATE', 'dd/mm/yyyy'];
+    if (/^(INICIO|FIN|HORA) /.test(c) || c === 'Inicio' || c === 'Fin') return [i, 'TIME', 'hh:mm:ss'];
+    if (['Creado', 'Modificado', 'Recibido', 'Desde'].includes(c)) return [i, 'DATE_TIME', 'dd/mm/yyyy hh:mm:ss'];
+    return null;
+  }).filter((x): x is [number, string, string] => !!x);
+  return [
+    { titulo: 'UVA_Registros', valores: regs, formatos: fmt(cabReg) },
+    { titulo: 'UVA_Etapas', valores: etas, formatos: fmt(cabEta) },
+  ];
+}
+
 /* ------------------------------------------------------------ handler */
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
@@ -532,6 +672,10 @@ Deno.serve(async (req) => {
     let sci: SCIDatos | null = null;
     let sciError = '';
     try { sci = await leerSCI(sb); } catch (e) { sciError = (e as Error).message || String(e); }
+    // Tiempo de ciclo Uva (APK + Integra + Planta): mismo aislamiento.
+    let uva: UvaDatos | null = null;
+    let uvaError = '';
+    try { uva = await leerUva(sb, parametros); } catch (e) { uvaError = (e as Error).message || String(e); }
 
     const colsCiclos: Col[] = [
       TX('fecha', 'Fecha'), NU('semana', 'Semana', 0), TX('codigo', 'Código'), TX('fundo', 'Fundo'), TX('lote', 'Lote'),
@@ -580,6 +724,7 @@ Deno.serve(async (req) => {
       ...pestanasS5(s5),
       ...pestanasMP(mp),
       ...pestanasSCI(sci),
+      ...pestanasUva(uva),
       { titulo: 'Sync_Info', valores: [
         ['Dato', 'Valor'],
         ['Última sincronización (hora Lima)', fechaHora(ahora)],
@@ -596,6 +741,9 @@ Deno.serve(async (req) => {
         ['Cliente interno · encuestas', sci ? sci.resultados.length : ''],
         ['Cliente interno · filas BD', sci ? sci.bd.length : ''],
         ['Cliente interno · estado', estadoSCI],
+        ['Uva · registros (Integra + Planta + APK continuados)', uva ? uva.filas.length : ''],
+        ['Uva · estado', uva ? 'OK' : 'No sincronizada: ' + uvaError],
+        ['Uva · ámbito', 'UVA_Registros: Campo (no continuado), Ciclo completo (campo continuado en planta, mismo ID que la APK) o Planta (iniciado en planta). Minutos con decimales, como la hoja de la APK.'],
         ['Tiempos', 'Las columnas (min:seg) son duraciones de Sheets: se ven como minutos:segundos y suman/promedian como números. Para pasarlas a minutos con decimales, multiplica por 1440.'],
         ['Nota', 'Estas pestañas se sobrescriben en cada sincronización. Crea tus gráficos o tablas dinámicas en otras pestañas. Las miniaturas de 5S_Observaciones y PM_Hallazgos se renuevan en cada sincronización.'],
       ] },
@@ -609,10 +757,11 @@ Deno.serve(async (req) => {
       s5_bd: s5 ? s5.bd.length : 0, s5_observaciones: s5 ? s5.obs.length : 0,
       mp_revisiones: mp ? mp.revs.length : 0, mp_hallazgos: mp ? mp.hallazgos.length : 0,
       sci_encuestas: sci ? sci.resultados.length : 0, sci_bd: sci ? sci.bd.length : 0,
+      uva: uva ? uva.filas.length : 0,
     };
     await fijarParametro(sb, 'ULTIMA_SYNC_SHEETS', ahora);
     const parciales = [s5 ? '' : `Auditoría 5S: ${s5Error}`, mp ? '' : `Plan de mantenimiento: ${mpError}`,
-      sci ? '' : `Cliente interno: ${sciError}`].filter(Boolean);
+      sci ? '' : `Cliente interno: ${sciError}`, uva ? '' : `Uva: ${uvaError}`].filter(Boolean);
     await fijarParametro(sb, 'ULTIMO_ERROR_SYNC_SHEETS', parciales.length ? `${fechaHora(ahora)} · ${parciales.join(' · ')}` : '');
     await sb.from('bitacora').insert({ usuario_id: usuarioId, modulo: 'SHEETS', accion: 'Sincronización OK', detalle: `${origen} · ${JSON.stringify(filas)}` });
     return responder({ ok: true, hoja: tituloHoja, filas, origen, s5: estadoS5, mp: estadoMP, sci: estadoSCI, duracion_ms: Date.now() - inicio });

@@ -137,6 +137,7 @@ CONFIG.tabUsuarios = function (c) {
       (u.activo && u.debe_cambiar_password ? ' <span class="pill gris">Aún no crea su contraseña</span>' : '') +
       (u.id === yo ? ' <span class="pill gris">Tú</span>' : '') +
       (u.rol === 'admin' ? '' : ' <span class="pill ' + (u.accesos ? 'azul' : 'gris') + '">' + DR.esc(CONFIG.textoAccesos(u.accesos)) + '</span>') +
+      (u.rol === 'admin' || !CONFIG.textoHorariosUsuario(u.accesos) ? '' : ' <span class="pill naranja">' + DR.esc(CONFIG.textoHorariosUsuario(u.accesos)) + '</span>') +
       (u.rol === 'admin' ? '' : ' <span class="pill ' + ((u.fundos || []).length ? 'azul' : 'gris') + '">' + DR.esc(CONFIG.textoFundos(u.fundos)) + '</span>') +
       (u.rol === 'admin' ? '' : ' <span class="pill ' + (u.ciclos_solo_propios ? 'azul' : 'gris') + '">' + CONFIG.textoVerCiclos(u.ciclos_solo_propios) + '</span>');
     var selector = '<select data-rol-de="' + u.id + '"' + (u.id === yo ? ' disabled' : '') + ' aria-label="Rol de ' + DR.esc(u.nombre) + '">' +
@@ -367,6 +368,17 @@ CONFIG.funcionesPorDefecto = function (k, lista) {
   return r;
 };
 CONFIG.valorAccesos = function (estado) { return estado.completo ? null : estado.lista.slice(); };
+/** «⏰ Arándano 07:00–18:00 · …» con los horarios (Config › Accesos) de los módulos que ve; '' si ninguno. */
+CONFIG.textoHorariosUsuario = function (accesos) {
+  var hs = CONFIG.horariosGuardados(), p = { rol: 'captura', accesos: accesos }, r = [];
+  AT.ACCESOS.forEach(function (g) {
+    g.modulos.forEach(function (m) {
+      var h = hs[m.id];
+      if (h && h.desde && h.hasta && AT.tieneAcceso(m.id, p)) r.push(m.t.replace(/^.*· /, '') + ' ' + h.desde + '–' + h.hasta);
+    });
+  });
+  return r.length ? '⏰ ' + r.join(' · ') : '';
+};
 CONFIG.textoAccesos = function (accesos) {
   if (!accesos) return 'Acceso completo';
   var p = { rol: 'captura', accesos: accesos };
@@ -375,6 +387,7 @@ CONFIG.textoAccesos = function (accesos) {
   return grupos.join(' · ') + ' (' + accesos.length + ' función' + (accesos.length === 1 ? '' : 'es') + ')';
 };
 CONFIG.selectorAccesos = function (id) {
+  var horarios = CONFIG.horariosGuardados();
   var chip = function (f, t) {
     return '<button type="button" class="opcion" data-acceso="' + f.id + '">' + DR.esc(t) + (f.registra ? ' ✎' : '') + '</button>';
   };
@@ -387,7 +400,8 @@ CONFIG.selectorAccesos = function (id) {
         g.modulos.map(function (m) {
           var solo = m.funciones.length === 1;
           return '<div class="acc-mod">' + (solo ? '' : '<span>' + DR.esc(m.t) + '</span>') +
-            '<div class="opciones">' + m.funciones.map(function (f) { return chip(f, solo ? m.t : f.t); }).join('') + '</div></div>';
+            '<div class="opciones">' + m.funciones.map(function (f) { return chip(f, solo ? m.t : f.t); }).join('') + '</div>' +
+            (horarios[m.id] ? '<div class="horario-linea">⏰ Horario: ' + DR.esc(AT.textoHorario(horarios[m.id])) + ' (se cambia en Config › Accesos)</div>' : '') + '</div>';
         }).join('') + '</div>';
     }).join('') +
     '<div class="ayuda-campo">✎ = registra datos: solo lo usa quien tiene el rol <b>Captura en campo</b>. Sin ✎ = consulta.</div></div>';

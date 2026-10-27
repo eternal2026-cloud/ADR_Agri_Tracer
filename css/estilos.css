@@ -819,6 +819,7 @@ td.mp-sangria{padding-left:26px}
 .modulo-card span.fuera-horario,.horario-linea{font-size:12.5px;color:var(--dr-naranja);font-weight:500;margin-top:6px}
 .horario-linea{color:var(--texto-3)}
 .horario-linea.cerrado{color:var(--dr-naranja)}
+.acc-mod .horario-linea{color:var(--dr-naranja)}
 .cultivo-tarjeta{background:linear-gradient(160deg,var(--panel),var(--panel-2));border:1px solid var(--borde);border-left:4px solid var(--c);border-radius:18px;padding:16px;box-shadow:var(--sombra)}
 .cultivo-tarjeta-cab{display:flex;align-items:center;gap:14px}
 .cultivo-tarjeta-cab b{display:block;font-size:18px;font-weight:500}

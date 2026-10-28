@@ -146,7 +146,10 @@ REG.enlazarTarjetas = function (raiz, repintar) {
       if (!REG.listo(r) && !(sig.e.id === 'cos' && REG.datosOrigen(r))) { DR.toast('Completa fundo, lote y código de pallet en la etapa Cosecha.', 'info'); REG.abrir(r.id); return; }
       var falta = sig.campo === 'fin' && REG.faltaParaFin(r, sig.e);
       if (falta) { DR.toast('Antes de terminar ' + sig.e.nombre.toLowerCase() + ' indica: ' + falta[1] + '.', 'info'); REG.abrir(r.id, sig.e.i); return; }
+      var antes = r.etapas[sig.e.id][sig.campo];
       r.etapas[sig.e.id][sig.campo] = new Date().toISOString();
+      var imposible = TC.horaImposible(r);
+      if (imposible) { r.etapas[sig.e.id][sig.campo] = antes; DR.toast(imposible + ' Corrige primero esa hora.', 'error'); REG.abrir(r.id); return; }
       DR.vibrar(25); REG.guardar(r); ALERTAS.sync(r);
       DR.toast(REG.rotHora(sig.e, sig.campo) + ' · ' + DR.hhmm(r.etapas[sig.e.id][sig.campo]) + ' guardado.', 'ok');
       if (DR.anima) anime({ targets: b, scale: [0.94, 1], duration: 380, easing: 'easeOutBack' });
@@ -397,7 +400,10 @@ REG.marcar = function (r, e, campo) {
       return;
     }
   }
+  var antes = r.etapas[e.id][campo];
   r.etapas[e.id][campo] = new Date().toISOString();
+  var imposible = TC.horaImposible(r);
+  if (imposible) { r.etapas[e.id][campo] = antes; DR.toast(imposible + ' Corrige primero esa hora.', 'error'); return; }
   r.etapas[e.id].editado = false;
   if (campo === 'fin') delete r.etapas[e.id].porPlanta;
   DR.vibrar(25);
@@ -441,7 +447,18 @@ REG.enlazarWiz = function (cont, r, e) {
       REG.leerExtras(r);
       var falta = f === 'fin' && inp.value && REG.faltaParaFin(r, TC.E[id]);
       if (falta) { DR.toast('Antes de terminar ' + TC.E[id].nombre.toLowerCase() + ' indica: ' + falta[1] + '.', 'error'); inp.value = DR.hhmm(r.etapas[id].fin); return; }
+      var previo = { ini: r.etapas[id].ini, fin: r.etapas[id].fin };
       r.etapas[id][f] = REG.horaAISO(r, id, f, inp.value);
+      if (f === 'ini' && !inp.value) r.etapas[id].fin = '';
+      // Horas imposibles: no se guardan (vuelve la hora anterior), como el orden de horas de Arándano.
+      var imposible = TC.horaImposible(r);
+      if (imposible) {
+        r.etapas[id].ini = previo.ini; r.etapas[id].fin = previo.fin;
+        inp.value = DR.hhmm(previo[f]);
+        DR.toast(imposible, 'error'); DR.vibrar(60);
+        var av = DR.$('#avisosEtapa'); if (av) av.innerHTML = '<div class="aviso alerta">' + DR.esc(imposible) + ' No se guardó.</div>';
+        return;
+      }
       r.etapas[id].editado = true;
       if (f === 'fin' || !inp.value) delete r.etapas[id].porPlanta;
       if (f === 'ini' && !inp.value) r.etapas[id].fin = '';

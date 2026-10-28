@@ -149,8 +149,37 @@ TC.calcular = function (r) {
   return res;
 };
 
+/**
+ * Horas imposibles (se bloquean al escribirlas o marcarlas, como el orden de horas de Arándano):
+ *   · el fin de una etapa antes de su inicio;
+ *   · cualquier hora antes del inicio de la cosecha (nada ocurre antes de cosechar: las etapas
+ *     en paralelo pueden empezar antes de que TERMINE la cosecha, nunca antes de que empiece);
+ *   · cualquier hora después de la llegada a planta (fin del traslado).
+ * Caso real: cosecha corregida a mano a 21:05 con la llegada a las 21:03 → ciclo de −2 min.
+ * Devuelve el texto del problema o ''.
+ */
+TC.horaImposible = function (r) {
+  var E = r.etapas, t = function (v) { return v ? new Date(v).getTime() : null; };
+  var rot = function (e, k) { return (k === 'ini' ? 'el inicio' : 'el fin') + ' de ' + e.nombre.toLowerCase() + ' (' + DR.hhmm(E[e.id][k]) + ')'; };
+  var iniCos = t(E.cos.ini), llegada = t(E.tra.fin);
+  for (var i = 0; i < TC.ETAPAS.length; i++) {
+    var e = TC.ETAPAS[i], x = E[e.id];
+    if (x.ini && x.fin && t(x.fin) < t(x.ini)) return 'En ' + e.nombre + ' el fin (' + DR.hhmm(x.fin) + ') es anterior al inicio (' + DR.hhmm(x.ini) + ').';
+    var ks = ['ini', 'fin'];
+    for (var j = 0; j < 2; j++) {
+      var k = ks[j], v = t(x[k]);
+      if (v === null) continue;
+      if (iniCos !== null && v < iniCos) return 'No puede ser: ' + rot(e, k) + ' es anterior al inicio de la cosecha (' + DR.hhmm(E.cos.ini) + ').';
+      if (llegada !== null && v > llegada && !(e.id === 'tra' && k === 'fin')) return 'No puede ser: ' + rot(e, k) + ' es posterior a la llegada a planta (' + DR.hhmm(E.tra.fin) + ').';
+    }
+  }
+  return '';
+};
+
 /** Valida datos y orden de horas. Devuelve el texto del problema o ''. */
 TC.validar = function (r, paraCerrar) {
+  var imposible = TC.horaImposible(r);
+  if (imposible) return imposible;
   if (paraCerrar) {
     if (!r.fundo) return 'Elige el fundo.';
     if (!r.lote) return 'Escribe o elige el lote.';

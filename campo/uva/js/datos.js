@@ -3,7 +3,9 @@
  * Misma lógica que el tiempo de ciclo de arándano de Integra Operaciones
  * (SITIO_AGRITRACER · ciclos, trigger 0002_ciclos_cosecha.sql):
  *   · tiempo de etapa = fin − inicio (min)
- *   · espera = inicio de la etapa − fin de la etapa de la que depende (min)
+ *   · espera = inicio de la etapa − fin de la etapa de la que depende (min); en las etapas en
+ *     paralelo (traslado de jaba ↔ cosecha) 0 si se cruzan y, si no, la distancia absoluta
+ *   · ciclo total = llegada a planta − el inicio más temprano de las etapas
  *   · el ciclo total solo se llena cuando todas las etapas están completas
  *   · semana = WEEKNUM(fecha) de Excel (semana que empieza en domingo)
  *   · ciclos atípicos (> 480 min) no entran en los promedios
@@ -126,7 +128,8 @@ TC.calcular = function (r) {
   var res = { etapas: {}, esperas: 0, suma: 0, total: null, conformacion: null, completas: 0, lenta: null, mayorEspera: null, meta: m.total };
   TC.ETAPAS.forEach(function (e) {
     var x = r.etapas[e.id] || {}, min = DR.minutos(x.ini, x.fin), pf = TC.finPrevio(r, e);
-    var espera = !e.sinEspera && pf && x.ini ? DR.minutos(pf, x.ini) : null;
+    // En secuencia: inicio − fin de la previa. En paralelo (libre): 0 si se cruzan; si no, distancia absoluta.
+    var espera = e.sinEspera ? null : e.libre && e.dep ? TC.esperaParalela(r.etapas[e.dep], x) : (pf && x.ini ? DR.minutos(pf, x.ini) : null);
     res.etapas[e.id] = { min: min, espera: espera, meta: TC.metaEtapa(r, e) };
     if (min !== null) { res.suma += min; res.completas++; if (!res.lenta || min > res.etapas[res.lenta].min) res.lenta = e.id; }
     if (espera !== null) {
@@ -141,7 +144,7 @@ TC.calcular = function (r) {
     if (k.min === null || k.espera === null) ok = false; else conf += k.min + k.espera;
   });
   if (ok && res.etapas.tra.espera !== null) res.conformacion = red(conf + res.etapas.tra.espera);
-  if (res.completas === TC.ETAPAS.length) res.total = DR.minutos(r.etapas.cos.ini, r.etapas.tra.fin);
+  if (res.completas === TC.ETAPAS.length) res.total = DR.minutos(TC.inicioCiclo(r), r.etapas.tra.fin);
   res.esperas = red(res.esperas);
   res.suma = red(res.suma);
   res.enMeta = res.total !== null && m.total > 0 ? res.total <= m.total : null;
@@ -150,30 +153,38 @@ TC.calcular = function (r) {
 };
 
 /**
- * Horas imposibles (se bloquean al escribirlas o marcarlas, como el orden de horas de Arándano):
- *   · el fin de una etapa antes de su inicio;
- *   · cualquier hora antes del inicio de la cosecha (nada ocurre antes de cosechar: las etapas
- *     en paralelo pueden empezar antes de que TERMINE la cosecha, nunca antes de que empiece);
- *   · cualquier hora después de la llegada a planta (fin del traslado).
- * Caso real: cosecha corregida a mano a 21:05 con la llegada a las 21:03 → ciclo de −2 min.
- * Devuelve el texto del problema o ''.
+ * Hora imposible (se bloquea al escribirla o marcarla): el fin de una etapa antes de su inicio.
+ * El orden ENTRE etapas no se bloquea: cosecha, traslado de jaba y armado corren en paralelo
+ * (la cosecha no tiene que ser la primera); en las etapas en secuencia (desde el lecturado) una
+ * espera negativa se pide explicar en el comentario (TC.validar). Devuelve el texto o ''.
  */
 TC.horaImposible = function (r) {
-  var E = r.etapas, t = function (v) { return v ? new Date(v).getTime() : null; };
-  var rot = function (e, k) { return (k === 'ini' ? 'el inicio' : 'el fin') + ' de ' + e.nombre.toLowerCase() + ' (' + DR.hhmm(E[e.id][k]) + ')'; };
-  var iniCos = t(E.cos.ini), llegada = t(E.tra.fin);
   for (var i = 0; i < TC.ETAPAS.length; i++) {
-    var e = TC.ETAPAS[i], x = E[e.id];
-    if (x.ini && x.fin && t(x.fin) < t(x.ini)) return 'En ' + e.nombre + ' el fin (' + DR.hhmm(x.fin) + ') es anterior al inicio (' + DR.hhmm(x.ini) + ').';
-    var ks = ['ini', 'fin'];
-    for (var j = 0; j < 2; j++) {
-      var k = ks[j], v = t(x[k]);
-      if (v === null) continue;
-      if (iniCos !== null && v < iniCos) return 'No puede ser: ' + rot(e, k) + ' es anterior al inicio de la cosecha (' + DR.hhmm(E.cos.ini) + ').';
-      if (llegada !== null && v > llegada && !(e.id === 'tra' && k === 'fin')) return 'No puede ser: ' + rot(e, k) + ' es posterior a la llegada a planta (' + DR.hhmm(E.tra.fin) + ').';
-    }
+    var e = TC.ETAPAS[i], x = r.etapas[e.id];
+    if (x.ini && x.fin && new Date(x.fin) < new Date(x.ini)) return 'En ' + e.nombre + ' el fin (' + DR.hhmm(x.fin) + ') es anterior al inicio (' + DR.hhmm(x.ini) + ').';
   }
   return '';
+};
+
+/**
+ * Espera de una etapa en paralelo respecto a su etapa previa (ej. traslado de jaba ↔ cosecha):
+ * si los dos tramos se cruzan no hay espera (0); si no, la distancia absoluta entre ellos
+ * (antes o después). null si aún no se puede saber.
+ */
+TC.esperaParalela = function (d, x) {
+  if (!d.ini || !x.ini) return null;
+  var dI = new Date(d.ini).getTime(), dF = d.fin ? new Date(d.fin).getTime() : null;
+  var xI = new Date(x.ini).getTime(), xF = x.fin ? new Date(x.fin).getTime() : null, ms;
+  if (xI >= dI) ms = dF === null || xI <= dF ? 0 : xI - dF;   // empezó durante la previa (cruce) o después de que terminó
+  else ms = xF === null || xF >= dI ? 0 : dI - xF;              // empezó antes: cruce, o terminó antes de que empiece la previa
+  return Math.round(ms / 6000) / 10;
+};
+
+/** Inicio del ciclo: la hora de inicio más temprana de las 8 etapas (la cosecha no siempre es la primera). */
+TC.inicioCiclo = function (r) {
+  var min = '';
+  TC.ETAPAS.forEach(function (e) { var v = r.etapas[e.id].ini; if (v && (!min || new Date(v) < new Date(min))) min = v; });
+  return min;
 };
 
 /** Valida datos y orden de horas. Devuelve el texto del problema o ''. */

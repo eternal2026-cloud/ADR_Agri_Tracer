@@ -10,6 +10,8 @@ var APP = {};
 APP.NAV = [['resumen', 'Resumen'], ['registrar', 'Registrar'], ['registros', 'Registros'], ['ayuda', 'Ayuda'], ['config', 'Config']];
 
 APP.ir = function (vista, sinAnimar) {
+  // Sin señal el Resumen no se muestra (necesita los datos de Integra): solo se registra.
+  if (vista === 'resumen' && !SHEETS.hayRed()) vista = 'registrar';
   clearInterval(DR._tick);
   if (vista !== 'registrar' && window.REG) REG.quitarBarra();
   DR.vista = vista;
@@ -40,8 +42,13 @@ APP.iniciarApp = function () {
   }).join('');
   DR.$$('#navInf button').forEach(function (b) { b.onclick = function () { DR.vibrar(6); APP.ir(b.getAttribute('data-v')); }; });
   DR.$('#chipDatos').onclick = function () { APP.ir('registros'); };
-  window.addEventListener('online', function () { APP.estado(); DR.toast('Volvió la señal.', 'info'); SHEETS.auto(); });
-  window.addEventListener('offline', APP.estado);
+  window.addEventListener('online', function () {
+    APP.red(); APP.estado(); DR.toast('Volvió la señal: el Resumen está otra vez disponible.', 'info'); SHEETS.auto(); NUBE.cargar(true);
+  });
+  window.addEventListener('offline', function () {
+    APP.red(); APP.estado();
+    if (DR.vista === 'resumen') { DR.toast('Sin señal: el Resumen vuelve cuando haya conexión. Puedes seguir registrando.', 'info'); APP.ir('registrar'); }
+  });
   // Al volver a la app (desde otra app o al encender la pantalla) se sube lo pendiente.
   document.addEventListener('visibilitychange', function () { if (!document.hidden) { APP.estado(); SHEETS.auto(); } });
   // Sincroniza cada 30 s (sube lo pendiente y trae lo de los demás equipos).
@@ -51,8 +58,16 @@ APP.iniciarApp = function () {
   ALERTAS.iniciar();
 
   DR.$('#app').style.opacity = 1;
-  APP.ir('resumen');
+  APP.red();
+  APP.ir(SHEETS.hayRed() ? 'resumen' : 'registrar');
   SHEETS.auto();
+};
+
+/** Sin señal se oculta la pestaña Resumen (y la barra se reparte entre las demás); con señal vuelve. */
+APP.red = function () {
+  var hay = SHEETS.hayRed(), b = DR.$('#navInf [data-v="resumen"]');
+  if (b) b.classList.toggle('oculto', !hay);
+  DR.$('#navInf').style.gridTemplateColumns = 'repeat(' + (hay ? APP.NAV.length : APP.NAV.length - 1) + ',1fr)';
 };
 
 /** Botón «atrás» de Android: cierra la hoja; fuera de Resumen vuelve a Resumen; en Resumen minimiza. */
@@ -62,7 +77,8 @@ APP.enlazarAtras = function () {
   App.addListener('backButton', function () {
     if (DR.$('#splash').style.display !== 'none') { App.exitApp(); return; }
     if (!DR.$('#hoja').classList.contains('oculto')) { DR.cerrarHoja(); return; }
-    if (DR.vista !== 'resumen') { APP.ir('resumen'); return; }
+    var casa = SHEETS.hayRed() ? 'resumen' : 'registrar';
+    if (DR.vista !== casa) { APP.ir(casa); return; }
     App.minimizeApp().catch(function () { App.exitApp(); });
   });
   App.addListener('resume', function () { APP.estado(); SHEETS.auto(); });

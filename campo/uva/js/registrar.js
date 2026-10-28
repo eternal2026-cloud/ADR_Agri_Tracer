@@ -288,7 +288,7 @@ REG.pintarWiz = function (cont, r, direccion) {
   var prox = REG.proxima(r), bloq = TC.bloqueada(r, e) || (!REG.listo(r) && REG.idx > 0);
   var pct = prox < 0 ? 100 : Math.round(TC.ETAPAS.filter(function (y) { return r.etapas[y.id].fin; }).length / (TC.ETAPAS.length) * 100);
   var vivo = x.ini && !x.fin;
-  var espera = k.espera !== null && e.libre && k.espera < 0 ? '<span class="pill">En paralelo con ' + DR.esc(TC.E[e.dep].nombre) + '</span>'
+  var espera = k.espera === 0 && e.libre ? '<span class="pill">En paralelo con ' + DR.esc(TC.E[e.dep].nombre) + ' (sin espera)</span>'
     : k.espera !== null ? '<span class="pill' + (k.espera < 0 ? ' rojo' : (k.espera > (TC.cfg.metas.espera || 1e9) ? ' naranja' : '')) + '">Espera desde ' + DR.esc(TC.E[e.dep].corto) + ': ' + DR.dur(k.espera) + '</span>' : '';
   var estado = x.fin ? '<span class="pill verde">Completada · ' + DR.dur(k.min) + (k.meta ? (k.min <= k.meta ? ' · en meta' : ' · sobre meta ' + k.meta + ' min') : '') + '</span>'
     : vivo ? '<span class="pill azul">En curso · <b class="vivo" data-ini="' + x.ini + '">' + DR.crono(x.ini) + '</b>' + (k.meta ? ' · meta ' + k.meta + ' min' : '') + '</span>'

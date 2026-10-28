@@ -102,7 +102,7 @@ RSU.barrasTramos = function (o) {
       '<div class="bt-nombre">' + DR.esc(t.t) + '</div>' +
       '<div class="bt-pista"><div class="bt-valor' + (neg ? ' neg' : '') + '" style="width:' + ancho + '%' + (!t.espera && t.color && !neg ? ';background:' + t.color : '') + '"></div></div>' +
       '<div class="bt-cifra">' + RSU.mmss(v) + '</div></div>';
-  }).join('') + '<div class="ayuda-campo">min:seg promedio por pallet. Fila punteada = espera entre etapas (pallet detenido); en rojo, una etapa que empezó antes de que terminara la anterior (en paralelo).' +
+  }).join('') + '<div class="ayuda-campo">min:seg promedio por pallet. Fila punteada = espera entre etapas (pallet detenido). Traslado de jaba corre en paralelo a la cosecha: si se cruzan, su espera es 0. En rojo, una etapa en secuencia que empezó antes de que terminara la anterior.' +
     (mayorEsp && o.tramos[mayorEsp.id].prom > 0 ? ' Mayor espera: <b>' + DR.esc(mayorEsp.t.replace('Espera antes de ', 'antes de ')) + '</b>.' : '') + '</div>';
 };
 
@@ -150,7 +150,7 @@ RSU.pintar = function (cont, quieto) {
     '<div class="tarjeta' + (quieto ? '' : ' entra') + '"><h2>Minutos por tramo · ' + DR.esc(ambito) + '</h2>' +
       '<p class="ayuda-campo" style="margin:0 0 10px">Promedio de cada etapa y, entre una etapa y la siguiente, la espera del pallet detenido. Incluye los tramos ya completados de los pallets en curso' +
       (o.atipicos ? ' · ' + o.atipicos + ' ciclo(s) atípico(s) (> ' + TC.ATIPICO + ' min) fuera' : '') +
-      (o.errores ? ' · <b style="color:var(--alerta)">' + o.errores + ' pallet(s) con horas cruzadas (ciclo negativo) fuera: revísalos en Registros</b>' : '') + '.</p>' + RSU.barrasTramos(o) + '</div>' +
+      (o.errores ? ' · <b style="color:var(--alerta)">' + o.errores + ' pallet(s) con ciclo negativo fuera: revísalos en Registros</b>' : '') + '.</p>' + RSU.barrasTramos(o) + '</div>' +
     '<div class="tarjeta' + (quieto ? '' : ' entra') + '"><h2>Tiempo promedio por ' + DR.esc(RSU.nombreDim(RSU.dim).toLowerCase()) + '</h2>' +
       '<div class="acc-dim">' + RSU.DIMS.map(function (d) { return '<button type="button" data-dim="' + d[0] + '" class="' + (d[0] === RSU.dim ? 'activa' : '') + '">' + d[1] + '</button>'; }).join('') +
       '<button type="button" id="rVerTabla" class="' + (RSU.verTabla ? 'activa' : '') + '">Ver tabla</button></div>' +

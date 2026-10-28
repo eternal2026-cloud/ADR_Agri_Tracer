@@ -200,7 +200,7 @@ REG.pasosHtml = function (r) {
 REG.horaHtml = function (r, e, campo, deshab) {
   var x = r.etapas[e.id], v = x[campo];
   return '<div class="hora' + (v ? ' llena' : '') + '" data-hora="' + e.id + '|' + campo + '">' +
-    '<div class="hora-info"><label>' + DR.ICO.check + '<span>' + REG.rotHora(e, campo) + (v && x.editado ? ' · editado' : '') + '</span></label>' +
+    '<div class="hora-info"><label>' + DR.ICO.check + '<span>' + REG.rotHora(e, campo) + (v && x.editado ? ' · editado' : '') + (v && campo === 'fin' && x.porPlanta ? ' · marcada en planta' : '') + '</span></label>' +
       '<input type="time" data-e="' + e.id + '" data-f="' + campo + '" value="' + DR.hhmm(v) + '"' + (deshab ? ' disabled' : '') + '></div>' +
     '<button type="button" class="hora-ahora" data-ahora="' + e.id + '|' + campo + '"' + (deshab ? ' disabled' : '') + '>' + DR.ICO.reloj + '<span>Ahora</span></button>' +
     '<div class="hora-aviso" data-aviso="' + e.id + '|' + campo + '"></div></div>';
@@ -374,6 +374,7 @@ REG.marcar = function (r, e, campo) {
   }
   r.etapas[e.id][campo] = new Date().toISOString();
   r.etapas[e.id].editado = false;
+  if (campo === 'fin') delete r.etapas[e.id].porPlanta;
   DR.vibrar(25);
   REG.guardar(r); ALERTAS.sync(r);
   DR.toast(REG.rotHora(e, campo) + ' · ' + DR.hhmm(r.etapas[e.id][campo]) + ' guardado.', 'ok');
@@ -417,6 +418,7 @@ REG.enlazarWiz = function (cont, r, e) {
       if (falta) { DR.toast('Antes de terminar ' + TC.E[id].nombre.toLowerCase() + ' indica: ' + falta[1] + '.', 'error'); inp.value = DR.hhmm(r.etapas[id].fin); return; }
       r.etapas[id][f] = REG.horaAISO(r, id, f, inp.value);
       r.etapas[id].editado = true;
+      if (f === 'fin' || !inp.value) delete r.etapas[id].porPlanta;
       if (f === 'ini' && !inp.value) r.etapas[id].fin = '';
       guardar(); ALERTAS.sync(r);
       REG.pintarWiz(cont, r, 0);

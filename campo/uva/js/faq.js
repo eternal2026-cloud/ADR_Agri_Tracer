@@ -51,6 +51,8 @@ FAQ.LISTA = [
   /* ---------- Integra y la APK ---------- */
   { c: 'sheets', p: '¿En qué se diferencia de la APK?',
     r: '<p>Es la <b>misma toma de tiempos</b> (8 etapas, mismas metas y cálculos), pensada para los <b>iPhone</b> y la web. Se entra con tu usuario de Integra, no hay que vincular nada.</p><p>Las dos son válidas y siguen funcionando: la APK sigue subiendo a su Google Sheet y además Integra recibe sus registros.</p>' },
+  { c: 'sheets', p: '¿Quién marca la llegada del camión: campo o planta?',
+    r: '<p><b>Cualquiera de los dos.</b> El fin de la etapa 8 (Traslado a planta) es la llegada del camión y vale la <b>primera</b> marca. Si la marcó planta, aquí se completa sola (dice «marcada en planta») apenas haya señal.</p><p>Si alguno la corrige a mano, vale la corrección.</p>' },
   { c: 'sheets', p: '¿Se duplican o chocan los datos con la APK?',
     r: '<p>No. Cada pallet tiene un <b>ID único</b>: <b>UV-IN-…</b> los de Integra y <b>UV-EQ-…</b> los de la APK. Si se reenvía, se reemplaza el mismo registro, nunca se duplica.</p>' },
   { c: 'sheets', p: '¿Qué pasa con la placa del camión?',

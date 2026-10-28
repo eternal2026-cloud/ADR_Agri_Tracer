@@ -89,9 +89,9 @@ SHEETS.subirPendientes = function (aviso) {
     if (i >= pend.length) return Promise.resolve({ total: pend.length, hechos: hechos, errores: errores });
     var r = pend[i], modEnviado = r.actualizado;
     aviso({ total: pend.length, hechos: hechos });
-    return SHEETS.llamar(SHEETS.paquete(r)).then(function () {
+    return SHEETS.llamar(SHEETS.paquete(r)).then(function (res) {
       var act = TC.obtener(r.id);
-      if (act) { act.subidoMod = modEnviado; act.subido = new Date().toISOString(); act.error = ''; TC.guardarRegistro(act, true); }
+      if (act) { act.subidoMod = modEnviado; act.subido = new Date().toISOString(); act.error = ''; TC.guardarRegistro(act, true); SHEETS.ponerLlegada(act, res); }
       hechos++;
       return siguiente(i + 1);
     }, function (e) {
@@ -127,9 +127,41 @@ SHEETS.subir = function (silencioso) {
   });
 };
 
+/* ------------------------------ llegada del camión (compartida con Planta) ------------------------------
+ * El fin de la etapa 8 (Traslado a planta) es la llegada del camión: la marca campo o planta, la que
+ * llegue primero. Si la marcó planta, aquí se completa la etapa 8 (y se vuelve a subir igual). */
+SHEETS.ponerLlegada = function (r, d) {
+  if (!r || !d || !d.llegada || r.estado === 'cerrado') return;
+  var x = r.etapas.tra;
+  if (x.fin) return;
+  if (!x.ini) x.ini = r.etapas.car.fin || '';
+  x.fin = new Date(d.llegada).toISOString();
+  x.porPlanta = true; x.editado = false;
+  if (!r.planta && d.planta) r.planta = d.planta;
+  TC.guardarRegistro(r); ALERTAS.sync(r);
+  DR.toast('Planta marcó la llegada del camión' + (r.placa ? ' ' + r.placa : '') + ' · ' + DR.hhmm(x.fin) + '.', 'info');
+  if (DR.vista === 'registrar' && window.REG && REG.id === r.id && REG.vista === 'wiz') REG.pintarWiz(DR.$('#contenido'), r, 0);
+  SHEETS.pronto();
+};
+
+/** Consulta las llegadas que marcó planta para los pallets en curso ya subidos (con placa). */
+SHEETS.llegadas = function () {
+  var ids = TC.registros().filter(function (r) {
+    return r.estado !== 'cerrado' && r.subidoMod && r.placa && !r.etapas.tra.fin;
+  }).map(function (r) { return r.id; });
+  if (!ids.length || SHEETS._consultando) return;
+  SHEETS._consultando = true;
+  sb.rpc('rpc_uva_campo_llegadas', { p_ids: ids }).then(function (res) {
+    SHEETS._consultando = false;
+    (res.data || []).forEach(function (d) { SHEETS.ponerLlegada(TC.obtener(d.id), d); });
+    APP.estado();
+  }, function () { SHEETS._consultando = false; });
+};
+
 /** Automática: al cerrar un registro, al volver la señal y cada 2 minutos. */
 SHEETS.auto = function () {
   if (!SHEETS.configurado() || !SHEETS.hayRed()) return;
+  SHEETS.llegadas();
   if (SHEETS.subiendo) { SHEETS._otraVez = true; return; }
   if (!TC.registros().some(TC.pendiente) && !TC.cfg.bajas.length) return;
   SHEETS.subir(true).then(function () {

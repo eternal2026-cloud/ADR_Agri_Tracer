@@ -79,7 +79,7 @@ PL.ponerFila = function (f) {
   var local = PL.regs[f.id];
   // Lo que aún está en la cola manda sobre lo que vino del servidor.
   var pend = PL.cola().filter(function (o) { return o.p.id === f.id && o.op === 'guardar'; });
-  pend.forEach(function (o) { Object.keys(o.p).forEach(function (k) { if (k !== 'id' && k !== 'detalle') f[k] = o.p[k] === '' ? null : o.p[k]; }); });
+  pend.forEach(function (o) { Object.keys(o.p).forEach(function (k) { if (k !== 'id' && k !== 'detalle' && k !== 'llegada_nueva') f[k] = o.p[k] === '' ? null : o.p[k]; }); });
   if (local && local.planta_detalle && pend.length) f.planta_detalle = local.planta_detalle;
   f._visto = new Date().toISOString();
   PL.regs[f.id] = f;

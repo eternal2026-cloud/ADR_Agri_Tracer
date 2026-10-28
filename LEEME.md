@@ -235,6 +235,11 @@ Protecciones en la base de datos (migración 0011):
 - **Dueño de cada dato**: la parte de campo solo la escribe su origen (una subida tardía de la APK no
   borra lo de planta); la parte de planta solo Planta. Borrar en campo un ciclo ya continuado en planta
   no lo borra.
+- **Llegada del camión compartida** (migración 0054): fin de la etapa 8 de campo = «Llegada del camión»
+  de planta, una sola hora en `hora_llegada`. Vale la primera marca (un «Ahora» del otro lado no la
+  pisa, `llegada_nueva`); una corrección a mano de cualquiera la reemplaza. `llegada_campo` = lo último
+  que mandó campo, `llegada_por` = quién puso la vigente. Integra campo recibe la de planta
+  (`rpc_uva_campo_llegadas`, cada 2 min) y completa su etapa 8; la APK solo envía (no la recibe).
 - **`campo/uva/`** es la APK portada tal cual (mismo `datos.js`, `registrar.js`, metas y cálculos);
   cambian `integra.js` (en lugar de `sheets.js`: `rpc_uva_guardar_campo` con el mismo paquete),
   `permisos.js` (catálogo de `uva_catalogo` + `parametros.UVA_CONFIG` vía `rpc_uva_config`) y el

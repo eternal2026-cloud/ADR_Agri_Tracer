@@ -26,7 +26,7 @@ VIS.hoy = function (c) {
       return '<article class="pl-tarjeta entra"><div class="pl-tarjeta-cab"><b class="pl-placa">' + DR.esc(r.placa) + '</b>' + VIS.chipOrigen(r) + '</div>' +
         '<div class="pl-dato">' + DR.esc([r.fundo, r.lote, r.variedad].filter(Boolean).join(' · ') || 'Sin lote') + (r.pallet ? ' · Pallet <b>' + DR.esc(r.pallet) + '</b>' : '') + '</div>' +
         '<div class="pl-sub">' + DR.esc(r.registrador || '') + ' · ' + (r.fin_carga ? 'Carga terminó ' + PL.horaCorta(r.fin_carga) : DR.esc(r.etapa_actual || r.estado || '')) +
-          (r.planta ? ' · ' + DR.esc(r.planta) : '') + '</div>' +
+          (r.planta ? ' · ' + DR.esc(r.planta) : '') + (r.hora_llegada ? ' · <b>Llegó ' + PL.horaCorta(r.hora_llegada) + '</b> (marcado en campo)' : '') + '</div>' +
         (puede ? '<button class="btn verde chico" data-continuar="' + DR.esc(r.id) + '" type="button">Continuar en planta</button>' : '') + '</article>';
     };
     var tarjetaPlanta = function (r) {
@@ -90,7 +90,7 @@ VIS.continuar = function (r) {
     var b = this; b.disabled = true;
     AT.rpc('rpc_uva_planta_iniciar', { p: { id_campo: r.id, planta: DR.$('#hPlanta').value, linea: DR.$('#hLinea').value } }).then(function (f) {
       PL.ponerFila(f); PL.guardarCache(); UI.cerrarHoja();
-      DR.toast('Ciclo vinculado: marca la llegada del camión.', 'ok');
+      DR.toast(f.hora_llegada ? 'Ciclo vinculado: campo ya marcó la llegada (' + PL.horaCorta(f.hora_llegada) + ').' : 'Ciclo vinculado: marca la llegada del camión.', 'ok');
       location.hash = '#reg/' + encodeURIComponent(f.id);
     }, function (e) { b.disabled = false; DR.toast(e.message, 'error'); });
   };
@@ -143,6 +143,7 @@ VIS.registro = function (c, id) {
       var activa = !v && previa && puede;
       return '<div class="pl-marca' + (v ? ' hecha' : '') + (sig && sig.k === m.k ? ' actual' : '') + '" style="--c:' + m.color + '">' +
         '<div class="pl-marca-cab"><span class="pl-n">' + (i + 1) + '</span><div><b>' + m.nombre + '</b>' +
+          (v && m.k === 'hora_llegada' && r.llegada_por === 'campo' ? '<small>Marcada en campo (' + PL.origenTxt(r) + ')</small>' : '') +
           (d.causa || d.com ? '<small>' + DR.esc([d.causa, d.com].filter(Boolean).join(' · ')) + '</small>' : '') + '</div>' +
           '<span class="pl-hora">' + PL.hora(v) + '</span></div>' +
         (puede ? '<div class="pl-marca-btns">' +
@@ -165,7 +166,7 @@ VIS.registro = function (c, id) {
       (puede ? '<div class="acciones"><button class="btn btn-peligro" id="plQuitar" type="button">' + (r.origen === 'planta' ? 'Anular registro' : 'Quitar de planta (vuelve a Campo)') + '</button></div>' : '') +
     '</div>';
 
-    DR.$$('[data-ahora]').forEach(function (b) { b.onclick = function () { VIS.marcar(r, b.getAttribute('data-ahora'), new Date().toISOString()); }; });
+    DR.$$('[data-ahora]').forEach(function (b) { b.onclick = function () { VIS.marcar(r, b.getAttribute('data-ahora'), new Date().toISOString(), true); }; });
     DR.$$('[data-editar]').forEach(function (b) { b.onclick = function () { VIS.editarHora(r, b.getAttribute('data-editar')); }; });
     DR.$$('[data-nota]').forEach(function (b) { b.onclick = function () { VIS.nota(r, b.getAttribute('data-nota')); }; });
     if (DR.$('#plDatos')) DR.$('#plDatos').onclick = function (e) { e.preventDefault(); VIS.datos(r); };
@@ -177,15 +178,18 @@ VIS.registro = function (c, id) {
   if (navigator.onLine) PL.cargarUno(id).then(pintar, function () { /* sin señal: lo del equipo */ });
 };
 
-/** Guarda una marca (en el equipo y a la cola). Valida el orden con la marca anterior y la siguiente. */
-VIS.marcar = function (r, k, iso) {
+/** Guarda una marca (en el equipo y a la cola). Valida el orden con la marca anterior y la siguiente.
+ *  ahora = botón «Ahora»: si campo ya marcó la llegada mientras tanto, el servidor conserva la de campo. */
+VIS.marcar = function (r, k, iso, ahora) {
   var i = PL.MARCAS.findIndex(function (m) { return m.k === k; });
   var ant = i > 0 ? r[PL.MARCAS[i - 1].k] : null, sig = i < PL.MARCAS.length - 1 ? r[PL.MARCAS[i + 1].k] : null;
   if (iso && ant && new Date(iso) < new Date(ant)) { DR.toast(PL.MARCAS[i].nombre + ' no puede ser antes de ' + PL.MARCAS[i - 1].nombre + ' (' + PL.hora(ant) + ').', 'error'); return; }
   if (iso && sig && new Date(iso) > new Date(sig)) { DR.toast(PL.MARCAS[i].nombre + ' no puede ser después de ' + PL.MARCAS[i + 1].nombre + ' (' + PL.hora(sig) + ').', 'error'); return; }
   r[k] = iso || null;
+  if (k === 'hora_llegada') r.llegada_por = iso ? 'planta' : null;
   PL.guardarCache();
   var p = { id: r.id }; p[k] = iso || '';
+  if (ahora && k === 'hora_llegada') p.llegada_nueva = true;
   PL.encolar('guardar', p);
   DR.vibrar && DR.vibrar(15);
   if (PL.alCambiar) PL.alCambiar();

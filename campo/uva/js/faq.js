@@ -14,7 +14,7 @@ FAQ.LISTA = [
   { c: 'uso', p: '¿Cómo elijo fundo y lote?',
     r: '<p>Elige el <b>fundo</b> (los fundos y lotes vienen del catálogo de Integra). La zona no se elige: sale sola del fundo y viaja a la BD. Al escribir o elegir el <b>lote</b>, la app completa sola el fundo, la <b>variedad</b> y el <b>color</b> desde el catálogo.</p><p>Si el lote no está en el catálogo se guarda igual, con un aviso; el administrador puede actualizar el catálogo en <b>Config → Catálogo de lotes</b>.</p>' },
   { c: 'uso', p: '¿Puedo seguir varios pallets a la vez?',
-    r: '<p>Sí. Cada <b>Nuevo pallet</b> es un registro aparte. En <b>Inicio → En curso</b> ves todos los pallets abiertos con su etapa actual y cronómetro; toca uno para seguir registrándolo.</p>' },
+    r: '<p>Sí. Cada <b>Nuevo pallet</b> es un registro aparte. En <b>Registrar</b> ves los pallets en curso de este equipo (toca uno para seguir) y, debajo, los <b>en curso en otros equipos</b>: ábrelo y toca <b>Continuar este pallet en este equipo</b> si el otro celular ya no lo va a seguir.</p>' },
   { c: 'uso', p: '¿Se pierde lo que llené si salgo de la app?',
     r: '<p>No. Cada cambio se guarda como <b>borrador</b>. El cronómetro sigue corriendo aunque cierres la app: se calcula con la hora de inicio guardada.</p>' },
   { c: 'uso', p: '¿Puedo corregir un registro ya cerrado?',

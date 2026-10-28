@@ -111,7 +111,30 @@ NUBE.verDetalle = function (r) {
     '<p class="ayuda-campo">' + DR.esc(NUBE.etiqueta(r)[0]) + ' · registró ' + DR.esc(r.registrador || '—') + (r.dispositivo ? ' (' + DR.esc(r.dispositivo) + ')' : '') + ' · ' + DR.esc(r.id) + '</p>' +
     '<div style="max-height:52vh;overflow:auto"><table class="tabla"><tr><th>Tramo</th><th class="n">Hora</th><th class="n">min:seg</th></tr>' + filas + '</table></div>' +
     '<p style="margin:10px 0 14px"><b>Ciclo de campo: ' + RSU.mmss(c.total) + '</b>' + (p.cicloCompleto !== null && p.cicloCompleto !== undefined ? ' · Ciclo completo (hasta abastecimiento): <b>' + RSU.mmss(p.cicloCompleto) + '</b>' : '') + '</p>' +
-    '<button class="btn bloque" id="hCerrar" type="button">Cerrar</button>', function () { DR.$('#hCerrar').onclick = DR.cerrarHoja; });
+    (NUBE.puedeContinuar(r) ? '<button class="btn verde bloque" id="hSeguir" type="button" style="margin-bottom:8px">Continuar este pallet en este equipo</button>' +
+      '<p class="ayuda-campo" style="margin:-2px 0 10px">Úsalo si el otro celular ya no lo va a seguir (sin batería, cambio de turno). Si los dos lo siguen, vale el último cambio que llegue a Integra.</p>' : '') +
+    '<button class="btn bloque" id="hCerrar" type="button">Cerrar</button>', function () {
+      DR.$('#hCerrar').onclick = DR.cerrarHoja;
+      if (DR.$('#hSeguir')) DR.$('#hSeguir').onclick = function () { DR.cerrarHoja(); NUBE.continuar(r); };
+    });
+};
+
+/** Solo pallets de Integra (la APK escribe en su propia hoja) en curso, del mismo usuario o con rol admin (igual que la base). */
+NUBE.puedeContinuar = function (r) {
+  return !TC.obtener(r.id) && r.origen === 'integra' && r.estado !== 'cerrado' && !!AT.perfil &&
+    (r.usuario_id === AT.perfil.id || AT.esAdmin());
+};
+/** Copia el pallet de Integra a este equipo (ya «subido»: no se reenvía hasta que se marque algo) y lo abre. */
+NUBE.continuar = function (r) {
+  var ahora = new Date().toISOString(), base = TC.nuevo(), local = {};
+  Object.keys(base).forEach(function (k) { local[k] = r[k] !== undefined ? r[k] : base[k]; });
+  local.etapas = JSON.parse(JSON.stringify(r.etapas));
+  local.estado = 'borrador';
+  local.creado = r.creado || ahora;
+  local.actualizado = ahora; local.subidoMod = ahora; local.subido = ahora; local.error = '';
+  TC.guardarRegistro(local, true);
+  DR.toast('Pallet ' + TC.titulo(local) + ' traído a este equipo: sigue con la siguiente etapa.', 'ok');
+  REG.abrir(local.id);
 };
 
 /** Abre el pallet: si está en este equipo se edita; si no, se ve (solo lectura). */

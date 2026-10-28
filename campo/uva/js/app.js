@@ -6,7 +6,8 @@
 
 var APP = {};
 
-APP.NAV = [['inicio', 'Inicio'], ['registrar', 'Registrar'], ['registros', 'Registros'], ['resumen', 'Resumen'], ['ayuda', 'Ayuda'], ['config', 'Config']];
+// Resumen es la primera pantalla; lo que era Inicio (saludo, hoy, en curso, subida) está en Registrar.
+APP.NAV = [['resumen', 'Resumen'], ['registrar', 'Registrar'], ['registros', 'Registros'], ['ayuda', 'Ayuda'], ['config', 'Config']];
 
 APP.ir = function (vista, sinAnimar) {
   clearInterval(DR._tick);
@@ -50,18 +51,18 @@ APP.iniciarApp = function () {
   ALERTAS.iniciar();
 
   DR.$('#app').style.opacity = 1;
-  APP.ir('inicio');
+  APP.ir('resumen');
   SHEETS.auto();
 };
 
-/** Botón «atrás» de Android: cierra la hoja; fuera de Inicio vuelve a Inicio; en Inicio minimiza. */
+/** Botón «atrás» de Android: cierra la hoja; fuera de Resumen vuelve a Resumen; en Resumen minimiza. */
 APP.enlazarAtras = function () {
   if (!DR.nativo) return;
   var App = DR.plugin('App');
   App.addListener('backButton', function () {
     if (DR.$('#splash').style.display !== 'none') { App.exitApp(); return; }
     if (!DR.$('#hoja').classList.contains('oculto')) { DR.cerrarHoja(); return; }
-    if (DR.vista !== 'inicio') { APP.ir('inicio'); return; }
+    if (DR.vista !== 'resumen') { APP.ir('resumen'); return; }
     App.minimizeApp().catch(function () { App.exitApp(); });
   });
   App.addListener('resume', function () { APP.estado(); SHEETS.auto(); });

@@ -165,7 +165,7 @@ SHEETS.auto = function () {
   if (SHEETS.subiendo) { SHEETS._otraVez = true; return; }
   if (!TC.registros().some(TC.pendiente) && !TC.cfg.bajas.length) return;
   SHEETS.subir(true).then(function () {
-    if (DR.vista === 'registros' || DR.vista === 'inicio') APP.ir(DR.vista, true);
+    if (DR.vista === 'registros' || (DR.vista === 'registrar' && REG.vista === 'lista')) APP.ir(DR.vista, true);
     if (SHEETS._otraVez) { SHEETS._otraVez = false; SHEETS.auto(); }
   }, function () { SHEETS._otraVez = false; });
 };

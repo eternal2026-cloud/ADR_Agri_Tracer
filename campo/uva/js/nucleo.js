@@ -4,7 +4,7 @@
  * Babel, todo es JavaScript ES5 que el navegador ejecuta directamente.
  * ==========================================================================*/
 
-/** Vistas de la app: cada archivo agrega la suya (VISTAS.inicio, VISTAS.registrar…). */
+/** Vistas de la app: cada archivo agrega la suya (VISTAS.resumen, VISTAS.registrar…). */
 var VISTAS = {};
 
 var DR = {

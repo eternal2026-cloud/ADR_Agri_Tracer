@@ -1,7 +1,7 @@
 /* ============================================================================
- * vistas.js — INICIO (pallets en curso), REGISTROS (filtros zona · fundo · lote · variedad ·
+ * vistas.js — REGISTROS (filtros zona · fundo · lote · variedad ·
  * grupo · planta, «Sólo resumen», CSV formato BD) Y CONFIG (con los permisos del admin).
- * Inicio y Registros muestran lo de Integra (nube.js: todos los equipos, la APK y Planta,
+ * Registros (y Registrar · Resumen) muestran lo de Integra (nube.js: todos los equipos, la APK y Planta,
  * según los permisos) más lo del equipo que aún no se sube; antes cada celular veía solo lo suyo.
  * ==========================================================================*/
 
@@ -41,43 +41,6 @@ RES.barra = function (o) {
   return TC.barra(c);
 };
 RES.nombreEtapa = function (id) { return id ? TC.E[id].nombre : '—'; };
-
-/* ================================ INICIO ================================ */
-VISTAS.inicio = function (cont) {
-  var hoy = DR.hoyISO(), regs = TC.registros(), antes = NUBE.hora;
-  var o = RES.resumir(NUBE.todos().filter(function (r) { return r.fecha === hoy; }));
-  var curso = regs.filter(function (r) { return r.estado !== 'cerrado' && r.registrador === TC.cfg.usuario; });
-  var pend = regs.filter(TC.pendiente).length;
-  var nombre = (TC.cfg.usuario || '').split(' ')[0];
-
-  cont.innerHTML = '<div class="vista">' +
-    '<div class="saludo entra"><div id="uviInicio" class="uvi-caja">' + MASCOTA.svg() + '</div><div><h1>¡Hola, ' + DR.esc(nombre) + '!</h1>' +
-      '<p id="fraseInicio">' + MASCOTA.FRASES[0] + '</p></div></div>' +
-    '<button class="btn verde bloque grande entra" id="btnRegistrar" type="button" style="margin-bottom:6px">' + DR.ICO.mas + '<span>Iniciar nuevo pallet</span></button>' +
-    (curso.length ? '<div class="sep-titulo entra">En curso (' + curso.length + ') · toca para seguir o marca la siguiente hora</div><div id="cursoInicio" class="entra">' +
-      curso.map(REG.tarjetaHtml).join('') + '</div>' : '') +
-    '<div class="enc entra"><div class="eti">Hoy · ' + DR.fechaCorta(hoy) + ' · Semana ' + TC.semana(hoy) + '</div></div>' +
-    '<div class="kpis entra"><div class="kpi"><b id="kN">0</b><span>Pallets cerrados</span></div>' +
-      '<div class="kpi"><b>' + (o.prom !== null ? DR.num(o.prom, 1) : '—') + '</b><span>Ciclo prom. (min)</span></div>' +
-      '<div class="kpi"><b>' + (o.pctMeta !== null ? DR.num(o.pctMeta) + '%' : '—') + '</b><span>Dentro de meta</span></div></div>' +
-    '<div class="tarjeta entra"><h2>Promedio por etapa hoy</h2>' +
-      (o.nTotal ? RES.barra(o) + TC.leyenda() + '<div class="aviso">Etapa más lenta: <b>' + RES.nombreEtapa(o.lenta) + '</b> (' + DR.dur(o.etapas[o.lenta].prom) + ').' +
-        (o.mayorEspera ? ' Mayor espera: antes de <b>' + RES.nombreEtapa(o.mayorEspera) + '</b> (' + DR.dur(o.etapas[o.mayorEspera].promEsp) + ').' : '') + '</div>'
-           : '<div class="vacio">Aún no hay pallets cerrados hoy.</div>') + '</div>' +
-    '<div class="tarjeta entra"><h2>Sincronización</h2><p style="color:var(--texto-2);font-size:14px">' +
-      (SHEETS.configurado() ? (pend ? '<b>' + pend + '</b> registro(s) por subir a Integra.' : 'Todo sincronizado con Integra.') : 'Inicia sesión en Integra para subir.') + '</p>' +
-      (SHEETS.configurado() && pend ? '<button class="btn primario bloque" id="btnSubirIni" type="button" style="margin-top:10px">' + DR.ICO.subir + 'Subir ahora</button>' : '') + '</div>' +
-  '</div>';
-
-  DR.contar(DR.$('#kN'), o.n);
-  NUBE.cargar().then(function () { if (DR.vista === 'inicio' && NUBE.hora !== antes) APP.ir('inicio', true); });
-  DR.$('#btnRegistrar').onclick = function () { REG.abrir(null); };
-  if (DR.$('#cursoInicio')) REG.enlazarTarjetas(DR.$('#cursoInicio'), function () { APP.ir('inicio', true); });
-  REG.reloj();
-  if (DR.$('#btnSubirIni')) DR.$('#btnSubirIni').onclick = function () { SHEETS.subir().then(function () { APP.ir('inicio', true); }, function () {}); };
-  DR.$('#uviInicio').onclick = function () { MASCOTA.saltar(DR.$('#uviInicio svg')); DR.$('#fraseInicio').innerHTML = MASCOTA.siguienteFrase(); };
-  DR.entrarPaneles('#contenido');
-};
 
 /* ================================ REGISTROS ================================ */
 var FIL = DR.leer('tcu.filtros', null) || {};

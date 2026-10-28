@@ -112,13 +112,14 @@ REG.guardar = function (r) {
 };
 
 /* ================================================ LISTA DE PALLETS */
-REG.tarjetaHtml = function (r) {
+/** soloVer === true: pallet de otro equipo (sin «Marcar … ahora»; se abre en solo lectura). */
+REG.tarjetaHtml = function (r, i, l, soloVer) {
   var idx = REG.proxima(r), et = idx > -1 ? TC.ETAPAS[idx] : null, cerrado = r.estado === 'cerrado';
   var seg = TC.ETAPAS.map(function (e, i) {
     var x = r.etapas[e.id];
     return '<i class="' + (x.fin ? 'hecho' : (i === idx || (x.ini && !x.fin) ? 'actual' : '')) + '" style="--c:' + e.color + '"></i>';
   }).join('');
-  var sig = REG.siguienteHora(r), c = TC.calcular(r), color = et ? et.color : 'var(--dr-verde)';
+  var sig = soloVer === true ? null : REG.siguienteHora(r), c = TC.calcular(r), color = et ? et.color : 'var(--dr-verde)';
   var vivo = et && r.etapas[et.id].ini && !r.etapas[et.id].fin;
   var pie = cerrado ? '<span><b>Cerrado</b> · ' + (c.total !== null ? DR.num(c.total, 0) + ' min de ciclo' : 'ver detalle') + '</span>'
     : et ? '<span>Etapa ' + (idx + 1) + ' de 8 · ' + (vivo ? 'En curso: ' : 'Siguiente: ') + '<b>' + et.nombre + '</b></span>'
@@ -128,14 +129,14 @@ REG.tarjetaHtml = function (r) {
       '<div class="cc-top"><span class="cc-id">' + (r.placa ? '<span class="cc-placa">' + DR.esc(r.placa) + '</span>' : '') +
         '<span class="cc-codigo">' + DR.esc(TC.titulo(r)) + '</span></span><span class="cc-hace">' +
         (vivo ? '<span class="vivo" data-ini="' + r.etapas[et.id].ini + '">' + DR.crono(r.etapas[et.id].ini) + '</span>' : DR.hace(r.actualizado)) + '</span></div>' +
-      '<div class="cc-sub">' + (REG.subtitulo(r) || 'Sin fundo') + '</div>' +
+      '<div class="cc-sub">' + (REG.subtitulo(r) || 'Sin fundo') + (soloVer === true ? ' · ' + DR.esc(r.registrador || '—') + ' · equipo ' + DR.esc(r.dispositivo || (NUBE.ORIGEN[r.origen] || '')) : '') + '</div>' +
       '<div class="cc-pasos">' + seg + '</div>' +
       '<div class="cc-sig">' + pie + DR.ICO.adelante + '</div></button>' +
     (sig ? '<button type="button" class="cc-rapido" data-rapido="' + r.id + '">' + DR.ICO.reloj +
       '<span>Marcar <b>' + DR.esc(REG.rotHora(sig.e, sig.campo).toLowerCase()) + '</b> ahora</span></button>' : '') +
   '</div>';
 };
-/** Enlaza tarjetas y «Marcar … ahora» dentro de un contenedor (también lo usa Inicio). */
+/** Enlaza tarjetas y «Marcar … ahora» dentro de un contenedor. */
 REG.enlazarTarjetas = function (raiz, repintar) {
   DR.$$('.ciclo-card', raiz).forEach(function (b) { b.onclick = function () { REG.abrir(b.getAttribute('data-id')); }; });
   DR.$$('.cc-rapido', raiz).forEach(function (b) {
@@ -154,27 +155,51 @@ REG.enlazarTarjetas = function (raiz, repintar) {
   });
 };
 
+/**
+ * Lista de Registrar (también hace lo que era Inicio): saludo, iniciar pallet, cifras de hoy,
+ * pallets en curso de ESTE equipo (se marcan aquí) y los en curso de los DEMÁS equipos y la APK
+ * (de Integra: antes no se veían y parecían perdidos; se pueden continuar en este equipo).
+ */
 REG.pintarLista = function (cont) {
   REG.vista = 'lista'; REG.quitarBarra();
+  var hoy = DR.hoyISO(), antes = NUBE.hora, nombre = (TC.cfg.usuario || '').split(' ')[0];
+  var o = RES.resumir(NUBE.todos().filter(function (r) { return r.fecha === hoy; }));
   cont.innerHTML = '<div class="vista">' +
-    '<div class="enc entra"><div class="eti">Captura en campo · ' + DR.esc(TC.cfg.campana) + '</div><h1>Pallets</h1><p>Inicia un pallet nuevo o toca uno en curso para registrar su siguiente etapa.</p></div>' +
+    '<div class="saludo entra"><div id="uviInicio" class="uvi-caja">' + MASCOTA.svg() + '</div><div><h1>¡Hola, ' + DR.esc(nombre) + '!</h1>' +
+      '<p id="fraseInicio">' + MASCOTA.FRASES[0] + '</p></div></div>' +
     '<button class="btn verde bloque grande entra" id="btnNuevoPallet" type="button">' + DR.ICO.mas + '<span>Iniciar nuevo pallet</span></button>' +
+    '<div class="kpis entra" style="margin-top:14px"><div class="kpi"><b>' + o.n + '</b><span>Cerrados hoy (todos)</span></div>' +
+      '<div class="kpi"><b>' + (o.prom !== null ? DR.num(o.prom, 1) : '—') + '</b><span>Ciclo prom. hoy (min)</span></div>' +
+      '<div class="kpi"><b>' + (o.pctMeta !== null ? DR.num(o.pctMeta) + '%' : '—') + '</b><span>Dentro de meta</span></div></div>' +
+    '<div id="syncLista" class="entra"></div>' +
     '<div class="buscador entra" style="margin-top:14px">' + DR.ICO.lupa + '<input id="inBuscar" type="search" placeholder="Buscar lote, fundo, placa o grupo…" autocomplete="off" value="' + DR.esc(REG.filtro) + '"></div>' +
     '<div id="listaPallets"></div></div>';
   var pintar = function () {
-    var q = DR.sinTildes(REG.filtro || ''), hoy = DR.hoyISO();
-    var coincide = function (r) { return !q || DR.sinTildes([r.lote, r.fundo, r.placa, r.grupo, r.variedad, r.pallet].join(' ')).indexOf(q) > -1; };
-    var mios = TC.registros().filter(function (r) { return r.registrador === TC.cfg.usuario && coincide(r); });
-    var curso = mios.filter(function (r) { return r.estado !== 'cerrado'; });
-    var cerr = mios.filter(function (r) { return r.estado === 'cerrado' && r.fecha === hoy; });
+    var q = DR.sinTildes(REG.filtro || '');
+    var coincide = function (r) { return !q || DR.sinTildes([r.lote, r.fundo, r.placa, r.grupo, r.variedad, r.pallet, r.registrador].join(' ')).indexOf(q) > -1; };
+    var locales = TC.registros().filter(coincide);
+    var curso = locales.filter(function (r) { return r.estado !== 'cerrado'; });
+    var cerr = locales.filter(function (r) { return r.estado === 'cerrado' && r.fecha === hoy; });
+    var otros = NUBE.todos().filter(function (r) { return !r.local && r.origen !== 'planta' && r.estado !== 'cerrado' && coincide(r); });
+    var pend = TC.registros().filter(TC.pendiente).length;
+    DR.$('#syncLista').innerHTML = '<div class="aviso' + (pend ? ' alerta' : ' ok') + '">' +
+      (pend ? '<b>' + pend + '</b> cambio(s) por subir: se suben solos apenas hay señal.' : 'Todo lo de este equipo ya está en Integra.') +
+      (NUBE.hora ? ' Última lectura de Integra: ' + DR.hace(NUBE.hora) + '.' : '') + '</div>';
     DR.$('#listaPallets').innerHTML =
-      '<div class="sep-titulo">En curso (' + curso.length + ')</div>' + (curso.length ? curso.map(REG.tarjetaHtml).join('') : '<div class="vacio">No hay pallets en curso.</div>') +
-      (cerr.length ? '<div class="sep-titulo">Cerrados hoy (' + cerr.length + ')</div>' + cerr.map(REG.tarjetaHtml).join('') : '');
+      '<div class="sep-titulo">En curso en este equipo (' + curso.length + ')</div>' + (curso.length ? curso.map(REG.tarjetaHtml).join('') : '<div class="vacio">No hay pallets en curso en este equipo.</div>') +
+      '<div class="sep-titulo">En curso en otros equipos (' + otros.length + ')</div>' +
+      (otros.length ? '<div id="otrosPallets">' + otros.map(function (r) { return REG.tarjetaHtml(r, 0, null, true); }).join('') + '</div>'
+        : '<div class="vacio">' + (NUBE.hora ? 'Ningún otro equipo tiene pallets en curso.' : 'Conéctate para ver los pallets de los demás equipos.') + '</div>') +
+      (cerr.length ? '<div class="sep-titulo">Cerrados hoy en este equipo (' + cerr.length + ')</div>' + cerr.map(REG.tarjetaHtml).join('') : '');
     REG.enlazarTarjetas(DR.$('#listaPallets'), pintar);
+    // Los de otros equipos se abren en solo lectura (con «Continuar en este equipo» si se puede).
+    DR.$$('#otrosPallets .ciclo-card').forEach(function (b) { b.onclick = function () { NUBE.abrir(b.getAttribute('data-id')); }; });
   };
   pintar();
+  NUBE.cargar().then(function () { if (DR.vista === 'registrar' && REG.vista === 'lista' && NUBE.hora !== antes) pintar(); });
   DR.$('#btnNuevoPallet').onclick = function () { REG.abrir(null); };
   DR.$('#inBuscar').oninput = function () { REG.filtro = this.value; pintar(); };
+  DR.$('#uviInicio').onclick = function () { MASCOTA.saltar(DR.$('#uviInicio svg')); DR.$('#fraseInicio').innerHTML = MASCOTA.siguienteFrase(); };
   REG.reloj();
   DR.entrarPaneles('#contenido');
 };

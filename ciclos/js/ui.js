@@ -4,19 +4,20 @@
 var UI = {};
 
 /** Tramos de tiempo del pivot, mismo orden que Postgres/Excel. */
+/** espera: tramo en que el producto está detenido entre dos etapas (se dibuja como fila de espera). */
 var CAMPOS_RESUMEN = [
   { clave: 't_cosecha', titulo: 'Cosecha', corto: 'Cosecha' },
-  { clave: 't_espera_jabero', titulo: 'Espera Jabero', corto: 'Esp. jabero' },
+  { clave: 't_espera_jabero', espera: true, titulo: 'Espera Jabero', corto: 'Esp. jabero' },
   { clave: 't_jabero', titulo: 'Jabero', corto: 'Jabero' },
-  { clave: 't_estadia_cs', titulo: 'Estadía C. Sombra', corto: 'Estadía C.S.' },
+  { clave: 't_estadia_cs', espera: true, titulo: 'Estadía C. Sombra', corto: 'Estadía C.S.' },
   { clave: 't_carga_moto', titulo: 'Carga Motocarga', corto: 'Carga moto' },
-  { clave: 't_espera_traslado', titulo: 'Espera Traslado a C.A.', corto: 'Esp. tras. C.A.' },
+  { clave: 't_espera_traslado', espera: true, titulo: 'Espera Traslado a C.A.', corto: 'Esp. tras. C.A.' },
   { clave: 't_traslado_ca', titulo: 'Traslado a C.A.', corto: 'Traslado C.A.' },
-  { clave: 't_espera_descarga', titulo: 'Espera Descarga/Armado', corto: 'Esp. descarga' },
+  { clave: 't_espera_descarga', espera: true, titulo: 'Espera Descarga/Armado', corto: 'Esp. descarga' },
   { clave: 't_descarga_ca', titulo: 'Descarga y Armado', corto: 'Descarga' },
-  { clave: 't_estadia_ca', titulo: 'Estadía en C.A.', corto: 'Estadía C.A.' },
+  { clave: 't_estadia_ca', espera: true, titulo: 'Estadía en C.A.', corto: 'Estadía C.A.' },
   { clave: 't_carga_camion', titulo: 'Carga al Camión', corto: 'Carga camión' },
-  { clave: 't_espera_traslado_planta', titulo: 'Espera Traslado a Planta', corto: 'Esp. tras. planta' },
+  { clave: 't_espera_traslado_planta', espera: true, titulo: 'Espera Traslado a Planta', corto: 'Esp. tras. planta' },
   { clave: 't_traslado_planta', titulo: 'Traslado a Planta', corto: 'Traslado planta' }
 ];
 
@@ -158,7 +159,7 @@ UI.barrasTramos = function (tramos, animar) {
   var maximo = Math.max.apply(null, tramos.map(function (x) { return Math.abs(Number(x.v)); }).concat([1]));
   return tramos.map(function (x) {
     var negativo = Number(x.v) < 0, ancho = Math.round(Math.abs(Number(x.v)) / maximo * 100);
-    return '<div class="barra-fila"><div title="' + DR.esc(x.t) + '">' + DR.esc(x.t) + '</div>' +
+    return '<div class="barra-fila' + (x.espera ? ' espera' : '') + '"><div title="' + DR.esc(x.t) + '">' + DR.esc(x.t) + '</div>' +
       '<div class="barra-pista"><div class="barra-valor" data-ancho="' + ancho + '" style="' + (animar ? '' : 'width:' + ancho + '%;') + 'background:' +
       (negativo ? '#E5484D' : 'linear-gradient(90deg,#0097CE,#76B729)') + '"></div></div>' +
       '<div class="barra-cifra"' + (negativo ? ' style="color:#FF8A8A"' : '') + '>' + UI.durCorta(x.v) + '</div></div>';

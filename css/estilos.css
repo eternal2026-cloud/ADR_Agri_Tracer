@@ -181,6 +181,13 @@ tr.fila-cerca td{background:#23170E}
 .barra-pista{height:12px;background:#2A221C;border-radius:6px;overflow:hidden}
 .barra-valor{height:100%;width:0;border-radius:6px}
 .barra-cifra{text-align:right;white-space:nowrap;color:var(--texto);font-variant-numeric:tabular-nums;font-weight:500}
+/* Esperas entre etapas: fila aparte, sangrada y punteada (como el tablero de uva) */
+.barra-fila.espera{margin:-4px 0 8px;font-size:12.5px}
+.barra-fila.espera > div:first-child{color:var(--texto-3,#9C8F84);padding-left:18px;position:relative}
+.barra-fila.espera > div:first-child::before{content:'';position:absolute;left:6px;top:-7px;height:13px;width:8px;border-left:1.5px dashed currentColor;border-bottom:1.5px dashed currentColor;opacity:.6}
+.barra-fila.espera .barra-pista{height:7px;background:transparent;border:1px dashed #4A3E34}
+.barra-fila.espera .barra-cifra{color:var(--texto-3,#9C8F84);font-weight:400}
+:root[data-tema="claro"] .barra-fila.espera .barra-pista{background:transparent;border-color:#CFC4B8}
 
 @media (min-width:720px){
   #contenido{padding-left:24px;padding-right:24px}

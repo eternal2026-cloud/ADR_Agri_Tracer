@@ -1,7 +1,8 @@
 /* ============================================================================
- * vistas.js — INICIO (pallets en curso), REGISTROS (filtros fundo · lote · variedad ·
+ * vistas.js — INICIO (pallets en curso), REGISTROS (filtros zona · fundo · lote · variedad ·
  * grupo · planta, «Sólo resumen», CSV formato BD) Y CONFIG (con los permisos del admin).
- * La zona no se muestra en la app: viaja en cada registro hacia la BD.
+ * Inicio y Registros muestran lo de Integra (nube.js: todos los equipos, la APK y Planta,
+ * según los permisos) más lo del equipo que aún no se sube; antes cada celular veía solo lo suyo.
  * ==========================================================================*/
 
 /** Promedios de un conjunto de registros cerrados (los atípicos > 480 min no promedian). */
@@ -35,16 +36,16 @@ RES.resumir = function (lista) {
   return o;
 };
 RES.barra = function (o) {
-  var c = { etapas: {}, esperas: Math.round(o.promEsperas * 10) / 10 };
-  TC.ETAPAS.forEach(function (e) { c.etapas[e.id] = { min: o.etapas[e.id].prom }; });
+  var c = { etapas: {} };
+  TC.ETAPAS.forEach(function (e) { c.etapas[e.id] = { min: o.etapas[e.id].prom, espera: o.etapas[e.id].promEsp }; });
   return TC.barra(c);
 };
 RES.nombreEtapa = function (id) { return id ? TC.E[id].nombre : '—'; };
 
 /* ================================ INICIO ================================ */
 VISTAS.inicio = function (cont) {
-  var hoy = DR.hoyISO(), regs = TC.registros();
-  var o = RES.resumir(regs.filter(function (r) { return r.fecha === hoy; }));
+  var hoy = DR.hoyISO(), regs = TC.registros(), antes = NUBE.hora;
+  var o = RES.resumir(NUBE.todos().filter(function (r) { return r.fecha === hoy; }));
   var curso = regs.filter(function (r) { return r.estado !== 'cerrado' && r.registrador === TC.cfg.usuario; });
   var pend = regs.filter(TC.pendiente).length;
   var nombre = (TC.cfg.usuario || '').split(' ')[0];
@@ -69,6 +70,7 @@ VISTAS.inicio = function (cont) {
   '</div>';
 
   DR.contar(DR.$('#kN'), o.n);
+  NUBE.cargar().then(function () { if (DR.vista === 'inicio' && NUBE.hora !== antes) APP.ir('inicio', true); });
   DR.$('#btnRegistrar').onclick = function () { REG.abrir(null); };
   if (DR.$('#cursoInicio')) REG.enlazarTarjetas(DR.$('#cursoInicio'), function () { APP.ir('inicio', true); });
   REG.reloj();
@@ -81,10 +83,9 @@ VISTAS.inicio = function (cont) {
 var FIL = DR.leer('tcu.filtros', null) || {};
 ['zona', 'fundo', 'lote', 'variedad', 'grupo', 'planta', 'desde', 'hasta', 'estado'].forEach(function (k) { if (FIL[k] === undefined) FIL[k] = ''; });
 if (FIL.resumen === undefined) FIL.resumen = false;
-FIL.zona = '';  // la zona ya no se filtra en la app
 
 RES.filtrar = function () {
-  return TC.registros().filter(function (r) {
+  return NUBE.todos().filter(function (r) {
     if (FIL.zona && r.zona !== FIL.zona) return false;
     if (FIL.fundo && r.fundo !== FIL.fundo) return false;
     if (FIL.lote && r.lote !== FIL.lote) return false;
@@ -93,30 +94,37 @@ RES.filtrar = function () {
     if (FIL.planta && r.planta !== FIL.planta) return false;
     if (FIL.desde && r.fecha < FIL.desde) return false;
     if (FIL.hasta && r.fecha > FIL.hasta) return false;
+    var sinSubir = !!r.local && (!r.nube || !!r.sinSubir) && TC.pendiente(r);
     if (FIL.estado === 'borrador' && r.estado !== 'borrador') return false;
-    if (FIL.estado === 'pendiente' && !TC.pendiente(r)) return false;
-    if (FIL.estado === 'subido' && !(r.estado === 'cerrado' && !TC.pendiente(r))) return false;
+    if (FIL.estado === 'pendiente' && !sinSubir) return false;
+    if (FIL.estado === 'subido' && !(r.estado === 'cerrado' && !sinSubir)) return false;
+    if (FIL.estado === 'mios' && !r.local) return false;
     return true;
   });
 };
 
 VISTAS.registros = function (cont) {
-  var regs = TC.registros();
+  var regs = NUBE.todos(), antes = NUBE.hora;
   var usados = function (k) { return CAT.unicos(regs.map(function (r) { return r[k]; })).sort(); };
   var opt = function (v, t, sel) { return '<option value="' + DR.esc(v) + '"' + (v === sel ? ' selected' : '') + '>' + DR.esc(t) + '</option>'; };
   var sel = function (id, k, todos, lista) { return '<select id="' + id + '">' + opt('', todos, FIL[k]) + lista.map(function (v) { return opt(v, v, FIL[k]); }).join('') + '</select>'; };
-  var fundos = CAT.unicos(PERM.fundos().concat(usados('fundo'))).sort();
+  var zonas = CAT.unicos(CAT.zonas().concat(usados('zona'))).sort();
+  var fundos = CAT.unicos(CAT.filas().filter(function (f) { return !FIL.zona || f[0] === FIL.zona; }).map(function (f) { return f[1]; })
+    .concat(regs.filter(function (r) { return !FIL.zona || r.zona === FIL.zona; }).map(function (r) { return r.fundo; }))).sort();
   var lotes = CAT.unicos(regs.filter(function (r) { return !FIL.fundo || r.fundo === FIL.fundo; }).map(function (r) { return r.lote; })).sort();
 
   cont.innerHTML = '<div class="vista">' +
-    '<div class="enc entra"><div class="eti">Registros</div><h1>Tiempos de ciclo</h1><p>Filtra por fundo, lote, variedad, grupo y planta.</p></div>' +
+    '<div class="enc entra"><div class="eti">Registros</div><h1>Tiempos de ciclo</h1><p>Todos los pallets de Integra (APK, Integra y Planta) que tus permisos te dejan ver' +
+      (NUBE.hora ? ' · actualizado ' + DR.hace(NUBE.hora) : '') + '. Filtra por zona, fundo, lote, variedad, grupo y planta.</p></div>' +
+    (NUBE.error ? '<div class="aviso alerta entra">No se pudo leer Integra (' + DR.esc(NUBE.error) + '). Se muestra la última copia del equipo.</div>' : '') +
     '<div class="filtros entra">' +
+      sel('fZona', 'zona', 'Todas las zonas', zonas) +
       sel('fFundo', 'fundo', 'Todos los fundos', fundos) +
       sel('fLote', 'lote', 'Todos los lotes', lotes) +
       sel('fVariedad', 'variedad', 'Todas las variedades', usados('variedad')) +
       sel('fGrupo', 'grupo', 'Todos los grupos', usados('grupo')) +
       sel('fPlanta', 'planta', 'Todas las plantas', CAT.unicos(PERM.plantas().concat(usados('planta')))) +
-      '<select id="fEstado">' + opt('', 'Todos los estados', FIL.estado) + opt('borrador', 'Borradores', FIL.estado) + opt('pendiente', 'Por subir', FIL.estado) + opt('subido', 'Sincronizados', FIL.estado) + '</select>' +
+      '<select id="fEstado">' + opt('', 'Todos los estados', FIL.estado) + opt('borrador', 'Borradores', FIL.estado) + opt('pendiente', 'Por subir', FIL.estado) + opt('subido', 'Sincronizados', FIL.estado) + opt('mios', 'De este equipo', FIL.estado) + '</select>' +
       '<label class="chk"><input type="checkbox" id="fResumen"' + (FIL.resumen ? ' checked' : '') + '> Sólo resumen</label>' +
       '<input type="date" id="fDesde" value="' + FIL.desde + '" aria-label="Desde"><input type="date" id="fHasta" value="' + FIL.hasta + '" aria-label="Hasta">' +
     '</div>' +
@@ -139,18 +147,21 @@ VISTAS.registros = function (cont) {
       : '<div class="vacio">Sin registros cerrados con estos filtros.</div>');
     if (FIL.resumen) { DR.$('#listaReg').innerHTML = RES.tablaResumen(l); return; }
     DR.$('#listaReg').innerHTML = l.length ? l.map(function (r) {
-      var c = TC.calcular(r), est = TC.etiquetaEstado(r);
+      var c = TC.calcular(r), est = NUBE.etiqueta(r);
       return '<div class="reg" data-id="' + r.id + '"><div class="l1"><span>' + DR.esc(TC.titulo(r)) + ' · ' + DR.esc(r.fundo) + '</span>' +
         '<span class="estado ' + est[1] + '">' + est[0] + '</span></div>' +
         '<div class="l2">' + DR.fechaCorta(r.fecha) + ' · Sem ' + TC.semana(r.fecha) + ' · ' + DR.esc(r.variedad) + ' · ' + DR.esc(r.grupo) + (r.planta ? ' → ' + DR.esc(r.planta) : '') + '</div>' +
         '<div class="l2"><b style="color:var(--texto)">Ciclo: ' + DR.dur(c.total) + '</b> · ' + c.completas + '/8 etapas' + (c.enMeta === false ? ' · <span style="color:var(--alerta)">sobre meta</span>' : '') + '</div>' +
-        TC.barra(c) + (r.error && TC.pendiente(r) ? '<div class="aviso alerta">' + DR.esc(r.error) + '</div>' : '') + '</div>';
+        (r.nube && !r.local ? '<div class="l2">Registró ' + DR.esc(r.registrador || '—') + (r.dispositivo ? ' · ' + DR.esc(r.dispositivo) : '') + '</div>' : '') +
+        TC.barra(c) + (r.local && r.error && TC.pendiente(r) ? '<div class="aviso alerta">' + DR.esc(r.error) + '</div>' : '') + '</div>';
     }).join('') : '<div class="vacio">No hay registros con estos filtros.</div>';
-    DR.$$('#listaReg .reg').forEach(function (d) { d.onclick = function () { REG.abrir(d.getAttribute('data-id')); }; });
+    DR.$$('#listaReg .reg').forEach(function (d) { d.onclick = function () { NUBE.abrir(d.getAttribute('data-id')); }; });
   };
   pintar();
+  NUBE.cargar().then(function () { if (DR.vista === 'registros' && NUBE.hora !== antes) APP.ir('registros', true); });
 
   var cambiar = function (k, v, repintarTodo) { FIL[k] = v; DR.guardar('tcu.filtros', FIL); if (repintarTodo) APP.ir('registros', true); else pintar(); };
+  DR.$('#fZona').onchange = function () { FIL.fundo = ''; FIL.lote = ''; cambiar('zona', this.value, true); };
   DR.$('#fFundo').onchange = function () { FIL.lote = ''; cambiar('fundo', this.value, true); };
   [['fLote', 'lote'], ['fVariedad', 'variedad'], ['fGrupo', 'grupo'], ['fPlanta', 'planta'], ['fEstado', 'estado'], ['fDesde', 'desde'], ['fHasta', 'hasta']].forEach(function (p) {
     DR.$('#' + p[0]).onchange = function () { cambiar(p[1], this.value); };
@@ -208,7 +219,7 @@ RES.csv = function (l) {
     var c = TC.calcular(r);
     var com = TC.ETAPAS.filter(function (e) { return r.etapas[e.id].com || r.etapas[e.id].causa; })
       .map(function (e) { var x = r.etapas[e.id]; return e.nombre + ': ' + [x.causa, x.com].filter(Boolean).join(' - '); }).join(' | ');
-    return RES.filaBD(r, n).concat([n(c.total), c.enMeta === null ? '' : (c.enMeta ? 'Sí' : 'No'), TC.etiquetaEstado(r)[0], r.id, r.registrador, com, r.observacion]).map(q).join(';');
+    return RES.filaBD(r, n).concat([n(c.total), c.enMeta === null ? '' : (c.enMeta ? 'Sí' : 'No'), NUBE.etiqueta(r)[0], r.id, r.registrador, com, r.observacion]).map(q).join(';');
   });
   DR.entregarArchivo('TiempoCiclo_Uva_' + DR.hoyISO() + '.csv', '﻿' + [cab.map(q).join(';')].concat(filas).join('\r\n'), 'text/csv;charset=utf-8')
     .then(function (donde) { DR.toast(l.length + ' registro(s) exportado(s): ' + donde, 'ok'); }, function (e) { DR.toast('No se pudo exportar: ' + e.message, 'error'); });
@@ -235,7 +246,7 @@ VISTAS.config = function (cont) {
         '<li>' + (P && Array.isArray(P.traslados) ? P.traslados.length : 0) + ' estándar(es) de traslado fundo → planta</li>' +
         '<li>Catálogo actualizado: ' + (P && P.actualizado ? new Date(P.actualizado).toLocaleString('es-PE') : '—') + '</li></ul>' +
       '<div class="botones"><button class="btn" id="btnCatIntegra" type="button">Actualizar catálogo</button><button class="btn primario" id="btnSubirCfg" type="button">' + DR.ICO.subir + 'Subir ahora</button></div>' +
-      '<label class="chk"><input type="checkbox" id="cVivo"' + (s.enVivo ? ' checked' : '') + '> En vivo: enviar también los pallets en proceso (Planta los ve por la placa)</label>' +
+      '<p class="ayuda-campo">Siempre en vivo: cada cambio (borradores, pallets en proceso y cerrados) sube solo apenas hay señal; sin señal queda en el equipo y sube al volver.</p>' +
       '<div class="ayuda-campo" style="margin-top:8px">Última subida: ' + (s.ultimaSubida ? new Date(s.ultimaSubida).toLocaleString('es-PE') : '—') + '</div></div>' +
 
     (AT.esAdmin() ? '<div class="tarjeta entra"><h2>APK · Apps Script</h2><p class="ayuda-campo" style="margin-top:0">Para que la APK también envíe a Integra: en la hoja de la APK, menú <b>Tiempo de ciclo → Configurar Integra…</b> y pega este token.</p>' +
@@ -266,7 +277,6 @@ VISTAS.config = function (cont) {
     '<p class="ayuda-campo" style="text-align:center">Tiempo de Ciclo Uva v' + DR.VERSION + ' · Integra · Don Ricardo</p>' +
   '</div>';
 
-  DR.$('#cVivo').onchange = function () { s.enVivo = this.checked; TC.guardarCfg(); SHEETS.auto(); };
   DR.$('#btnSubirCfg').onclick = function () { SHEETS.subir().then(function () { APP.ir('config', true); }, function () {}); };
   DR.$('#btnCatIntegra').onclick = function () {
     PERM.cargar().then(function (p) { DR.toast('Catálogo actualizado: ' + p.catalogo.length + ' lotes.', 'ok'); APP.ir('config', true); },

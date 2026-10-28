@@ -48,7 +48,8 @@ CONFIG.cargar = function () {
     sb.from('listas_maestras').select('*').order('tipo').order('orden').order('valor'),
     sb.from('perfiles').select('*').order('creado_en'),
     AT.rpc('rpc_estado_sync_sheets').catch(function (e) { return { _error: e.message }; }),
-    sb.from('sci_areas').select('*').order('orden').order('nombre')
+    sb.from('sci_areas').select('*').order('orden').order('nombre'),
+    sb.from('uva_catalogo').select('zona,fundo,lote,activo').eq('activo', true)
   ]).then(function (r) {
     [0, 1, 2].forEach(function (i) { if (r[i].error) throw new Error(r[i].error.message); });
     CONFIG.parametros = {};
@@ -57,6 +58,7 @@ CONFIG.cargar = function () {
     CONFIG.usuarios = r[2].data || [];
     CONFIG.sync = r[3] || {};
     CONFIG.areas = r[4].error ? [] : (r[4].data || []);
+    CONFIG.uvaCatalogo = r[5].error ? [] : (r[5].data || []);
   });
 };
 
@@ -252,10 +254,26 @@ CONFIG.cambiarUsuario = function (u) {
   };
 };
 
-/* ---- fundos asignados: el usuario solo puede elegir estos al registrar ciclos ([] = todos) ---- */
+/* ---- fundos asignados: el usuario solo puede elegir estos al registrar ciclos ([] = todos) ----
+ * Valen para Arándano y para Uva (0055): se comparan sin tildes ni espacios sobrantes, así
+ * «LA MAQUINA» de la lista equivale a «LA MÁQUINA» del catálogo de Uva. */
+CONFIG.llave = function (s) {
+  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toUpperCase();
+};
+/** Fundos del catálogo de Uva: [{ zona, fundo, lotes }]. */
+CONFIG.fundosUva = function () {
+  var o = {};
+  (CONFIG.uvaCatalogo || []).forEach(function (f) {
+    var k = f.zona + '|' + f.fundo;
+    (o[k] = o[k] || { zona: f.zona, fundo: f.fundo, lotes: 0 }).lotes++;
+  });
+  return Object.keys(o).sort().map(function (k) { return o[k]; });
+};
 CONFIG.fundosDisponibles = function (extra) {
   var l = CONFIG.listas.filter(function (x) { return x.tipo === 'fundo' && x.activo; }).map(function (x) { return x.valor; });
-  (extra || []).forEach(function (f) { if (l.indexOf(f) < 0) l.push(f); });
+  var llaves = l.map(CONFIG.llave);
+  CONFIG.fundosUva().forEach(function (u) { if (llaves.indexOf(CONFIG.llave(u.fundo)) < 0) { l.push(u.fundo); llaves.push(CONFIG.llave(u.fundo)); } });
+  (extra || []).forEach(function (f) { if (llaves.indexOf(CONFIG.llave(f)) < 0) { l.push(f); llaves.push(CONFIG.llave(f)); } });
   return l;
 };
 CONFIG.textoFundos = function (fundos) {
@@ -288,7 +306,7 @@ CONFIG.editarFundos = function (u) {
     '<div class="res-nombre">' + DR.esc(u.nombre) + '</div>' +
     '<div class="res-dni">Fundos donde puede registrar ciclos</div>' +
     '<div style="margin-top:14px">' + CONFIG.selectorFundos('hojaFundos', elegidos) + '</div>' +
-    '<div class="aviso" style="margin-top:14px">Solo verá y podrá elegir los fundos marcados, y solo podrá seguir ciclos de esos fundos. <b>Sin marcar ninguno = todos los fundos.</b></div>' +
+    '<div class="aviso" style="margin-top:14px">Solo verá y podrá elegir los fundos marcados, y solo podrá seguir ciclos de esos fundos, <b>en Arándano y en Uva</b> (los nombres se comparan sin tildes). <b>Sin marcar ninguno = todos los fundos.</b></div>' +
     '<div class="acciones"><button type="button" class="btn sec" id="btnFundosCancelar" style="flex:1">Cancelar</button>' +
     '<button type="button" class="btn verde" id="btnFundosGuardar" style="flex:1">Guardar</button></div>');
   CONFIG.enlazarSelectorFundos('hojaFundos', function (lista) { elegidos = lista; });
@@ -670,7 +688,7 @@ CONFIG.tabListas = function (c) {
       }).join('') : '<span class="nota-vacia">Todavía no hay opciones.</span>') + '</div>' +
       '<div class="lista-add"><input placeholder="Nueva ' + CONFIG.SINGULAR[tipo] + '…" data-nuevo-lista="' + tipo + '" autocomplete="off">' +
       '<button type="button" class="btn chico" data-agregar-lista="' + tipo + '">Agregar</button></div>');
-  }).join('') + CONFIG.panelCodigosPlanta();
+  }).join('') + CONFIG.panelFundosUva() + CONFIG.panelCodigosPlanta();
   CONFIG.enlazarCodigosPlanta(c);
 
   DR.$$('[data-lista-id]', c).forEach(function (chip) {
@@ -697,6 +715,35 @@ CONFIG.tabListas = function (c) {
   DR.$$('[data-nuevo-lista]', c).forEach(function (inp) {
     inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') agregar(this.getAttribute('data-nuevo-lista')); });
   });
+};
+
+/**
+ * Zonas y fundos del catálogo de Uva frente a la lista de fundos: los fundos asignados a un
+ * usuario (Usuarios › Fundos) valen en los dos cultivos, así que aquí se ve qué coincide.
+ */
+CONFIG.panelFundosUva = function () {
+  var uva = CONFIG.fundosUva();
+  if (!uva.length) return '';
+  var lista = CONFIG.listas.filter(function (l) { return l.tipo === 'fundo'; });
+  var porLlave = {};
+  lista.forEach(function (l) { porLlave[CONFIG.llave(l.valor)] = l; });
+  var llavesUva = uva.map(function (u) { return CONFIG.llave(u.fundo); });
+  var zonas = {};
+  uva.forEach(function (u) { (zonas[u.zona] = zonas[u.zona] || []).push(u); });
+  var faltan = uva.filter(function (u) { return !porLlave[CONFIG.llave(u.fundo)]; }).length;
+  var soloArandano = lista.filter(function (l) { return l.activo && llavesUva.indexOf(CONFIG.llave(l.valor)) < 0; });
+  return UI.panel('Fundos de Uva por zona', uva.length + ' fundo(s) en el catálogo de Uva · ' + (faltan ? faltan + ' sin coincidencia en la lista de fundos' : 'todos coinciden con la lista de fundos'),
+    Object.keys(zonas).sort().map(function (z) {
+      return '<div style="margin-bottom:10px"><div class="ayuda-campo" style="font-weight:600;margin-bottom:6px">Zona ' + DR.esc(z) + '</div><div class="opciones">' +
+        zonas[z].map(function (u) {
+          var l = porLlave[CONFIG.llave(u.fundo)];
+          var txt = u.fundo + ' · ' + u.lotes + ' lote(s)' + (l && l.valor !== u.fundo ? ' = ' + l.valor : '') + (l ? (l.activo ? '' : ' (oculto en Arándano)') : ' · no está en la lista');
+          return '<span class="opcion ' + (l ? 'activa' : 'inactiva') + '" style="cursor:default;--c:' + (l ? '#76B729' : '#EF7C3B') + '">' + DR.esc(txt) + '</span>';
+        }).join('') + '</div></div>';
+    }).join('') +
+    (soloArandano.length ? '<div class="ayuda-campo">Solo en Arándano: ' + soloArandano.map(function (l) { return DR.esc(l.valor); }).join(', ') + '.</div>' : '') +
+    '<div class="aviso" style="margin-top:10px">Los fundos que asignas en <b>Usuarios › Fundos</b> valen para Arándano y para Uva (sin importar tildes). ' +
+      'Un fundo de Uva que no está en la lista igual aparece al asignar fundos; agrégalo arriba solo si también se registra Arándano en él.</div>');
 };
 
 /**

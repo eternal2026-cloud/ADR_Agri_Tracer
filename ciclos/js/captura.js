@@ -869,7 +869,7 @@ CAPTURA.mostrarFin = function (fila) {
   cont.scrollTop = 0;
 
   var total = fila.t_ciclo_total;
-  var tramos = CAMPOS_RESUMEN.map(function (c) { return { t: c.titulo, v: fila[c.clave] }; })
+  var tramos = CAMPOS_RESUMEN.map(function (c) { return { t: c.titulo, espera: c.espera, v: fila[c.clave] }; })
     .filter(function (x) { return x.v !== null && x.v !== undefined; });
   var sub = [fila.fundo, fila.lote ? 'Lote ' + fila.lote : '', fila.lider].filter(Boolean).map(DR.esc).join(' · ');
 

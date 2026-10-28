@@ -48,8 +48,9 @@ TC.cfg = DR.leer('tcu.cfg', null) || {};
 TC.cfg.usuario = TC.cfg.usuario || '';
 TC.cfg.dispositivo = TC.cfg.dispositivo || ('IN-' + Math.random().toString(36).slice(2, 6).toUpperCase());
 TC.cfg.sheets = TC.cfg.sheets || { url: '', clave: '', auto: true, ultimaSubida: '' };
-// «En vivo»: también se envían los pallets en proceso, para el dashboard en tiempo real.
-if (TC.cfg.sheets.enVivo === undefined) TC.cfg.sheets.enVivo = true;
+// Siempre en vivo: todo cambio se sube a Integra en cuanto hay señal (antes se podía apagar y
+// los pallets en proceso o sin iniciar quedaban solo en el celular).
+TC.cfg.sheets.enVivo = true;
 // IDs eliminados en el equipo que ya estaban en Sheets: se borran allá en la próxima subida.
 TC.cfg.bajas = TC.cfg.bajas || [];
 TC.cfg.metas = TC.cfg.metas || {};
@@ -85,12 +86,14 @@ TC.guardarRegistro = function (r, sinTocarFecha) {
   var i = TC._regs.findIndex(function (x) { return x.id === r.id; });
   if (i < 0) TC._regs.unshift(r); else TC._regs[i] = r;
   TC.persistir();
+  if (!sinTocarFecha && window.SHEETS) SHEETS.pronto();
 };
 TC.eliminar = function (id) {
   var r = TC.obtener(id);
   if (r && r.subidoMod) { TC.cfg.bajas.push({ id: r.id, registrador: r.registrador, dispositivo: r.dispositivo }); TC.guardarCfg(); }
   TC._regs = TC._regs.filter(function (x) { return x.id !== id; });
   TC.persistir();
+  if (window.SHEETS) SHEETS.pronto();
 };
 
 TC.nuevo = function () {
@@ -177,11 +180,8 @@ TC.validar = function (r, paraCerrar) {
 
 /** Un borrador «en proceso» ya tiene al menos una etapa iniciada. */
 TC.enProceso = function (r) { return r.estado !== 'cerrado' && TC.ETAPAS.some(function (e) { return r.etapas[e.id].ini; }); };
-TC.pendiente = function (r) {
-  if (r.subidoMod === r.actualizado) return false;
-  // Lo ya enviado se reenvía siempre que cambie (así no queda en Sheets un estado viejo).
-  return r.estado === 'cerrado' || !!r.subidoMod || (TC.cfg.sheets.enVivo && TC.enProceso(r));
-};
+/** Todo lo guardado en el equipo que cambió desde su última subida (también borradores y en proceso). */
+TC.pendiente = function (r) { return r.subidoMod !== r.actualizado; };
 /** Etapa bloqueada: su etapa previa aún no termina (ej. Lecturado se habilita después del armado).
  *  Las etapas libres (traslado de jaba y armado) nunca se bloquean. */
 TC.bloqueada = function (r, e) { return !!e.dep && !e.libre && !r.etapas[e.dep].fin && !r.etapas[e.id].ini; };
@@ -200,8 +200,9 @@ TC.situacion = function (r) {
 };
 TC.etiquetaEstado = function (r) {
   if (r.estado !== 'cerrado') {
-    if (TC.enProceso(r) && TC.cfg.sheets.enVivo && SHEETS.configurado()) return r.subidoMod === r.actualizado ? ['En proceso · en vivo', 'subido'] : ['En proceso', ''];
-    return ['Borrador', ''];
+    var arriba = r.subidoMod === r.actualizado;
+    if (TC.enProceso(r)) return arriba ? ['En proceso · en vivo', 'subido'] : ['En proceso · por subir', ''];
+    return arriba ? ['Borrador · en Integra', 'subido'] : ['Borrador · por subir', ''];
   }
   if (r.error && r.subidoMod !== r.actualizado) return ['Error al subir', 'error'];
   return r.subidoMod === r.actualizado ? ['Sincronizado', 'subido'] : ['Por subir', 'cerrado'];
@@ -211,10 +212,15 @@ TC.titulo = function (r) {
   return (r.lote || 'Sin lote') + (r.sublote && r.sublote !== '-' ? '-' + r.sublote : '') + (r.pasada ? ' · P' + r.pasada : '') + (r.pallet ? ' · Pallet ' + r.pallet : '');
 };
 
-/** Barra apilada (etapas + esperas) de un registro. */
+/** Barra apilada de un registro: cada etapa con su espera justo antes (gris rayado), en el orden del proceso. */
+TC.ESPERA_FONDO = 'repeating-linear-gradient(135deg,var(--espera) 0 3px,#D5DCE3 3px 6px)';
 TC.barra = function (c) {
-  var partes = TC.ETAPAS.map(function (e) { return [c.etapas[e.id].min || 0, e.color, e.nombre]; });
-  if (c.esperas > 0) partes.push([c.esperas, 'var(--espera)', 'Esperas']);
+  var partes = [];
+  TC.ETAPAS.forEach(function (e) {
+    var k = c.etapas[e.id], w = k.espera;
+    if (w > 0) partes.push([w, TC.ESPERA_FONDO, 'Espera antes de ' + e.nombre.toLowerCase()]);
+    partes.push([k.min || 0, e.color, e.nombre]);
+  });
   var tot = partes.reduce(function (s, p) { return s + p[0]; }, 0);
   if (!tot) return '<div class="barra"></div>';
   return '<div class="barra">' + partes.filter(function (p) { return p[0] > 0; }).map(function (p) {
@@ -223,5 +229,5 @@ TC.barra = function (c) {
 };
 TC.leyenda = function () {
   return '<div class="leyenda">' + TC.ETAPAS.map(function (e) { return '<span><i style="background:' + e.color + '"></i>' + e.n + '. ' + e.nombre + '</span>'; }).join('') +
-    '<span><i style="background:var(--espera)"></i>Esperas</span></div>';
+    '<span><i style="background:' + TC.ESPERA_FONDO + '"></i>Espera entre etapas</span></div>';
 };

@@ -144,7 +144,7 @@ RES.enlazarSelectores = function () {
 
 /** «Minutos por tramo» del ámbito (fila Total general); al tocarlo se abre el resumen por lote. */
 RES.tramosHtml = function (total) {
-  var tramos = CAMPOS_RESUMEN.map(function (c) { return { t: c.titulo, v: total[c.clave] }; })
+  var tramos = CAMPOS_RESUMEN.map(function (c) { return { t: c.titulo, espera: c.espera, v: total[c.clave] }; })
     .filter(function (x) { return x.v !== null && x.v !== undefined; });
   var meta = RES.meta, t = total.t_ciclo_total;
   return '<section class="panel entra res-tramos clicable" id="resTramos" role="button" tabindex="0">' +

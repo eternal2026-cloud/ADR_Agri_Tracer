@@ -6,7 +6,7 @@
 
 var APP = {};
 
-APP.NAV = [['inicio', 'Inicio'], ['registrar', 'Registrar'], ['registros', 'Registros'], ['ayuda', 'Ayuda'], ['config', 'Config']];
+APP.NAV = [['inicio', 'Inicio'], ['registrar', 'Registrar'], ['registros', 'Registros'], ['resumen', 'Resumen'], ['ayuda', 'Ayuda'], ['config', 'Config']];
 
 APP.ir = function (vista, sinAnimar) {
   clearInterval(DR._tick);
@@ -43,7 +43,9 @@ APP.iniciarApp = function () {
   window.addEventListener('offline', APP.estado);
   // Al volver a la app (desde otra app o al encender la pantalla) se sube lo pendiente.
   document.addEventListener('visibilitychange', function () { if (!document.hidden) { APP.estado(); SHEETS.auto(); } });
-  setInterval(function () { APP.estado(); SHEETS.auto(); }, 2 * 60000);
+  // Sincroniza cada 30 s (sube lo pendiente y trae lo de los demás equipos).
+  setInterval(function () { APP.estado(); SHEETS.auto(); NUBE.cargar(); }, 30000);
+  window.addEventListener('focus', function () { SHEETS.auto(); });
   APP.enlazarAtras();
   ALERTAS.iniciar();
 

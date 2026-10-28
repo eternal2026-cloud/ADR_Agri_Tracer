@@ -4,13 +4,13 @@
  * sin señal se abre la copia guardada. Solo archivos del sitio (GET); las llamadas
  * a Supabase nunca se guardan (los registros viven en el equipo y suben luego).
  * ==========================================================================*/
-var CACHE = 'integra-uva-v1';
+var CACHE = 'integra-uva-v3';
 var BASE = [
   './', 'index.html', 'css/app.css', 'img/icono.svg',
   'fonts/jost-latin-400-normal.woff2', 'fonts/jost-latin-500-normal.woff2', 'fonts/jost-latin-600-normal.woff2', 'fonts/jost-latin-700-normal.woff2',
   'js/nucleo.js', 'js/catalogo.js', 'js/datos.js', 'js/permisos.js', 'js/mascota.js', 'js/integra.js', 'js/registrar.js',
-  'js/alertas.js', 'js/vistas.js', 'js/faq.js', 'js/app.js',
-  '../../vendor/anime.min.js', '../../vendor/supabase.min.js', '../../js/supabase-cliente.js'
+  'js/alertas.js', 'js/vistas.js', 'js/nube.js', 'js/resumen.js', 'js/faq.js', 'js/app.js',
+  'data/lotes_uva.geojson', '../../vendor/leaflet/leaflet.css', '../../vendor/leaflet/leaflet.js', '../../vendor/anime.min.js', '../../vendor/supabase.min.js', '../../js/supabase-cliente.js'
 ];
 
 self.addEventListener('install', function (e) {

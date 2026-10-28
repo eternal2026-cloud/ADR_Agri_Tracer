@@ -82,13 +82,12 @@ VIS.continuar = function (r) {
   UI.abrirHoja('<h3>Continuar en planta</h3><p class="ayuda-campo">Placa <b>' + DR.esc(r.placa) + '</b> · ' + DR.esc([r.fundo, r.lote, r.variedad].filter(Boolean).join(' · ')) +
       (r.pallet ? ' · Pallet ' + DR.esc(r.pallet) : '') + ' · registrado en ' + PL.origenTxt(r) + ' por ' + DR.esc(r.registrador || '—') + '.</p>' +
     '<div class="campo"><label for="hPlanta">Planta</label><select id="hPlanta">' + VIS.opcionesPlanta(r.planta) + '</select></div>' +
-    '<div class="campo"><label for="hLinea">Línea de abastecimiento</label><input id="hLinea" list="plLineas" maxlength="40" placeholder="ej. Línea 3">' + VIS.listaLineas() + '</div>' +
     '<div class="acciones"><button class="btn sec" id="hNo" type="button">Cancelar</button><button class="btn verde" id="hSi" type="button">Continuar</button></div>');
   DR.$('#hNo').onclick = UI.cerrarHoja;
   DR.$('#hSi').onclick = function () {
     if (!navigator.onLine) { DR.toast('Para continuar un ciclo de campo se necesita señal (Integra confirma que nadie más lo tomó).', 'error'); return; }
     var b = this; b.disabled = true;
-    AT.rpc('rpc_uva_planta_iniciar', { p: { id_campo: r.id, planta: DR.$('#hPlanta').value, linea: DR.$('#hLinea').value } }).then(function (f) {
+    AT.rpc('rpc_uva_planta_iniciar', { p: { id_campo: r.id, planta: DR.$('#hPlanta').value } }).then(function (f) {
       PL.ponerFila(f); PL.guardarCache(); UI.cerrarHoja();
       DR.toast(f.hora_llegada ? 'Ciclo vinculado: campo ya marcó la llegada (' + PL.horaCorta(f.hora_llegada) + ').' : 'Ciclo vinculado: marca la llegada del camión.', 'ok');
       location.hash = '#reg/' + encodeURIComponent(f.id);
@@ -101,7 +100,6 @@ VIS.nuevo = function () {
   UI.abrirHoja('<h3>Nuevo en planta</h3><p class="ayuda-campo">Para camiones sin ciclo de campo registrado. Su ámbito será <b>Planta</b>.</p>' +
     '<div class="campo"><label for="hPlaca">Placa del camión</label><input id="hPlaca" maxlength="12" autocapitalize="characters" placeholder="ABC123" value="' + DR.esc(VIS.filtro) + '"></div>' +
     '<div class="campo"><label for="hPlanta">Planta</label><select id="hPlanta">' + VIS.opcionesPlanta('') + '</select></div>' +
-    '<div class="campo"><label for="hLinea">Línea de abastecimiento</label><input id="hLinea" list="plLineas" maxlength="40" placeholder="ej. Línea 3">' + VIS.listaLineas() + '</div>' +
     '<label class="chk"><input type="checkbox" id="hYa" checked> Marcar ahora la llegada del camión</label>' +
     '<div class="acciones"><button class="btn sec" id="hNo" type="button">Cancelar</button><button class="btn azul" id="hSi" type="button">Iniciar</button></div>');
   DR.$('#hNo').onclick = UI.cerrarHoja;
@@ -109,8 +107,8 @@ VIS.nuevo = function () {
     var placa = DR.$('#hPlaca').value.toUpperCase().replace(/\s+/g, '');
     if (!placa) { DR.toast('Escribe la placa del camión.', 'error'); return; }
     var id = PL.nuevoId(), ahora = new Date().toISOString(), ya = DR.$('#hYa').checked;
-    var p = { id_nuevo: id, placa: placa, planta: DR.$('#hPlanta').value, linea: DR.$('#hLinea').value, creado: ahora };
-    PL.ponerFila({ id: id, origen: 'planta', placa: placa, planta: p.planta, planta_destino: p.planta, linea: p.linea, fecha: PL.hoyISO(),
+    var p = { id_nuevo: id, placa: placa, planta: DR.$('#hPlanta').value, creado: ahora };
+    PL.ponerFila({ id: id, origen: 'planta', placa: placa, planta: p.planta, planta_destino: p.planta, linea: null, fecha: PL.hoyISO(),
       planta_inicio: ahora, planta_usuario: AT.perfil.nombre, registrador: AT.perfil.nombre, planta_detalle: {}, vinculado: false, _nuevo: true,
       hora_llegada: ya ? ahora : null });
     PL.guardarCache();
@@ -144,6 +142,7 @@ VIS.registro = function (c, id) {
       return '<div class="pl-marca' + (v ? ' hecha' : '') + (sig && sig.k === m.k ? ' actual' : '') + '" style="--c:' + m.color + '">' +
         '<div class="pl-marca-cab"><span class="pl-n">' + (i + 1) + '</span><div><b>' + m.nombre + '</b>' +
           (v && m.k === 'hora_llegada' && r.llegada_por === 'campo' ? '<small>Marcada en campo (' + PL.origenTxt(r) + ')</small>' : '') +
+          (m.k === 'ini_abastecimiento' && r.linea ? '<small>Línea ' + DR.esc(r.linea) + '</small>' : '') +
           (d.causa || d.com ? '<small>' + DR.esc([d.causa, d.com].filter(Boolean).join(' · ')) + '</small>' : '') + '</div>' +
           '<span class="pl-hora">' + PL.hora(v) + '</span></div>' +
         (puede ? '<div class="pl-marca-btns">' +
@@ -158,15 +157,20 @@ VIS.registro = function (c, id) {
     c.innerHTML = '<div class="vista angosta">' +
       '<a class="campo-volver" href="#hoy">' + DR.ICONOS.atras + 'Hoy</a>' +
       '<div class="pl-tarjeta-cab entra" style="margin:6px 0 4px"><b class="pl-placa grande">' + DR.esc(r.placa || '—') + '</b>' + VIS.chipAmbito(r) + '</div>' +
-      '<p class="ayuda-campo entra">' + DR.esc(r.planta_destino || r.planta || '') + (r.linea ? ' · Línea ' + DR.esc(r.linea) : '') + ' · ' + DR.esc(r.planta_usuario || '') +
-        (puede ? ' · <a href="#" id="plDatos">Cambiar planta / línea</a>' : '') + '</p>' +
+      '<p class="ayuda-campo entra">' + DR.esc(r.planta_destino || r.planta || '') + ' · ' + DR.esc(r.planta_usuario || '') +
+        (puede ? ' · <a href="#" id="plDatos">Cambiar planta</a>' : '') + '</p>' +
       UI.panel('Planta', sig ? 'Sigue: ' + sig.nombre : 'Las 5 marcas están completas', '<div class="pl-marcas">' + marcas + '</div>') +
       UI.panel('Tiempos en planta', 'Se calculan entre marcas (min:seg)', '<div class="pl-tramos">' + tramos + '</div>') +
       campo +
       (puede ? '<div class="acciones"><button class="btn btn-peligro" id="plQuitar" type="button">' + (r.origen === 'planta' ? 'Anular registro' : 'Quitar de planta (vuelve a Campo)') + '</button></div>' : '') +
     '</div>';
 
-    DR.$$('[data-ahora]').forEach(function (b) { b.onclick = function () { VIS.marcar(r, b.getAttribute('data-ahora'), new Date().toISOString(), true); }; });
+    DR.$$('[data-ahora]').forEach(function (b) {
+      b.onclick = function () {
+        var k = b.getAttribute('data-ahora'), iso = new Date().toISOString();
+        if (k === 'ini_abastecimiento') VIS.abastecer(r, iso); else VIS.marcar(r, k, iso, true);
+      };
+    });
     DR.$$('[data-editar]').forEach(function (b) { b.onclick = function () { VIS.editarHora(r, b.getAttribute('data-editar')); }; });
     DR.$$('[data-nota]').forEach(function (b) { b.onclick = function () { VIS.nota(r, b.getAttribute('data-nota')); }; });
     if (DR.$('#plDatos')) DR.$('#plDatos').onclick = function (e) { e.preventDefault(); VIS.datos(r); };
@@ -179,34 +183,62 @@ VIS.registro = function (c, id) {
 };
 
 /** Guarda una marca (en el equipo y a la cola). Valida el orden con la marca anterior y la siguiente.
- *  ahora = botón «Ahora»: si campo ya marcó la llegada mientras tanto, el servidor conserva la de campo. */
-VIS.marcar = function (r, k, iso, ahora) {
+ *  ahora = botón «Ahora»: si campo ya marcó la llegada mientras tanto, el servidor conserva la de campo.
+ *  extra = datos que van con la marca (la línea con el inicio de abastecimiento). */
+VIS.marcar = function (r, k, iso, ahora, extra) {
   var i = PL.MARCAS.findIndex(function (m) { return m.k === k; });
   var ant = i > 0 ? r[PL.MARCAS[i - 1].k] : null, sig = i < PL.MARCAS.length - 1 ? r[PL.MARCAS[i + 1].k] : null;
   if (iso && ant && new Date(iso) < new Date(ant)) { DR.toast(PL.MARCAS[i].nombre + ' no puede ser antes de ' + PL.MARCAS[i - 1].nombre + ' (' + PL.hora(ant) + ').', 'error'); return; }
   if (iso && sig && new Date(iso) > new Date(sig)) { DR.toast(PL.MARCAS[i].nombre + ' no puede ser después de ' + PL.MARCAS[i + 1].nombre + ' (' + PL.hora(sig) + ').', 'error'); return; }
   r[k] = iso || null;
   if (k === 'hora_llegada') r.llegada_por = iso ? 'planta' : null;
-  PL.guardarCache();
   var p = { id: r.id }; p[k] = iso || '';
   if (ahora && k === 'hora_llegada') p.llegada_nueva = true;
+  Object.keys(extra || {}).forEach(function (x) { r[x] = extra[x] || null; p[x] = extra[x]; });
+  PL.guardarCache();
   PL.encolar('guardar', p);
   DR.vibrar && DR.vibrar(15);
   if (PL.alCambiar) PL.alCambiar();
 };
 
+/** Campo «Línea de abastecimiento»: va con la marca de inicio de abastecimiento (se sabe en ese momento). */
+VIS.campoLinea = function (r) {
+  return '<div class="campo"><label for="hLinea">Línea de abastecimiento</label><input id="hLinea" list="plLineas" maxlength="40" placeholder="ej. Línea 3" value="' +
+    DR.esc(r.linea || '') + '">' + VIS.listaLineas() + '</div>';
+};
+VIS.leerLinea = function () {
+  var l = DR.$('#hLinea').value.trim();
+  if (!l) { DR.toast('Indica a qué línea se abastece.', 'error'); DR.$('#hLinea').focus(); return null; }
+  return l;
+};
+
+/** «Ahora» en inicio de abastecimiento: la hora es la del toque; se pide la línea. */
+VIS.abastecer = function (r, iso) {
+  UI.abrirHoja('<h3>Inicio de abastecimiento · ' + PL.hora(iso) + '</h3>' + VIS.campoLinea(r) +
+    '<div class="acciones"><button class="btn sec" id="hNo" type="button">Cancelar</button><button class="btn verde" id="hSi" type="button">Guardar</button></div>');
+  DR.$('#hNo').onclick = UI.cerrarHoja;
+  DR.$('#hSi').onclick = function () {
+    var l = VIS.leerLinea(); if (!l) return;
+    UI.cerrarHoja(); VIS.marcar(r, 'ini_abastecimiento', iso, true, { linea: l });
+  };
+  setTimeout(function () { var i = DR.$('#hLinea'); if (i && !i.value) i.focus(); }, 50);
+};
+
 VIS.editarHora = function (r, k) {
-  var m = PL.MARCAS.filter(function (x) { return x.k === k; })[0], v = r[k];
+  var m = PL.MARCAS.filter(function (x) { return x.k === k; })[0], v = r[k], abast = k === 'ini_abastecimiento';
   var base = v || r.hora_llegada || r.planta_inicio || new Date().toISOString();
   UI.abrirHoja('<h3>' + m.nombre + '</h3><div class="campo"><label for="hHora">Hora (con segundos)</label><input id="hHora" type="time" step="1" value="' + (v ? PL.hora(v) : PL.hora(new Date().toISOString())) + '"></div>' +
+    (abast ? VIS.campoLinea(r) : '') +
     '<div class="acciones">' + (v ? '<button class="btn btn-peligro" id="hBorrar" type="button">Borrar</button>' : '') +
     '<button class="btn sec" id="hNo" type="button">Cancelar</button><button class="btn verde" id="hSi" type="button">Guardar</button></div>');
   DR.$('#hNo').onclick = UI.cerrarHoja;
-  if (DR.$('#hBorrar')) DR.$('#hBorrar').onclick = function () { UI.cerrarHoja(); VIS.marcar(r, k, null); };
+  if (DR.$('#hBorrar')) DR.$('#hBorrar').onclick = function () { UI.cerrarHoja(); VIS.marcar(r, k, null, false, abast ? { linea: '' } : null); };
   DR.$('#hSi').onclick = function () {
     var iso = PL.deHora(base, DR.$('#hHora').value);
     if (!iso) { DR.toast('Escribe la hora.', 'error'); return; }
-    UI.cerrarHoja(); VIS.marcar(r, k, iso);
+    var l = abast ? VIS.leerLinea() : null;
+    if (abast && !l) return;
+    UI.cerrarHoja(); VIS.marcar(r, k, iso, false, abast ? { linea: l } : null);
     var d = (r.planta_detalle = r.planta_detalle || {}), dd = PL.MARCAS.filter(function (x) { return x.k === k; })[0].d;
     d[dd] = Object.assign({}, d[dd] || {}, { editado: true });
     var p = { id: r.id, detalle: {} }; p.detalle[dd] = d[dd];
@@ -232,16 +264,15 @@ VIS.nota = function (r, dd) {
 };
 
 VIS.datos = function (r) {
-  UI.abrirHoja('<h3>Planta y línea</h3>' +
+  UI.abrirHoja('<h3>Planta</h3>' +
     (r.origen === 'planta' ? '<div class="campo"><label for="hPlaca">Placa</label><input id="hPlaca" maxlength="12" value="' + DR.esc(r.placa || '') + '"></div>' : '') +
     '<div class="campo"><label for="hPlanta">Planta</label><select id="hPlanta">' + VIS.opcionesPlanta(r.planta_destino || r.planta) + '</select></div>' +
-    '<div class="campo"><label for="hLinea">Línea de abastecimiento</label><input id="hLinea" list="plLineas" maxlength="40" value="' + DR.esc(r.linea || '') + '">' + VIS.listaLineas() + '</div>' +
     '<div class="campo"><label for="hObs">Observación</label><textarea id="hObs" rows="2" maxlength="300">' + DR.esc(r.planta_obs || '') + '</textarea></div>' +
     '<div class="acciones"><button class="btn sec" id="hNo" type="button">Cancelar</button><button class="btn verde" id="hSi" type="button">Guardar</button></div>');
   DR.$('#hNo').onclick = UI.cerrarHoja;
   DR.$('#hSi').onclick = function () {
-    var p = { id: r.id, planta: DR.$('#hPlanta').value, linea: DR.$('#hLinea').value, obs: DR.$('#hObs').value };
-    r.planta_destino = p.planta; r.linea = p.linea; r.planta_obs = p.obs;
+    var p = { id: r.id, planta: DR.$('#hPlanta').value, obs: DR.$('#hObs').value };
+    r.planta_destino = p.planta; r.planta_obs = p.obs;
     if (DR.$('#hPlaca')) { p.placa = DR.$('#hPlaca').value.toUpperCase().replace(/\s+/g, ''); r.placa = p.placa; r.planta = p.planta; }
     PL.guardarCache(); PL.encolar('guardar', p); UI.cerrarHoja();
     if (PL.alCambiar) PL.alCambiar();

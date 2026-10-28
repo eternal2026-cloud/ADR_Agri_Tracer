@@ -248,7 +248,8 @@ Protecciones en la base de datos (migración 0011):
 - **Planta** (`planta/uva-recepcion/`, acceso `planta.uva`): busca por placa los ciclos de campo **del
   mismo día** con placa y los **continúa** (`rpc_uva_planta_iniciar`), o inicia uno nuevo. 5 marcas
   en secuencia: llegada del camión → recepción → inicio descarga → fin descarga → inicio
-  abastecimiento; planta, línea, causa y comentario por marca. Cola sin señal en `localStorage`.
+  abastecimiento; causa y comentario por marca. La **línea** no se pide al iniciar: se indica (obligatoria)
+  al marcar el inicio de abastecimiento, que es cuando se sabe. Cola sin señal en `localStorage`.
 - **Ámbito**: `Campo` (no continuado), `Ciclo completo` (continuado en planta), `Planta` (iniciado en planta).
 - **Sheets** (`sync-sheets` v13): `UVA_Registros` (mismas columnas y orden que `Registros` de la APK +
   columnas de planta) y `UVA_Etapas` (8 etapas + 5 de planta, N° 9–13). Solo van los de Integra y los de

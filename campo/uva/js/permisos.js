@@ -56,7 +56,9 @@ PERM.cargar = function () {
     var c = r.data.config || {};
     var p = {
       actualizado: new Date().toISOString(),
-      catalogo: (r.data.catalogo || []).map(function (f) { return [CAT.limpiar(f[0]), CAT.limpiar(f[1]), CAT.limpiar(f[2]), CAT.normVariedad(f[3])]; }),
+      // + los lotes digitados en este equipo que aún no llegan a Integra (CAT.agregarLote).
+      catalogo: (r.data.catalogo || []).map(function (f) { return [CAT.limpiar(f[0]), CAT.limpiar(f[1]), CAT.limpiar(f[2]), CAT.normVariedad(f[3])]; })
+        .concat((TC.cfg.lotesNuevos || []).filter(function (n) { return !(r.data.catalogo || []).some(function (f) { return CAT.limpiar(f[1]) === n[1] && CAT.limpiar(f[2]) === n[2]; }); })),
       plantas: Array.isArray(c.plantas) ? c.plantas : [],
       lineas: Array.isArray(c.lineas) ? c.lineas : [],
       lideres: Array.isArray(c.lideres) ? c.lideres : [],

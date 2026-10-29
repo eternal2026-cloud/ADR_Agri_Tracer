@@ -2,7 +2,8 @@
  * reporte.js — EXPORTABLES DEL ESTUDIO TOP
  * Excel (ExcelJS): resumen, tiempos estándar, tomas, estándares, REBA,
  * ergonomía y propuesta, con los datos crudos para Power BI.
- * PDF (jsPDF): informe técnico de sustento con las imágenes REBA de la hoja.
+ * PDF (jsPDF): informe técnico de sustento con las imágenes REBA de la hoja y, en la portada,
+ * la última foto subida en las evaluaciones del periodo como imagen de referencia.
  * ==========================================================================*/
 var REPORTE = {};
 
@@ -158,10 +159,48 @@ REPORTE.imagen = function (src) {
   }).catch(function () { return null; });
 };
 
+/**
+ * Última foto subida en el periodo (estándares y REBA). La ruta termina en «-<Date.now()>.jpg»
+ * (FOTOS.subirLista): ese número es la hora de subida. Devuelve {ruta, ts, eval, donde} o null.
+ */
+REPORTE.ultimaFoto = function (D) {
+  var mejor = null;
+  var ver = function (ruta, evalId, donde) {
+    var m = /-(\d{11,})\.jpe?g$/i.exec(ruta || ''), ts = m ? Number(m[1]) : 0;
+    if (ruta && (!mejor || ts > mejor.ts)) mejor = { ruta: ruta, ts: ts, eval: evalId, donde: donde };
+  };
+  D.cump.forEach(function (c) {
+    var it = TOP.items.filter(function (x) { return x.id === c.item_id; })[0];
+    (c.fotos || []).forEach(function (f) { ver(f, c.evaluacion_id, 'Estándar' + (it ? ': ' + it.descripcion : '')); });
+  });
+  D.reba.forEach(function (x) { (x.fotos || []).forEach(function (f) { ver(f, x.evaluacion_id, 'Postura REBA'); }); });
+  return mejor;
+};
+/** Descarga la foto del bucket privado y la reduce (lado mayor 1200 px) para el PDF. */
+REPORTE.fotoPdf = function (ruta) {
+  return sb.storage.from(FOTOS.BUCKET).download(ruta).then(function (r) {
+    if (r.error || !r.data) return null;
+    return new Promise(function (res) {
+      var url = URL.createObjectURL(r.data), img = new Image();
+      img.onload = function () {
+        var esc = Math.min(1, 1200 / Math.max(img.naturalWidth, img.naturalHeight)), c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(img.naturalWidth * esc)); c.height = Math.max(1, Math.round(img.naturalHeight * esc));
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        res({ src: c.toDataURL('image/jpeg', 0.8), w: c.width, h: c.height });
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); res(null); };
+      img.src = url;
+    });
+  }).catch(function () { return null; });
+};
+
 REPORTE.pdf = function (D, A) {
   var imgs = ['img/reba-cuello.jpg', 'img/reba-tronco.jpg', 'img/reba-piernas.jpg', 'img/reba-antebrazo.jpg', 'img/reba-muneca.jpg', 'img/ergonomia-cuerpo.jpg'];
-  return Promise.all([REPORTE.lib('../../vendor/jspdf.umd.min.js', 'jspdf.jsPDF'), REPORTE.propuestas(), Promise.all(imgs.map(REPORTE.imagen))]).then(function (r) {
-    var JsPDF = r[0], props = r[1], fig = r[2], doc = new JsPDF({ unit: 'mm', format: 'a4' }), T = REPORTE.t;
+  var ultima = REPORTE.ultimaFoto(D);
+  return Promise.all([REPORTE.lib('../../vendor/jspdf.umd.min.js', 'jspdf.jsPDF'), REPORTE.propuestas(), Promise.all(imgs.map(REPORTE.imagen)),
+    ultima ? REPORTE.fotoPdf(ultima.ruta) : null]).then(function (r) {
+    var JsPDF = r[0], props = r[1], fig = r[2], ref = r[3], doc = new JsPDF({ unit: 'mm', format: 'a4' }), T = REPORTE.t;
     var W = 210, M = 16, y = 0, pagina = 1;
     var colores = { azul: [0, 151, 206], naranja: [239, 124, 59], verde: [118, 183, 41], gris: [110, 97, 85], texto: [34, 26, 19] };
     var pie = function () {
@@ -226,6 +265,22 @@ REPORTE.pdf = function (D, A) {
       D.cump.length + ' verificaciones de estándar · ' + D.reba.length + ' posturas REBA · ' + D.ergo.length + ' entrevistas ergonómicas · ' +
       (D.enc || []).length + ' encuestas de factores de rendimiento.', 10.5);
     parrafo('Emitido el ' + TOP.fecha(TOP.hoy()) + ' por ' + ((AT.perfil && AT.perfil.nombre) || '—') + '.', 9, colores.gris);
+
+    // Imagen de referencia: la última foto subida en las evaluaciones del periodo (centrada, con su proporción).
+    if (ref) {
+      var ev = REPORTE.evalDe(D, ultima.eval), maxW = W - 2 * M, maxH = 120, k = Math.min(maxW / ref.w, maxH / ref.h);
+      var iw = ref.w * k, ih = ref.h * k;
+      y += 2;
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor.apply(doc, colores.texto);
+      doc.text(T('Imagen de referencia'), M, y); y += 3;
+      try {
+        doc.addImage(ref.src, 'JPEG', M + (maxW - iw) / 2, y, iw, ih, undefined, 'FAST');
+        doc.setDrawColor(230, 222, 212); doc.rect(M + (maxW - iw) / 2, y, iw, ih);
+        y += ih + 5;
+        parrafo('Última foto subida' + (ultima.ts ? ' (' + TOP.fecha(new Date(ultima.ts - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10)) + ')' : '') +
+          (ev.cosechador ? ' · ' + ev.cosechador : '') + (ev.codigo ? ' · ' + ev.codigo : '') + ' · ' + ultima.donde + '.', 8, colores.gris);
+      } catch (e) { /* imagen no disponible */ }
+    }
 
     titulo('1. Objetivo y metodología');
     parrafo('Actualizar los estándares de cosecha a partir del método del personal TOP, con un sustento medible. A cada cosechador TOP se le observa durante su jornada y se registra:');

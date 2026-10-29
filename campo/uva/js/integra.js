@@ -49,7 +49,10 @@ SHEETS.paquete = function (r) {
     registro: {
       id: r.id, semana: TC.semana(r.fecha), fecha: r.fecha, campana: r.campana, zona: r.zona, fundo: r.fundo, lote: r.lote,
       sublote: r.sublote, pasada: r.pasada, color: r.color, variedad: r.variedad, grupo: r.grupo, pallet: r.pallet,
-      jabas: r.jabas, zunchos: r.zunchos, placa: r.placa, palletsTot: r.palletsTot, palletsCarg: r.palletsCarg, planta: r.planta,
+      jabas: r.jabas, zunchos: r.zunchos, placa: r.placa, palletsTot: r.palletsTot, palletsCarg: r.palletsCarg,
+      cargaTot: r.cargaTot || '', cargaCarg: r.cargaCarg || '', planta: r.planta,
+      // Hora en que se tomó cada dato en el celular: Integra junta versiones del mismo ciclo por ella (0057).
+      marcas: r.t || {}, union: r.union ? true : undefined, editadoPor: TC.cfg.usuario,
       minTotal: r1(c.total), minConformacion: r1(c.conformacion), minEtapas: r1(c.suma), minEsperas: r1(c.esperas), metaTotal: c.meta,
       enMeta: c.enMeta === null ? '' : (c.enMeta ? 'Sí' : 'No'), atipico: c.atipico ? 'Sí' : '',
       lenta: nombre(c.lenta), mayorEspera: nombre(c.mayorEspera),
@@ -90,8 +93,16 @@ SHEETS.subirPendientes = function (aviso) {
     var r = pend[i], modEnviado = r.actualizado;
     aviso({ total: pend.length, hechos: hechos });
     return SHEETS.llamar(SHEETS.paquete(r)).then(function (res) {
-      var act = TC.obtener(r.id);
-      if (act) { act.subidoMod = modEnviado; act.subido = new Date().toISOString(); act.error = ''; TC.guardarRegistro(act, true); SHEETS.ponerLlegada(act, res); }
+      // Integra pudo unirlo a otro ciclo del mismo N° de pallet (otro ID) y devuelve el ciclo combinado.
+      var act = res && res.id && res.id !== r.id ? TC.renombrar(r.id, res.id) : TC.obtener(r.id);
+      if (act) {
+        // Con otro ID se vuelve a subir con el vigente (Integra ya tiene lo combinado; no duplica).
+        act.subidoMod = res && res.id && res.id !== r.id ? '' : modEnviado; act.subido = new Date().toISOString(); act.error = '';
+        // Lo que otra persona tomó en este ciclo entra al equipo; se vuelve a subir para recalcular minutos y esperas.
+        if (res && res.fila && TC.fusionar(act, NUBE.aRegistro(res.fila))) act.actualizado = new Date().toISOString();
+        TC.guardarRegistro(act, true); SHEETS.ponerLlegada(act, res);
+        if (window.REG && REG.id === act.id && REG.vista === 'wiz' && DR.vista === 'registrar' && act.actualizado !== act.subidoMod) REG.pintarWiz(DR.$('#contenido'), act, 0);
+      }
       hechos++;
       return siguiente(i + 1);
     }, function (e) {
@@ -163,11 +174,27 @@ SHEETS.auto = function () {
   if (!SHEETS.configurado() || !SHEETS.hayRed()) return;
   SHEETS.llegadas();
   if (SHEETS.subiendo) { SHEETS._otraVez = true; return; }
+  SHEETS.lotesNuevos();
   if (!TC.registros().some(TC.pendiente) && !TC.cfg.bajas.length) return;
   SHEETS.subir(true).then(function () {
     if (DR.vista === 'registros' || (DR.vista === 'registrar' && REG.vista === 'lista')) APP.ir(DR.vista, true);
     if (SHEETS._otraVez) { SHEETS._otraVez = false; SHEETS.auto(); }
   }, function () { SHEETS._otraVez = false; });
+};
+
+/** Lotes digitados que no estaban en el catálogo (CAT.agregarLote): se guardan en Integra para todos. */
+SHEETS.lotesNuevos = function () {
+  var l = TC.cfg.lotesNuevos || [];
+  if (!l.length || SHEETS._lotes) return;
+  SHEETS._lotes = true;
+  var x = l[0];
+  sb.rpc('rpc_uva_lote_nuevo', { p_fundo: x[1], p_lote: x[2], p_variedad: x[3] || '' }).then(function (res) {
+    SHEETS._lotes = false;
+    // Sin señal o la base aún sin rpc_uva_lote_nuevo (0057): se reintenta luego. Si Integra lo rechaza, queda solo aquí.
+    if (res.error && (SHEETS.SIN_RED.test(res.error.message || '') || /function|funci[oó]n|schema cache/i.test(res.error.message || ''))) return;
+    TC.cfg.lotesNuevos.shift(); TC.guardarCfg();
+    SHEETS.lotesNuevos();
+  }, function () { SHEETS._lotes = false; });
 };
 
 /** Envío «en vivo»: unos segundos después de cada Iniciar/Terminar (agrupa toques seguidos). */

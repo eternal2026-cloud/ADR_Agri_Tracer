@@ -7,32 +7,43 @@
  *    cuál pasar (botón «Siguiente» o los pasos de arriba).
  *  · Cosecha, traslado de jaba y armado se toman en paralelo (cualquiera en cualquier orden).
  *    Desde el lecturado, cada etapa se habilita cuando termina aquella de la que depende.
- *  · Sin código de pallet no se pasa de la etapa Cosecha.
- *  · Datos obligatorios para terminar una etapa: N° de jabas (armado), N° de zunchos
- *    (enzunchado), N° total de pallets y de pallets cargados (portabin) y planta (traslado).
+ *  · Datos iniciales (fundo, lote, grupo…): libres en las etapas 1 a 3; hacen falta para pasar
+ *    del Lecturado en adelante. El código de pallet se escribe en el Lecturado (etapa 4) y hace
+ *    falta para las etapas 5 a 8.
+ *  · Los datos de cada etapa se escriben LUEGO de marcar su fin: N° de jabas (armado), N° de
+ *    zunchos (enzunchado), pallets totales/cargados (portabin), pallets cargados/total y placa
+ *    (carga). Se exigen al cerrar. Solo la planta destino se pide antes del fin del traslado.
+ *  · «Unirse por N° de pallet»: el auxiliar que sigue el ciclo desde la carga abre el pallet de
+ *    otro equipo o, sin señal, lo crea solo con el N°; Integra junta ambos por N° de pallet + fecha.
  *  · Desde la lista, cada pallet en curso tiene «Marcar … ahora» para registrar sin entrar.
  * Todo se guarda en el equipo en cada cambio (borrador) y sube solo a Integra (la misma base de la APK).
  * ==========================================================================*/
 
 var REG = { vista: 'lista', id: null, idx: 0, filtro: '', _pct: 0 };
 
-/** Campos propios de algunas etapas (columnas de la BD): [campo, rótulo, tipo, ejemplo, obligatorio para terminarla]. */
+/** Campos propios de algunas etapas (columnas de la BD):
+ *  [campo, rótulo, tipo, ejemplo, obligatorio (al cerrar), se pide ANTES del fin]. */
 REG.EXTRAS = {
   arm: [['jabas', 'N° jabas', 'number', '45', true]],
+  lec: [['pallet', 'Código de pallet', 'text', 'ej. 102345', true]],
   enz: [['zunchos', 'N° de zunchos', 'number', '3', true]],
   por: [['palletsTot', 'N° total de pallets', 'number', '14', true], ['palletsCarg', 'N° total de pallets cargados', 'number', '14', true]],
-  car: [['placa', 'Placa de camión', 'text', 'CCV39']],
-  tra: [['planta', 'Planta destino', 'planta', '', true]]
+  car: [['cargaCarg', 'N° de pallets cargados', 'number', '14', true], ['cargaTot', 'N° de pallets total', 'number', '14', true], ['placa', 'Placa de camión', 'text', 'CCV39', true]],
+  tra: [['planta', 'Planta destino', 'planta', '', true, true]]
 };
-/** Dato obligatorio que aún falta para terminar la etapa ([campo, rótulo…]) o null. */
+REG.vacio = function (r, f) { return f[2] === 'number' ? !(Number(r[f[0]]) > 0) : !String(r[f[0]] || '').trim(); };
+/** Dato que hace falta ANTES de marcar el fin (solo la planta destino) o null. */
 REG.faltaParaFin = function (r, e) {
-  return (REG.EXTRAS[e.id] || []).filter(function (f) {
-    return f[4] && (f[2] === 'number' ? !(Number(r[f[0]]) > 0) : !String(r[f[0]] || '').trim());
-  })[0] || null;
+  return (REG.EXTRAS[e.id] || []).filter(function (f) { return f[4] && f[5] && REG.vacio(r, f); })[0] || null;
 };
+/** Primer dato de la etapa que falta luego de su fin (se escribe después de marcar el fin) o null. */
+REG.faltaDato = function (r, e) {
+  return (REG.EXTRAS[e.id] || []).filter(function (f) { return f[4] && REG.vacio(r, f); })[0] || null;
+};
+REG.MAYUS = { placa: true, pallet: true };
 /** Toma lo escrito en los campos de la etapa aunque aún no hayan perdido el foco. */
 REG.leerExtras = function (r) {
-  DR.$$('[data-x]').forEach(function (inp) { var k = inp.getAttribute('data-x'); r[k] = k === 'placa' ? inp.value.trim().toUpperCase() : inp.value; });
+  DR.$$('[data-x]').forEach(function (inp) { var k = inp.getAttribute('data-x'); r[k] = REG.MAYUS[k] ? inp.value.replace(/\s+/g, '').toUpperCase() : inp.value; });
 };
 
 /* ------------------------------------------------ horas */
@@ -80,8 +91,19 @@ REG.siguienteHora = function (r) {
 REG.rotHora = function (e, campo) { return (campo === 'ini' ? 'Inicio' : 'Fin') + ' ' + e.nombre.toLowerCase(); };
 REG.subtitulo = function (r) { return [r.fundo, r.variedad, r.grupo].filter(Boolean).map(DR.esc).join(' · '); };
 REG.datosOrigen = function (r) { return !!(r.fundo && r.lote); };
-/** Con fundo, lote y código de pallet ya se puede pasar a las demás etapas. */
-REG.listo = function (r) { return REG.datosOrigen(r) && !!String(r.pallet || '').trim(); };
+/** Unido por N° de pallet (auxiliar de carga): los datos iniciales llegan del ciclo de la otra persona. */
+REG.listo = function (r) { return REG.datosOrigen(r) || !!r.union; };
+/**
+ * Qué falta para trabajar en la etapa i (o null): las etapas 1 a 3 no piden nada; desde el
+ * Lecturado hacen falta fundo y lote, y desde el Enzunchado también el código de pallet.
+ * {txt, boton, idx (etapa donde se completa), campo}
+ */
+REG.requisito = function (r, i) {
+  if (i < TC.E.lec.i) return null;
+  if (!REG.listo(r)) return { txt: 'Completa los datos iniciales (fundo y lote) en la etapa 1 para pasar al Lecturado.', boton: 'Completar datos iniciales', idx: 0, campo: r.fundo ? '#inLote' : '#inFundo' };
+  if (i > TC.E.lec.i && !String(r.pallet || '').trim()) return { txt: 'Escribe el código de pallet en la etapa 4 · Lecturado.', boton: 'Escribir código de pallet', idx: TC.E.lec.i, campo: '[data-x="pallet"]' };
+  return null;
+};
 
 /* ------------------------------------------------ navegación */
 VISTAS.registrar = function (cont) {
@@ -98,7 +120,9 @@ REG.abrir = function (id, idx) {
   if (r.estado === 'cerrado') REG.vista = 'fin';
   else {
     REG.vista = 'wiz'; var p = REG.proxima(r);
-    REG.idx = !REG.listo(r) ? 0 : idx !== undefined ? idx : p < 0 ? TC.ETAPAS.length - 1 : p;
+    REG.idx = idx !== undefined ? idx : p < 0 ? TC.ETAPAS.length - 1 : p;
+    var q = REG.requisito(r, REG.idx);
+    if (q && idx === undefined) REG.idx = q.idx;
   }
   REG._pct = 0;
   APP.ir('registrar');
@@ -126,7 +150,7 @@ REG.tarjetaHtml = function (r, i, l, soloVer) {
     : '<span><b>Etapas completas</b> · falta cerrar</span>';
   return '<div class="ciclo-item' + (sig ? ' con-rapido' : '') + '" style="--c:' + color + '">' +
     '<button type="button" class="ciclo-card" data-id="' + r.id + '">' +
-      '<div class="cc-top"><span class="cc-id">' + (r.placa ? '<span class="cc-placa">' + DR.esc(r.placa) + '</span>' : '') +
+      '<div class="cc-top"><span class="cc-id">' + (r.pallet ? '<span class="cc-placa cc-pallet">N° ' + DR.esc(r.pallet) + '</span>' : '') + (r.placa ? '<span class="cc-placa">' + DR.esc(r.placa) + '</span>' : '') +
         '<span class="cc-codigo">' + DR.esc(TC.titulo(r)) + '</span></span><span class="cc-hace">' +
         (vivo ? '<span class="vivo" data-ini="' + r.etapas[et.id].ini + '">' + DR.crono(r.etapas[et.id].ini) + '</span>' : DR.hace(r.actualizado)) + '</span></div>' +
       '<div class="cc-sub">' + (REG.subtitulo(r) || 'Sin fundo') + (soloVer === true ? ' · ' + DR.esc(r.registrador || '—') + ' · equipo ' + DR.esc(r.dispositivo || (NUBE.ORIGEN[r.origen] || '')) : '') + '</div>' +
@@ -143,7 +167,8 @@ REG.enlazarTarjetas = function (raiz, repintar) {
     b.onclick = function () {
       var r = TC.obtener(b.getAttribute('data-rapido')), sig = r && REG.siguienteHora(r);
       if (!sig) return;
-      if (!REG.listo(r) && !(sig.e.id === 'cos' && REG.datosOrigen(r))) { DR.toast('Completa fundo, lote y código de pallet en la etapa Cosecha.', 'info'); REG.abrir(r.id); return; }
+      var q = REG.requisito(r, sig.e.i);
+      if (q) { DR.toast(q.txt, 'info'); REG.abrir(r.id, q.idx); return; }
       var falta = sig.campo === 'fin' && REG.faltaParaFin(r, sig.e);
       if (falta) { DR.toast('Antes de terminar ' + sig.e.nombre.toLowerCase() + ' indica: ' + falta[1] + '.', 'info'); REG.abrir(r.id, sig.e.i); return; }
       var antes = r.etapas[sig.e.id][sig.campo];
@@ -171,6 +196,7 @@ REG.pintarLista = function (cont) {
     '<div class="saludo entra"><div id="uviInicio" class="uvi-caja">' + MASCOTA.svg() + '</div><div><h1>¡Hola, ' + DR.esc(nombre) + '!</h1>' +
       '<p id="fraseInicio">' + MASCOTA.FRASES[0] + '</p></div></div>' +
     '<button class="btn verde bloque grande entra" id="btnNuevoPallet" type="button">' + DR.ICO.mas + '<span>Iniciar nuevo pallet</span></button>' +
+    '<button class="btn bloque entra" id="btnUnirse" type="button" style="margin-top:8px">' + DR.ICO.lupa + '<span>Unirse a un pallet por su N° (carga en adelante)</span></button>' +
     '<div class="kpis entra" style="margin-top:14px"><div class="kpi"><b>' + o.n + '</b><span>Cerrados hoy (todos)</span></div>' +
       '<div class="kpi"><b>' + (o.prom !== null ? DR.num(o.prom, 1) : '—') + '</b><span>Ciclo prom. hoy (min)</span></div>' +
       '<div class="kpi"><b>' + (o.pctMeta !== null ? DR.num(o.pctMeta) + '%' : '—') + '</b><span>Dentro de meta</span></div></div>' +
@@ -201,6 +227,7 @@ REG.pintarLista = function (cont) {
   pintar();
   NUBE.cargar().then(function () { if (DR.vista === 'registrar' && REG.vista === 'lista' && NUBE.hora !== antes) pintar(); });
   DR.$('#btnNuevoPallet').onclick = function () { REG.abrir(null); };
+  DR.$('#btnUnirse').onclick = REG.unirse;
   DR.$('#inBuscar').oninput = function () { REG.filtro = this.value; pintar(); };
   DR.$('#uviInicio').onclick = function () { MASCOTA.saltar(DR.$('#uviInicio svg')); DR.$('#fraseInicio').innerHTML = MASCOTA.siguienteFrase(); };
   REG.reloj();
@@ -219,7 +246,6 @@ REG.pasosHtml = function (r) {
   return TC.ETAPAS.map(function (e, i) {
     var x = r.etapas[e.id], hecho = !!x.fin, actual = i === REG.idx;
     var accesible = actual || hecho || !TC.bloqueada(r, e) || i === prox;
-    if (!REG.listo(r) && i > 0) accesible = false;
     return '<button type="button" class="paso' + (hecho ? ' hecho' : '') + (actual ? ' actual' : '') + (x.ini && !x.fin ? ' corriendo' : '') + '" data-paso="' + i + '" style="--c:' + e.color + '"' +
       (accesible ? '' : ' disabled') + ' aria-label="' + e.nombre + '"><i>' + (hecho && !actual ? DR.ICO.check : (i + 1)) + '</i><span>' + e.corto + '</span></button>';
   }).join('');
@@ -248,16 +274,16 @@ REG.origenHtml = function (r) {
     : '<input id="inGrupo" list="dlGrupos" maxlength="50" autocomplete="off" value="' + DR.esc(r.grupo) + '" placeholder="ej. TOMÁS MENDOZA">' +
       '<datalist id="dlGrupos">' + TC.grupos().map(function (g) { return '<option value="' + DR.esc(g) + '">'; }).join('') + '</datalist>';
   return '<div class="datos">' +
-    '<div class="campo"><label for="inFundo">Fundo<em>obligatorio</em></label><select id="inFundo"><option value="">— Elegir —</option>' + fundos.map(function (f) { return opt(f, r.fundo); }).join('') + '</select></div>' +
-    '<div class="campo"><label for="inLote">Lote<em>obligatorio</em></label><input id="inLote" list="dlLotes" maxlength="12" autocomplete="off" value="' + DR.esc(r.lote) + '" placeholder="ej. YU8">' +
+    '<p class="ayuda-campo ancho" style="margin:0">No hacen falta para las etapas 1 a 3: complétalos antes de pasar al Lecturado. El código de pallet va en la etapa 4.</p>' +
+    '<div class="campo"><label for="inFundo">Fundo<em>desde etapa 4</em></label><select id="inFundo"><option value="">— Elegir —</option>' + fundos.map(function (f) { return opt(f, r.fundo); }).join('') + '</select></div>' +
+    '<div class="campo"><label for="inLote">Lote<em>desde etapa 4</em></label><input id="inLote" list="dlLotes" maxlength="12" autocomplete="off" value="' + DR.esc(r.lote) + '" placeholder="ej. YU8">' +
       '<datalist id="dlLotes">' + lotes.map(function (l) { return '<option value="' + DR.esc(l) + '">'; }).join('') + '</datalist></div>' +
-    '<div class="campo ancho"><label for="inPallet">Código de pallet<em>obligatorio</em></label><input id="inPallet" maxlength="20" autocomplete="off" value="' + DR.esc(r.pallet) + '" placeholder="Sin el código no se pasa a otra etapa"></div>' +
     '<div class="campo"><label for="inVariedad">Variedad</label><input id="inVariedad" list="dlVar" maxlength="40" autocomplete="off" value="' + DR.esc(r.variedad) + '">' +
       '<datalist id="dlVar">' + CAT.variedades().map(function (v) { return '<option value="' + DR.esc(v) + '">'; }).join('') + '</datalist></div>' +
     '<div class="campo"><label>Color</label><div class="opciones" id="selColor">' + CAT.COLORES.map(function (c) {
       return '<button type="button" class="opcion' + (r.color === c ? ' activa' : '') + '" data-c="' + c + '">' + c + '</button>'; }).join('') + '</div></div>' +
     '<div class="campo"><label for="inFecha">Fecha · semana <b id="outSemana">' + TC.semana(r.fecha) + '</b></label><input type="date" id="inFecha" value="' + r.fecha + '"></div>' +
-    '<div class="campo"><label for="inGrupo">Grupo (líder)<em>obligatorio</em></label>' + grupo + '</div>' +
+    '<div class="campo"><label for="inGrupo">Grupo (líder)<em>al cerrar</em></label>' + grupo + '</div>' +
     '<div class="campo ancho"><label>Pasada</label><div class="opciones" id="selPasada">' + REG.PASADAS.map(function (n) {
       return '<button type="button" class="opcion' + (String(r.pasada) === String(n) ? ' activa' : '') + '" data-p="' + n + '">' + n + '</button>'; }).join('') + '</div></div>' +
     '<div class="ancho" id="avisoLote"></div>' +
@@ -268,11 +294,12 @@ REG.PASADAS = [1, 2, 3, 4, 5, 6];
 REG.extrasHtml = function (r, e) {
   var l = REG.EXTRAS[e.id] || [];
   if (!l.length) return '';
-  return '<div class="sep-titulo">Datos de la etapa</div><div class="datos">' + l.map(function (f) {
+  var x = r.etapas[e.id], antes = l.some(function (f) { return f[5]; });
+  return '<div class="sep-titulo">Datos de la etapa' + (antes ? '' : x.fin ? ' · escríbelos ahora' : ' · luego del fin') + '</div><div class="datos' + (!antes && x.fin && REG.faltaDato(r, e) ? ' datos-pendientes' : '') + '">' + l.map(function (f) {
     if (f[2] === 'planta') return '<div class="campo ancho"><label>' + f[1] + '<em>obligatorio</em></label><div class="opciones" data-x-opc="planta">' +
       PERM.plantas().map(function (p) { return '<button type="button" class="opcion' + (r.planta === p ? ' activa' : '') + '" data-valor="' + DR.esc(p) + '">' + DR.esc(p) + '</button>'; }).join('') + '</div></div>';
-    return '<div class="campo"><label>' + f[1] + (f[4] ? '<em>obligatorio</em>' : '') + '</label><input data-x="' + f[0] + '" type="' + (f[2] === 'number' ? 'number' : 'text') + '" inputmode="' + (f[2] === 'number' ? 'numeric' : 'text') + '" min="0" maxlength="12" placeholder="' + f[3] + '" value="' + DR.esc(r[f[0]]) + '"' + (f[0] === 'placa' ? ' style="text-transform:uppercase"' : '') + '></div>';
-  }).join('') + '</div>';
+    return '<div class="campo' + (f[0] === 'pallet' ? ' ancho' : '') + '"><label>' + f[1] + (f[4] ? '<em>obligatorio</em>' : '') + '</label><input data-x="' + f[0] + '" type="' + (f[2] === 'number' ? 'number' : 'text') + '" inputmode="' + (f[2] === 'number' ? 'numeric' : 'text') + '" min="0" maxlength="' + (f[0] === 'pallet' ? 20 : 12) + '" autocomplete="off" placeholder="' + f[3] + '" value="' + DR.esc(r[f[0]]) + '"' + (REG.MAYUS[f[0]] ? ' style="text-transform:uppercase"' : '') + '></div>';
+  }).join('') + (e.id === 'lec' ? '<div class="ancho" id="avisoPallet">' + REG.avisoPallet(r) + '</div>' : '') + '</div>';
 };
 
 REG.notaHtml = function (r, e) {
@@ -285,22 +312,24 @@ REG.notaHtml = function (r, e) {
 
 REG.pintarWiz = function (cont, r, direccion) {
   var e = TC.ETAPAS[REG.idx], x = r.etapas[e.id], c = TC.calcular(r), k = c.etapas[e.id];
-  var prox = REG.proxima(r), bloq = TC.bloqueada(r, e) || (!REG.listo(r) && REG.idx > 0);
+  var prox = REG.proxima(r), req = REG.requisito(r, REG.idx), bloq = TC.bloqueada(r, e) || !!req;
   var pct = prox < 0 ? 100 : Math.round(TC.ETAPAS.filter(function (y) { return r.etapas[y.id].fin; }).length / (TC.ETAPAS.length) * 100);
   var vivo = x.ini && !x.fin;
   var espera = k.espera === 0 && e.libre ? '<span class="pill">En paralelo con ' + DR.esc(TC.E[e.dep].nombre) + ' (sin espera)</span>'
     : k.espera !== null ? '<span class="pill' + (k.espera < 0 ? ' rojo' : (k.espera > (TC.cfg.metas.espera || 1e9) ? ' naranja' : '')) + '">Espera desde ' + DR.esc(TC.E[e.dep].corto) + ': ' + DR.dur(k.espera) + '</span>' : '';
   var estado = x.fin ? '<span class="pill verde">Completada · ' + DR.dur(k.min) + (k.meta ? (k.min <= k.meta ? ' · en meta' : ' · sobre meta ' + k.meta + ' min') : '') + '</span>'
     : vivo ? '<span class="pill azul">En curso · <b class="vivo" data-ini="' + x.ini + '">' + DR.crono(x.ini) + '</b>' + (k.meta ? ' · meta ' + k.meta + ' min' : '') + '</span>'
-    : bloq ? '<span class="pill">' + (!REG.listo(r) ? 'Se habilita al completar fundo, lote y código de pallet' : 'Se habilita al terminar ' + DR.esc(TC.E[e.dep].nombre)) + '</span>' : '';
+    : bloq ? '<span class="pill">' + (req ? DR.esc(req.txt) : 'Se habilita al terminar ' + DR.esc(TC.E[e.dep].nombre)) + '</span>' : '';
 
   var horas = '<div class="horas">' + REG.horaHtml(r, e, 'ini', bloq) + REG.horaHtml(r, e, 'fin', bloq || !x.ini) + '</div>';
-  var cuerpo = (e.id === 'cos' ? REG.origenHtml(r) + '<div class="sep-titulo">Tiempos de cosecha</div>' + horas : horas + REG.extrasHtml(r, e)) + REG.notaHtml(r, e);
+  var cuerpo = (e.id === 'cos' ? horas + '<div class="sep-titulo">Datos iniciales del ciclo</div>' + REG.origenHtml(r) : horas + REG.extrasHtml(r, e)) +
+    (r.union && !REG.datosOrigen(r) ? '<div class="aviso" style="margin-top:10px">Unido por N° de pallet: fundo, lote y las etapas anteriores llegan del celular que inició el ciclo cuando suba sus datos.</div>' : '') +
+    REG.notaHtml(r, e);
 
   REG.quitarBarra();
   cont.innerHTML = '<div class="vista">' +
     '<div class="wiz-cab"><button type="button" class="wiz-volver" id="btnVolver">' + DR.ICO.atras + '<span>Pallets</span></button>' +
-      '<div class="wiz-id"><b>' + DR.esc(r.lote ? TC.titulo(r) : 'Nuevo pallet') + '</b><span>' + (REG.subtitulo(r) || 'Elige zona, fundo y lote') + '</span></div></div>' +
+      '<div class="wiz-id"><b>' + DR.esc(r.lote || r.pallet ? TC.titulo(r) : 'Nuevo pallet') + '</b><span>' + (REG.subtitulo(r) || 'Fundo y lote: antes del Lecturado') + '</span></div></div>' +
     '<div class="pasos"><div class="pasos-pista"><div class="pasos-relleno" id="pasosRelleno" style="width:' + REG._pct + '%"></div></div>' + REG.pasosHtml(r) + '</div>' +
     '<section class="etapa" id="etapaCard" style="--c:' + e.color + '">' +
       '<div class="etapa-cab"><span class="etapa-num">Etapa ' + (REG.idx + 1) + ' de 8</span><h2>' + e.nombre + '</h2><p class="etapa-desc">' + e.desc + '</p>' +
@@ -345,12 +374,12 @@ REG.revisar = function (r, e) {
 REG.ponerBarra = function (r, e, bloq) {
   var b = document.createElement('div'); b.id = 'barraAccion';
   var x = r.etapas[e.id], prox = REG.proxima(r), modo, txt, ico = '';
-  if (e.id === 'cos' && !REG.datosOrigen(r)) { modo = 'origen'; txt = 'Elige fundo y lote'; }
-  else if (bloq && !REG.listo(r)) { modo = 'pallet'; txt = 'Escribe el código de pallet'; }
+  var req = REG.requisito(r, REG.idx), dato = x.fin && REG.faltaDato(r, e);
+  if (req) { modo = 'req'; txt = req.boton; ico = DR.ICO.adelante; }
   else if (bloq) { modo = 'ir'; txt = 'Ir a ' + TC.ETAPAS[Math.max(0, prox)].nombre; ico = DR.ICO.adelante; }
   else if (!x.ini) { modo = 'ini'; txt = 'Marcar inicio de ' + e.nombre.toLowerCase(); ico = DR.ICO.play; }
   else if (!x.fin) { modo = 'fin'; txt = 'Marcar fin de ' + e.nombre.toLowerCase(); ico = DR.ICO.stop; }
-  else if (!REG.listo(r)) { modo = 'pallet'; txt = 'Escribe el código de pallet'; }
+  else if (dato) { modo = 'dato'; txt = 'Escribe: ' + dato[1]; }
   else if (prox > -1) { modo = 'ir'; txt = 'Siguiente: ' + TC.ETAPAS[prox].nombre; ico = DR.ICO.adelante; }
   else { modo = 'cerrar'; txt = 'Cerrar registro'; ico = DR.ICO.check; }
   b.innerHTML = '<button type="button" class="btn grande ' + (modo === 'fin' ? 'naranja' : modo === 'cerrar' ? 'verde' : 'primario') + '" id="btnAccion" data-modo="' + modo + '" style="--c:' + e.color + '">' + ico + '<span>' + DR.esc(txt) + '</span></button>';
@@ -358,8 +387,8 @@ REG.ponerBarra = function (r, e, bloq) {
   DR.$('#contenido').classList.add('con-barra');
   DR.$('#btnAccion').onclick = function () {
     var m = this.getAttribute('data-modo');
-    if (m === 'origen') { var z = DR.$('#inFundo').value ? DR.$('#inLote') : DR.$('#inFundo'); z.scrollIntoView({ behavior: 'smooth', block: 'center' }); z.focus(); DR.toast('Primero elige fundo y lote.', 'info'); return; }
-    if (m === 'pallet') { REG.irPallet(r); return; }
+    if (m === 'req') { REG.irRequisito(r, REG.requisito(r, REG.idx)); return; }
+    if (m === 'dato') { REG.enfocarDato(r, e); return; }
     if (m === 'ini' || m === 'fin') { REG.marcar(r, e, m); return; }
     if (m === 'ir') { REG.irEtapa(r, Math.max(0, REG.proxima(r))); return; }
     if (m === 'cerrar') REG.cerrar(r);
@@ -371,12 +400,82 @@ REG.quitarBarra = function () {
   var c = DR.$('#contenido'); if (c) c.classList.remove('con-barra');
 };
 
-/** Lleva al campo «Código de pallet» de la etapa Cosecha. */
-REG.irPallet = function (r) {
-  if (REG.idx !== 0) REG.irEtapa(r, 0);
-  var p = DR.$('#inPallet');
-  if (p) { p.scrollIntoView({ behavior: 'smooth', block: 'center' }); p.focus(); }
-  DR.toast('Escribe el código de pallet para pasar a otra etapa.', 'info');
+/** Lleva a la etapa y al campo que faltan (datos iniciales en la etapa 1 o pallet en la 4). */
+REG.irRequisito = function (r, q) {
+  if (!q) return;
+  if (REG.idx !== q.idx) REG.irEtapa(r, q.idx);
+  var c = DR.$(q.campo);
+  if (c) { c.scrollIntoView({ behavior: 'smooth', block: 'center' }); c.focus(); }
+};
+/** Lleva al primer dato de la etapa que falta (se escribe luego del fin). */
+REG.enfocarDato = function (r, e) {
+  var f = REG.faltaDato(r, e), c = f && (DR.$('[data-x="' + f[0] + '"]') || DR.$('[data-x-opc="' + f[0] + '"]'));
+  if (c) { c.scrollIntoView({ behavior: 'smooth', block: 'center' }); if (c.focus) c.focus(); }
+};
+
+/** Otro ciclo (de cualquier equipo) con el mismo N° de pallet y fecha ±1 día: Integra los junta al subir. */
+REG.mismoPallet = function (r) {
+  var k = String(r.pallet || '').replace(/\s+/g, '').toUpperCase();
+  if (!k) return null;
+  var dia = function (f) { return f ? new Date(f + 'T00:00:00').getTime() : 0; }, d0 = dia(r.fecha);
+  return NUBE.todos().filter(function (o) {
+    return o.id !== r.id && o.origen !== 'planta' && o.origen !== 'apk' && String(o.pallet || '').replace(/\s+/g, '').toUpperCase() === k && Math.abs(dia(o.fecha) - d0) <= 864e5;
+  })[0] || null;
+};
+REG.avisoPallet = function (r) {
+  var o = REG.mismoPallet(r);
+  return o ? '<div class="aviso">El pallet ' + DR.esc(r.pallet) + ' también lo registra ' + DR.esc(o.registrador || 'otro equipo') + ' (' + DR.esc(TC.titulo(o)) +
+    '). Al subir, Integra junta los dos en un solo ciclo: vale cada hora según cuándo se tomó.</div>' : '';
+};
+
+/**
+ * «Unirse a un pallet por su N°»: el auxiliar que sigue el ciclo (de la carga en adelante) busca el
+ * N° de pallet entre los ciclos en curso de todos los equipos (como la placa en Arándano) y lo
+ * continúa. Sin señal o si aún no aparece, lo crea solo con el N°; al subir, Integra lo une al ciclo
+ * del mismo N° de pallet y fecha sin perder los datos de nadie.
+ */
+REG.unirse = function () {
+  var hoy = DR.hoyISO(), q = '';
+  var lista = function () {
+    var k = q.replace(/\s+/g, '').toUpperCase();
+    return NUBE.todos().filter(function (r) {
+      return r.origen === 'integra' && r.estado !== 'cerrado' && r.pallet && (!k || String(r.pallet).toUpperCase().indexOf(k) > -1);
+    }).slice(0, 30);
+  };
+  var pintar = function () {
+    var l = lista();
+    DR.$('#unLista').innerHTML = l.length ? l.map(function (r) {
+      var sit = TC.situacion(r);
+      return '<button type="button" class="un-item" data-un="' + DR.esc(r.id) + '"><b>N° ' + DR.esc(r.pallet) + '</b><span>' +
+        DR.esc([r.fundo, r.lote, r.registrador].filter(Boolean).join(' · ') || 'Sin datos iniciales') + ' · ' + DR.esc(sit.estado + ': ' + sit.etapa) + '</span></button>';
+    }).join('') : '<div class="vacio">' + (NUBE.hora ? 'Ningún pallet en curso con ese N°.' : 'Sin señal: no se ven los pallets de los demás.') + '</div>';
+    DR.$$('[data-un]').forEach(function (b) {
+      b.onclick = function () {
+        var id = b.getAttribute('data-un'); DR.cerrarHoja();
+        if (TC.obtener(id)) REG.abrir(id); else NUBE.continuar(NUBE.todos().filter(function (x) { return x.id === id; })[0]);
+      };
+    });
+    DR.$('#unCrear').disabled = !q.trim();
+  };
+  DR.hoja('<h3>Unirse a un pallet</h3><p class="ayuda-campo" style="margin-top:0">Escribe el N° de pallet (el que se ve en el pallet). Toca el que corresponde para seguirlo en este equipo. ' +
+    'Si no aparece (otro equipo sin señal), créalo con el N°: al subir, Integra lo junta con el del mismo N° de pallet y fecha.</p>' +
+    '<div class="buscador">' + DR.ICO.lupa + '<input id="unPallet" type="search" inputmode="text" autocomplete="off" placeholder="N° de pallet" style="text-transform:uppercase"></div>' +
+    '<div id="unLista" style="max-height:40vh;overflow:auto;margin:10px 0"></div>' +
+    '<button class="btn verde bloque" id="unCrear" type="button" disabled>Crear con este N° y seguir desde la Carga</button>' +
+    '<button class="btn bloque" id="unCerrar" type="button" style="margin-top:8px">Cancelar</button>', function () {
+      DR.$('#unCerrar').onclick = DR.cerrarHoja;
+      DR.$('#unPallet').oninput = function () { q = this.value; pintar(); };
+      DR.$('#unCrear').onclick = function () {
+        var r = TC.nuevo();
+        r.pallet = q.replace(/\s+/g, '').toUpperCase(); r.union = true; r.fecha = hoy;
+        REG.guardar(r); DR.cerrarHoja();
+        DR.toast('Pallet ' + r.pallet + ' creado: sigue desde la Carga. Integra lo une al ciclo de ese pallet al subir.', 'ok');
+        REG.abrir(r.id, TC.E.car.i);
+      };
+      pintar();
+      NUBE.cargar(true).then(function () { if (DR.$('#unLista')) pintar(); });
+      setTimeout(function () { var i = DR.$('#unPallet'); if (i) i.focus(); }, 200);
+    });
 };
 
 REG.irEtapa = function (r, i) {
@@ -388,8 +487,8 @@ REG.irEtapa = function (r, i) {
 /** «Ahora» o botón grande: marca la hora del celular y guarda. Al terminar una etapa se queda
  *  en ella; el supervisor decide luego a qué etapa pasar. */
 REG.marcar = function (r, e, campo) {
-  if (!REG.datosOrigen(r)) { DR.toast('Primero elige fundo y lote.', 'info'); return; }
-  if (e.id !== 'cos' && !REG.listo(r)) { REG.irPallet(r); return; }
+  var q = REG.requisito(r, e.i);
+  if (q) { DR.toast(q.txt, 'info'); REG.irRequisito(r, q); return; }
   if (campo === 'fin') {
     REG.leerExtras(r);
     var falta = REG.faltaParaFin(r, e);
@@ -413,6 +512,8 @@ REG.marcar = function (r, e, campo) {
   if (fila && DR.anima) anime({ targets: fila, scale: [0.96, 1], duration: 420, easing: 'easeOutBack' });
   if (campo === 'fin' && e.id === 'arm') DR.toast('Pallet armado: Lecturado habilitado.', 'info');
   REG.pintarWiz(DR.$('#contenido'), r, 0);
+  // Los datos de la etapa se escriben luego del fin: se lleva al primero que falta.
+  if (campo === 'fin' && REG.faltaDato(r, e)) { DR.toast('Ahora escribe: ' + REG.faltaDato(r, e)[1] + '.', 'info'); REG.enfocarDato(r, e); }
 };
 
 REG.cerrar = function (r) {
@@ -421,7 +522,7 @@ REG.cerrar = function (r) {
     DR.toast(prob, 'error');
     // «Falta completar la etapa 3 · …», «… (etapa Portabin).» o datos del origen (etapa Cosecha).
     var m = /etapa (\d)/.exec(prob), n = /\(etapa ([^)]+)\)/.exec(prob), en = n && TC.ETAPAS.filter(function (x) { return x.nombre === n[1]; })[0];
-    var i = m ? +m[1] - 1 : en ? en.i : /pallets cargados/.test(prob) ? TC.E.por.i : /fundo|lote|variedad|grupo/i.test(prob) ? 0 : REG.idx;
+    var i = m ? +m[1] - 1 : en ? en.i : /datos iniciales|fundo|lote|variedad|grupo/i.test(prob) ? 0 : REG.idx;
     if (i !== REG.idx) REG.irEtapa(r, i); else REG.pintarWiz(DR.$('#contenido'), r, 0);
     DR.$('#avisosEtapa').innerHTML = '<div class="aviso alerta">' + DR.esc(prob) + '</div>';
     return;
@@ -436,7 +537,11 @@ REG.enlazarWiz = function (cont, r, e) {
   var guardar = function () { REG.guardar(r); };
   DR.$('#btnVolver').onclick = function () { REG.aLista(); };
   DR.$$('.paso', cont).forEach(function (p) {
-    p.onclick = function () { var i = +p.getAttribute('data-paso'); if (i !== REG.idx) REG.irEtapa(r, i); };
+    p.onclick = function () {
+      var i = +p.getAttribute('data-paso'), q = REG.requisito(r, i);
+      if (q) { DR.toast(q.txt, 'info'); REG.irRequisito(r, q); return; }
+      if (i !== REG.idx) REG.irEtapa(r, i);
+    };
   });
   DR.$$('.hora-ahora', cont).forEach(function (b) {
     b.onclick = function () { var p = b.getAttribute('data-ahora').split('|'); REG.marcar(r, TC.E[p[0]], p[1]); };
@@ -472,7 +577,13 @@ REG.enlazarWiz = function (cont, r, e) {
     t.onchange = function () { REG.revisar(r, e); };
   });
   DR.$$('[data-x]', cont).forEach(function (inp) {
-    inp.onchange = function () { var k = inp.getAttribute('data-x'); r[k] = k === 'placa' ? inp.value.trim().toUpperCase() : inp.value; inp.value = r[k]; guardar(); };
+    inp.onchange = function () {
+      var k = inp.getAttribute('data-x');
+      r[k] = REG.MAYUS[k] ? inp.value.replace(/\s+/g, '').toUpperCase() : inp.value; inp.value = r[k]; guardar();
+      // El código de pallet habilita las etapas 5 a 8 y avisa si otro equipo tiene el mismo pallet.
+      if (k === 'pallet') { REG.pintarWiz(cont, r, 0); return; }
+      if (r.etapas[e.id].fin && !REG.faltaDato(r, e)) REG.pintarWiz(cont, r, 0);
+    };
   });
   DR.$$('[data-x-opc="planta"] .opcion', cont).forEach(function (b) {
     b.onclick = function () {
@@ -504,8 +615,16 @@ REG.enlazarWiz = function (cont, r, e) {
   };
   DR.$('#inLote').onchange = function () {
     var lote = CAT.limpiar(this.value), f = CAT.lote(lote, r.fundo) || CAT.lote(lote);
-    if (lote && !f && PERM.catalogo()) {
-      DR.toast('El lote ' + lote + ' no está en tus permisos' + (r.fundo ? ' para ' + r.fundo : '') + '.', 'error'); this.value = r.lote; return;
+    if (lote && !f) {
+      var inp = this;
+      if (!r.fundo) { DR.toast('El lote ' + lote + ' no está en el catálogo: elige primero el fundo para agregarlo.', 'error'); inp.value = r.lote; return; }
+      DR.confirmar('Lote nuevo', 'El lote <b>' + DR.esc(lote) + '</b> no está en el catálogo de <b>' + DR.esc(r.fundo) + '</b>. ¿Agregarlo? Queda guardado en Integra para todos.', 'Agregar lote', function () {
+        CAT.agregarLote(r.fundo, lote, r.variedad);
+        r.lote = lote; revisarGrupo(); guardar(); repintar();
+        DR.toast('Lote ' + lote + ' agregado a ' + r.fundo + '.', 'ok');
+      });
+      inp.value = r.lote;
+      return;
     }
     r.lote = lote;
     // El lote del catálogo define zona, fundo, variedad y color.
@@ -522,7 +641,6 @@ REG.enlazarWiz = function (cont, r, e) {
   });
   DR.$('#inFecha').onchange = function () { r.fecha = this.value || DR.hoyISO(); DR.$('#outSemana').textContent = TC.semana(r.fecha); guardar(); };
   DR.$('#inGrupo').onchange = function () { r.grupo = CAT.limpiar(this.value); this.value = r.grupo; TC.cfg.ultimo.grupo = r.grupo; TC.guardarCfg(); guardar(); };
-  DR.$('#inPallet').onchange = function () { r.pallet = this.value.trim().toUpperCase(); this.value = r.pallet; guardar(); repintar(); };
 };
 
 /* ================================================ CIERRE */

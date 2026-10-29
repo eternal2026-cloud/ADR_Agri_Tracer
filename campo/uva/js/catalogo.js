@@ -125,6 +125,19 @@ CAT.lote = function (lote, fundo) {
 CAT.zonaDeFundo = function (fundo) { var f = CAT.filas().filter(function (x) { return x[1] === fundo; })[0]; return f ? f[0] : ''; };
 CAT.colorDe = function (variedad) { return CAT.COLOR_VARIEDAD[CAT.normVariedad(variedad)] || ''; };
 
+/**
+ * Lote digitado que no estaba en el catálogo: se agrega en el equipo (para el autocompletado y el
+ * mapa) y queda en cola para guardarse en Integra (rpc_uva_lote_nuevo), así lo ven todos.
+ */
+CAT.agregarLote = function (fundo, lote, variedad) {
+  var fila = [CAT.zonaDeFundo(fundo), fundo, CAT.limpiar(lote), CAT.normVariedad(variedad || '')];
+  var p = PERM.datos();
+  if (p && Array.isArray(p.catalogo)) { p.catalogo.push(fila); DR.guardar(PERM.CLAVE, p); }
+  else { var l = CAT.filas().slice(); l.push(fila); DR.guardar('tcu.catalogo', l); }
+  TC.cfg.lotesNuevos = (TC.cfg.lotesNuevos || []).concat([fila]); TC.guardarCfg();
+  if (window.SHEETS) SHEETS.lotesNuevos();
+};
+
 /** CSV/TSV pegado («Zona;Fundo;Lote;Variedad», con o sin encabezado) → filas limpias. */
 CAT.desdeTexto = function (txt) {
   var filas = [];

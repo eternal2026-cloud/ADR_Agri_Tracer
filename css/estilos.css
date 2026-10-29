@@ -615,6 +615,9 @@ tr.fila-cerca td{background:#23170E}
 .foto-galeria-btn{display:flex;align-items:center;justify-content:center;padding:8px 14px;border:1.5px solid #5A4C40;border-radius:14px;background:#130F0C;color:var(--texto-2);font-size:13.5px;font-weight:500;cursor:pointer;text-transform:none;letter-spacing:normal}
 .foto-galeria-btn input{display:none}
 .foto-galeria,.foto-celda,.foto-grupo{display:flex;flex-wrap:wrap;gap:4px}
+/* Galería por defecto (Estudio TOP): miniaturas; la foto completa se ve al tocarla (visor). */
+.foto-galeria{gap:6px}
+.foto-galeria img{width:84px;height:84px;border-radius:10px;object-fit:cover;background:#130F0C;border:1px solid var(--borde);cursor:zoom-in}
 .foto-celda img{width:46px;height:46px;border-radius:7px;object-fit:cover;background:#130F0C;border:1px solid var(--borde);cursor:zoom-in}
 .foto-grupo img{flex:1 1 44%;aspect-ratio:1;border-radius:14px;object-fit:cover;background:#130F0C;border:1px solid var(--borde);cursor:zoom-in}
 .foto-grupo.chico img{flex:0 0 56px;width:56px;height:56px;border-radius:9px;aspect-ratio:auto}

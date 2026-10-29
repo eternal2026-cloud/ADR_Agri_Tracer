@@ -4,7 +4,8 @@
  * Configuración → Google Sheets (JWT de su sesión). Sobrescribe solo sus
  * pestañas: Ciclos_BD, Resumen_Semanal, Personal_Reubicacion,
  * Auditoria_Escaneos, 5S_BD, 5S_Observaciones, 5S_Resumen, PM_Revisiones,
- * PM_Hallazgos, PM_Resultados, SCI_BD, SCI_Resultados, UVA_Registros, UVA_Etapas y Sync_Info;
+ * PM_Hallazgos, PM_Resultados, SCI_BD, SCI_Resultados, UVA_Registros, UVA_Etapas, TOP_* (Estudio de
+ * cosechador TOP: Evaluaciones, Tiempos, Estandares, REBA, Ergonomia, Encuesta, Propuestas) y Sync_Info;
  * cualquier otra pestaña de la hoja se respeta.
  * La clave de la cuenta de servicio vive en Vault, nunca en el código.
  * ==========================================================================*/
@@ -466,6 +467,189 @@ function pestanasSCI(d: SCIDatos | null): Pestana[] {
   ];
 }
 
+/* ------------------------------------------------------------ Estudio de cosechador TOP (campo/estudio-top)
+ * Las mismas hojas que el Excel del módulo (reporte.js), en formato de base de datos: una fila por
+ * evaluación, toma de tiempo, verificación de estándar, postura REBA, respuesta ergonómica y encuesta.
+ * Solo evaluaciones no anuladas. Las duraciones van como duración de Sheets ([m]:ss). */
+type TopDatos = { evals: Fila[]; tiempos: Fila[]; cump: Fila[]; reba: Fila[]; ergo: Fila[]; enc: Fila[]; acts: Fila[]; items: Fila[]; props: Fila[] };
+
+async function leerTop(sb: SupabaseClient): Promise<TopDatos> {
+  const [evals, tiempos, cump, reba, ergo, enc, acts, items, props] = await Promise.all([
+    leerTodo(sb, 'top_evaluaciones', [['fecha', true], ['codigo', true]]),
+    leerTodo(sb, 'top_tiempos', [['inicio', true]]),
+    leerTodo(sb, 'top_cumplimiento', [['evaluacion_id', true], ['item_id', true]]),
+    leerTodo(sb, 'top_reba', [['creado_en', true]]),
+    leerTodo(sb, 'top_ergonomia', [['evaluacion_id', true]]),
+    leerTodo(sb, 'top_encuestas', [['creado_en', true]]),
+    leerTodo(sb, 'top_actividades', [['orden', true]]),
+    leerTodo(sb, 'top_estandar_items', [['orden', true]]),
+    leerTodo(sb, 'top_propuestas', [['creado_en', true]]),
+  ]);
+  const vivas = evals.filter((e) => !e.anulada);
+  const ids = new Set(vivas.map((e) => e.id));
+  const de = (l: Fila[]) => l.filter((x) => ids.has(x.evaluacion_id));
+  return { evals: vivas, tiempos: de(tiempos), cump: de(cump), reba: de(reba), ergo: de(ergo), enc: de(enc), acts, items, props };
+}
+
+const TOP_CLASES: Record<string, string> = { productiva: 'Productiva', soporte: 'Soporte necesario', espera: 'Espera / eliminable', personal: 'Personal' };
+const TOP_MUERTO = 20;
+/** Checklist ergonómico (TOP.ERGO de datos.js): [sección, N°, pregunta, respuesta desfavorable]. */
+const TOP_ERGO: [string, string, string, string][] = [
+  ['1. Puesto de trabajo', '1.1', 'Es adecuada la distancia entre sus ojos y el trabajo que realiza', 'NO'],
+  ['1. Puesto de trabajo', '1.2', 'Tiene espacio suficiente para variar la posición de piernas y rodillas', 'NO'],
+  ['1. Puesto de trabajo', '1.3', 'Puede apoyar los brazos', 'NO'],
+  ['1. Puesto de trabajo', '1.4', 'La altura de la herramienta, ¿es la adecuada a su estatura?', 'NO'],
+  ['1. Puesto de trabajo', '1.5', 'Levanta pesos superiores a 3 kg en su puesto de trabajo', 'SI'],
+  ['1. Puesto de trabajo', '1.6', 'En general, ¿dispone de espacio suficiente para realizar su trabajo con holgura?', 'NO'],
+  ['1. Puesto de trabajo', '1.7', 'Al finalizar la jornada laboral, ¿se siente cansado?', 'SI'],
+  ...([['2.1', 'Nuca'], ['2.2', 'Hombro izquierdo'], ['2.3', 'Hombro derecho'], ['2.4', 'Brazo y antebrazo izquierdo'], ['2.5', 'Brazo y antebrazo derecho'],
+    ['2.6', 'Parte superior de la espalda'], ['2.7', 'Mano y muñeca izquierda'], ['2.8', 'Mano y muñeca derecha'], ['2.9', 'Parte baja de la espalda'],
+    ['2.10', 'Posaderas'], ['2.11', 'Muslos'], ['2.12', 'Piernas'], ['2.13', 'Tobillos']] as [string, string][])
+    .map(([n, t]): [string, string, string, string] => ['2. Síntomas debidos a la postura', n, t, 'SI']),
+  ['3. Fatiga física', '3.1', '¿A su capacidad física?', 'NO'], ['3. Fatiga física', '3.2', '¿A la temperatura ambiental?', 'NO'],
+  ['3. Fatiga física', '3.3', '¿A su edad?', 'NO'], ['3. Fatiga física', '3.4', '¿A su entrenamiento?', 'NO'],
+  ['3. Fatiga física', '3.5', '¿Existen pausas establecidas?', 'NO'],
+  ['8. Traumatismos repetidos', '8.1', 'Pesadez, calambres, pinchazos u hormigueo en una o ambas manos', 'SI'],
+  ['8. Traumatismos repetidos', '8.2', 'Hinchazón o molestias en algún antebrazo o codo', 'SI'],
+  ['8. Traumatismos repetidos', '8.3', 'Molestias o quemazón en los hombros', 'SI'],
+  ['8. Traumatismos repetidos', '8.4', 'Alguna alteración le ha hecho despertar mientras dormía', 'SI'],
+  ['8. Traumatismos repetidos', '8.5.1', 'Las molestias aparecen por la mañana', 'SI'],
+  ['8. Traumatismos repetidos', '8.5.2', 'Las molestias aparecen por la tarde', 'SI'],
+  ['8. Traumatismos repetidos', '8.5.3', 'Las molestias aparecen por la tarde - noche', 'SI'],
+  ['8. Traumatismos repetidos', '8.5.4', 'Las molestias aparecen por la noche', 'SI'],
+];
+const TOP_MOMENTOS = ['Mañanas', 'Tardes', 'Noche', 'Varía según los días', 'Constantemente'];
+/** Opciones de la encuesta (ENC.OP de encuesta.js). */
+const TOP_ENC: Record<string, [unknown, string][]> = {
+  presentaciones: [['GRANEL', 'Granel'], ['JARRA', 'Jarra'], ['AMBAS', 'Ambas']],
+  momento: [['ALMUERZO', 'Almuerzo'], ['FIN', 'Fin de jornada'], ['OTRO', 'Otro']],
+  p1: [['<1', 'Menos de 1 campaña'], ['1-2', '1 a 2 campañas'], ['3-5', '3 a 5 campañas'], ['>5', 'Más de 5 campañas']],
+  p3: [['SI', 'Sí'], ['PARTE', 'En parte'], ['NO', 'No']],
+  p4: [['GRANEL', 'Granel'], ['JARRA', 'Jarra'], ['IGUAL', 'Igual en ambas'], ['NA', 'No aplica (solo trabaja una)']],
+  p6: [[1, 'Esperar envases o bandejas'], [2, 'Traslados'], [3, 'Uso del tamiz'], [4, 'Calidad de la planta'],
+    [5, 'Calibre o estado de la fruta'], [6, 'Indicaciones del supervisor'], [7, 'Calor'], [8, 'Otro']],
+  p8: [['CAPACITACION', 'Capacitación de la empresa'], ['COMPANERO', 'Un compañero'], ['CUENTA', 'Por mi cuenta'], ['OTRA', 'Otra campaña o empresa']],
+};
+const encTxt = (k: string, v: unknown) => (TOP_ENC[k] || []).find((o) => String(o[0]) === String(v))?.[1] ?? txt(v);
+const siNo = (v: unknown) => v ? 'Sí' : '';
+const segDur = (s: unknown) => (s === null || s === undefined || s === '') ? '' : Math.round(Number(s)) / 86400;
+
+function pestanasTop(d: TopDatos | null): Pestana[] {
+  if (!d) return [];
+  const ev = new Map<string, Fila>(d.evals.map((e) => [e.id, e]));
+  const act = new Map<number, Fila>(d.acts.map((a) => [Number(a.id), a]));
+  const item = new Map<number, Fila>(d.items.map((i) => [Number(i.id), i]));
+  // Columnas comunes de la evaluación (como colsBase del Excel del módulo).
+  const B: Col[] = [
+    ['Código', (f) => txt(ev.get(f.evaluacion_id)?.codigo)], ['Fecha', (f) => txt(ev.get(f.evaluacion_id)?.fecha)],
+    ['Cosechador', (f) => txt(ev.get(f.evaluacion_id)?.cosechador)], ['DNI', (f) => txt(ev.get(f.evaluacion_id)?.dni)],
+    ['Fundo', (f) => txt(ev.get(f.evaluacion_id)?.fundo)], ['Lote', (f) => txt(ev.get(f.evaluacion_id)?.lote)],
+    ['Material', (f) => txt(ev.get(f.evaluacion_id)?.material)], ['Estándar', (f) => txt(ev.get(f.evaluacion_id)?.presentacion)],
+    ['Variedad', (f) => txt(ev.get(f.evaluacion_id)?.variedad)], ['Líder', (f) => txt(ev.get(f.evaluacion_id)?.lider)],
+  ];
+
+  // Evaluaciones: una fila por cosechador y día, con su jornada repartida por clase de actividad.
+  const porEval = new Map<string, Fila[]>();
+  d.tiempos.forEach((t) => { const l = porEval.get(t.evaluacion_id) || []; l.push(t); porEval.set(t.evaluacion_id, l); });
+  const cumpN = new Map<string, Fila[]>();
+  d.cump.forEach((c) => { const l = cumpN.get(c.evaluacion_id) || []; l.push(c); cumpN.set(c.evaluacion_id, l); });
+  const rebaN = new Map<string, Fila[]>();
+  d.reba.forEach((r) => { const l = rebaN.get(r.evaluacion_id) || []; l.push(r); rebaN.set(r.evaluacion_id, l); });
+  const encIds = new Set(d.enc.map((x) => x.evaluacion_id));
+  const ergoIds = new Set(d.ergo.map((x) => x.evaluacion_id));
+  const evFilas = d.evals.map((e) => {
+    const tt = porEval.get(e.id) || [];
+    const tot: Record<string, number> = { productiva: 0, soporte: 0, espera: 0, personal: 0 };
+    let muerto = 0;
+    tt.forEach((t) => {
+      const s = Number(t.duracion_seg) || 0, a = act.get(Number(t.actividad_id));
+      if (Number(t.actividad_id) === TOP_MUERTO) muerto += s;
+      if (a && tot[a.clase] !== undefined) tot[a.clase] += s;
+    });
+    const total = Object.values(tot).reduce((a, b) => a + b, 0);
+    const cc = (cumpN.get(e.id) || []).filter((c) => c.resultado === 'C' || c.resultado === 'NC');
+    const rr = rebaN.get(e.id) || [];
+    const jornada = e.jornada_inicio && e.jornada_fin ? (Date.parse(e.jornada_fin) - Date.parse(e.jornada_inicio)) / 1000 : null;
+    return { ...e, evaluacion_id: e.id, _jornada: jornada, _muerto: muerto, _tot: tot, _total: total,
+      _pct: total ? Math.round(tot.productiva / total * 1000) / 10 : '', _tomas: tt.length,
+      _cump: cc.length ? Math.round(cc.filter((c) => c.resultado === 'C').length / cc.length * 1000) / 10 : '',
+      _nCump: (cumpN.get(e.id) || []).length, _nReba: rr.length,
+      _rebaMax: rr.length ? Math.max(...rr.map((r) => Number(r.puntaje_final) || 0)) : '',
+      _ergo: ergoIds.has(e.id) ? 'Sí' : '', _enc: encIds.has(e.id) ? 'Sí' : '' };
+  });
+  const colsEval: Col[] = [...B, TX('labor', 'Labor'), TX('herramienta', 'Herramienta'), TX('evaluador_txt', 'Evaluador'),
+    TS('jornada_inicio', 'Inicio jornada'), TS('jornada_fin', 'Fin jornada'),
+    ['Jornada (min:seg)', (f) => segDur(f._jornada), 'dur'], ['Tiempo muerto (min:seg)', (f) => segDur(f._muerto), 'dur'],
+    ...Object.keys(TOP_CLASES).map((c): Col => [TOP_CLASES[c] + ' (min:seg)', (f) => segDur(f._tot[c]), 'dur']),
+    ['Total medido (min:seg)', (f) => segDur(f._total), 'dur'], ['% productivo', (f) => f._pct], ['Tomas de tiempo', (f) => f._tomas],
+    ['Verificaciones de estándar', (f) => f._nCump], ['% cumplimiento', (f) => f._cump], ['Posturas REBA', (f) => f._nReba],
+    ['REBA máximo', (f) => f._rebaMax], ['Checklist ergonómico', (f) => f._ergo], ['Encuesta', (f) => f._enc],
+    TX('observaciones', 'Observaciones'), TS('creado_en', 'Registrado'), TS('actualizado_en', 'Actualizado')];
+
+  const colsTiempos: Col[] = [...B,
+    ['Actividad', (f) => txt(act.get(Number(f.actividad_id))?.nombre)],
+    ['Clase', (f) => TOP_CLASES[act.get(Number(f.actividad_id))?.clase] || ''],
+    TS('inicio', 'Inicio'), TS('fin', 'Fin'), ['Duración (min:seg)', (f) => segDur(f.duracion_seg), 'dur'], NU('duracion_seg', 'Duración (s)', 0), TX('nota', 'Nota')];
+
+  const colsCump: Col[] = [...B, NU('ronda', 'Ronda', 0),
+    ['Tipo', (f) => txt(item.get(Number(f.item_id))?.tipo)], ['Presentación', (f) => txt(item.get(Number(f.item_id))?.presentacion)],
+    ['N°', (f) => txt(item.get(Number(f.item_id))?.numero)], ['Ítem', (f) => txt(item.get(Number(f.item_id))?.descripcion)],
+    ['Resultado', (f) => ({ C: 'Cumple', NC: 'No cumple', NA: 'No aplica' } as Record<string, string>)[f.resultado] || ''],
+    TX('practica_top', 'Cómo lo hace el TOP'), TX('observacion', 'Observación'), ['Fotos', (f) => (f.fotos || []).length]];
+
+  const colsReba: Col[] = [...B, ['Actividad', (f) => txt(act.get(Number(f.actividad_id))?.nombre)], TX('momento', 'Momento'),
+    NU('cuello', 'Cuello', 0), ['Cuello +1', (f) => siNo(f.cuello_mod)], NU('tronco', 'Tronco', 0), ['Tronco +1', (f) => siNo(f.tronco_mod)],
+    NU('piernas', 'Piernas', 0), NU('piernas_mod', 'Piernas +', 0), NU('carga', 'Carga', 0), ['Brusca +1', (f) => siNo(f.carga_brusca)],
+    NU('brazo', 'Brazo', 0), ['Hombro +1', (f) => siNo(f.brazo_elevado)], ['Apoyo −1', (f) => siNo(f.brazo_apoyo)], NU('antebrazo', 'Antebrazo', 0),
+    NU('muneca', 'Muñeca', 0), ['Muñeca +1', (f) => siNo(f.muneca_mod)], NU('agarre', 'Agarre', 0),
+    ['Estática', (f) => siNo(f.act_estatica)], ['Repetitiva', (f) => siNo(f.act_repetitiva)], ['Inestable', (f) => siNo(f.act_inestable)],
+    NU('tabla_a', 'Tabla A', 0), NU('puntaje_a', 'Puntaje A', 0), NU('tabla_b', 'Tabla B', 0), NU('puntaje_b', 'Puntaje B', 0),
+    NU('puntaje_c', 'Puntaje C', 0), NU('puntaje_final', 'REBA final', 0), TX('riesgo', 'Riesgo'), TX('observacion', 'Observación'),
+    ['Fotos', (f) => (f.fotos || []).length], TS('creado_en', 'Registrado')];
+
+  // Ergonomía en formato largo: una fila por pregunta respondida (más fácil de pivotear que 40 columnas).
+  const ergoFilas: Fila[] = [];
+  d.ergo.forEach((g) => {
+    const r = g.respuestas || {}, dol = g.dolor || {};
+    TOP_ERGO.forEach(([sec, n, t, malo]) => {
+      if (r[n] === undefined || r[n] === null || r[n] === '') return;
+      ergoFilas.push({ evaluacion_id: g.evaluacion_id, _sec: sec, _n: n, _t: t,
+        _r: ({ SI: 'Sí', NO: 'No', NS: 'NS/NC' } as Record<string, string>)[r[n]] || txt(r[n]), _malo: r[n] === malo ? 'Sí' : 'No',
+        _mom: (dol[n] || []).map((m: number) => TOP_MOMENTOS[m - 1] || '').filter(Boolean).join(', ') });
+    });
+  });
+  const colsErgo: Col[] = [...B, ['Sección', (f) => f._sec], ['N°', (f) => f._n], ['Pregunta', (f) => f._t], ['Respuesta', (f) => f._r],
+    ['Desfavorable', (f) => f._malo], ['Momento del dolor', (f) => f._mom]];
+
+  const R = (f: Fila) => (f.respuestas || {}) as Fila;
+  const colsEnc: Col[] = [...B, ['Aceptó', (f) => f.acepto ? 'Sí' : 'No'], ['Presentaciones', (f) => encTxt('presentaciones', R(f).presentaciones)],
+    ['Momento', (f) => R(f).momento === 'OTRO' ? txt(R(f).momento_otro || 'Otro') : encTxt('momento', R(f).momento)],
+    ['1 Campañas', (f) => encTxt('p1', R(f).p1)], ['2 Cómo trabaja la planta', (f) => txt(R(f).p2)],
+    ['3 Distinto a capacitación', (f) => encTxt('p3', R(f).p3)], ['3 ¿En qué?', (f) => txt(R(f).p3_que)],
+    ['4 Rinde más en', (f) => encTxt('p4', R(f).p4)], ['5 Granel', (f) => txt(R(f).p5_granel)], ['5 Jarra', (f) => txt(R(f).p5_jarra)],
+    ...[0, 1, 2].map((i): Col => ['6 Tiempo perdido ' + (i + 1) + 'º', (f) => { const v = (R(f).p6 || [])[i]; return v ? encTxt('p6', v) : ''; }]),
+    ['6 Otro', (f) => txt(R(f).p6_otro)], ['7 Cómo lo resuelve', (f) => txt(R(f).p7)], ['8 Cómo aprendió', (f) => encTxt('p8', R(f).p8)],
+    ['9 Truco', (f) => txt(R(f).p9)], ['10 Qué cambiaría', (f) => txt(R(f).p10)], ['Observaciones', (f) => txt(R(f).obs)], TS('actualizado_en', 'Actualizado')];
+
+  const ESTADOS: Record<string, string> = { borrador: 'Borrador', aprobada: 'Aprobada', descartada: 'Descartada' };
+  const colsProp: Col[] = [NU('id', 'N°', 0), ['Estado', (f) => ESTADOS[f.estado] || txt(f.estado)], TX('ambito', 'Ámbito'), TX('tipo', 'Tipo'),
+    ['Presentación', (f) => txt(f.presentacion) || 'Ambas'],
+    ['Actual', (f) => txt(f.texto_actual) || txt(act.get(Number(f.actividad_id))?.nombre)], TX('texto_propuesto', 'Propuesto'),
+    ['Tiempo estándar (min:seg)', (f) => segDur(f.tiempo_estandar_seg), 'dur'], TX('sustento', 'Sustento'),
+    TS('creado_en', 'Creada'), TS('aprobado_en', 'Aprobada el')];
+
+  const p = (titulo: string, cols: Col[], filas: Fila[]): Pestana => ({ titulo, valores: tabla(cols, filas), duraciones: columnasDuracion(cols) });
+  return [
+    p('TOP_Evaluaciones', colsEval, evFilas),
+    p('TOP_Tiempos', colsTiempos, d.tiempos),
+    p('TOP_Estandares', colsCump, d.cump),
+    p('TOP_REBA', colsReba, d.reba),
+    p('TOP_Ergonomia', colsErgo, ergoFilas),
+    p('TOP_Encuesta', colsEnc, d.enc),
+    p('TOP_Propuestas', colsProp, d.props),
+  ];
+}
+
 /* ------------------------------------------------------------ Tiempo de ciclo Uva (APK + Integra + Planta)
  * Misma estructura que la hoja «Registros» / «Etapas» del Apps Script de la APK (Code.gs: BASE + BD + EXTRA,
  * mismas columnas y orden) + columnas de planta al final. Solo van los registros de Integra (campo y planta)
@@ -520,6 +704,8 @@ const UVA_EXTRA = ['T. CICLO TOTAL', 'Meta ciclo (min)', 'En meta', 'Atípico', 
 const UVA_PLANTA = ['Origen', 'HORA LLEGADA CAMIÓN', 'HORA RECEPCIÓN', 'T. espera recepción', 'INICIO DESCARGA', 'T. espera descarga',
   'FIN DESCARGA', 'T. descarga', 'INICIO ABASTECIMIENTO', 'T. espera abastecimiento', 'LÍNEA ABASTECIMIENTO', 'PLANTA RECEPCIÓN',
   'T. EN PLANTA', 'T. fin carga → llegada planta', 'T. CICLO COMPLETO', 'Registrado en planta por', 'Observación planta', 'Causas planta'];
+/** Datos de la etapa Carga (desde 0057, al final para no mover las columnas del dashboard). */
+const UVA_CARGA = ['N° pallets cargados (carga)', 'N° pallets total (carga)', 'Último en editar'];
 const UVA_ETAPAS = ['Semana', 'Fecha', 'Zona', 'Fundo', 'Lote', 'Variedad', 'Grupo', 'Planta', 'Estado', 'N°', 'Etapa', 'Inicio', 'Fin',
   'Minutos', 'Espera previa (min)', 'Meta (min)', 'En meta', 'Causa de demora', 'Comentario', 'Hora editada', 'Recibido'];
 /** Marcas de planta como «etapas» 9…13 de la hoja Etapas: [nombre, desde, hasta, tramo, clave de detalle]. */
@@ -533,7 +719,7 @@ const UVA_ETAPAS_PLANTA: [string, string, string, string, string][] = [
 
 function pestanasUva(d: UvaDatos | null): Pestana[] {
   if (!d) return [];
-  const cabReg = [...UVA_BASE, ...UVA_BD, ...UVA_EXTRA, ...UVA_PLANTA];
+  const cabReg = [...UVA_BASE, ...UVA_BD, ...UVA_EXTRA, ...UVA_PLANTA, ...UVA_CARGA];
   const cabEta = [...UVA_BASE, ...UVA_ETAPAS];
   const regs: unknown[][] = [cabReg];
   const etas: unknown[][] = [cabEta];
@@ -568,7 +754,7 @@ function pestanasUva(d: UvaDatos | null): Pestana[] {
     const pl = [origenTxt(f.origen), H(f.hora_llegada), H(f.hora_recepcion), vNum(f.t_espera_recepcion), H(f.ini_descarga), vNum(f.t_espera_descarga),
       H(f.fin_descarga), vNum(f.t_descarga), H(f.ini_abastecimiento), vNum(f.t_espera_abastecimiento), f.linea || '', MU(f.planta_destino),
       vNum(f.t_en_planta), vNum(f.t_llegada_desde_carga), vNum(f.t_ciclo_completo), f.planta_usuario || '', f.planta_obs || '', causas];
-    regs.push([...base, ...bd, ...extra, ...pl]);
+    regs.push([...base, ...bd, ...extra, ...pl, vNum(r.cargaCarg), vNum(r.cargaTot), r.editadoPor || '']);
 
     const comun = (n: unknown, etapa: string) => [...base, vNum(f.semana ?? r.semana), serialF(f.fecha || r.fecha), zona, fundo, r.lote || f.lote || '',
       r.variedad || f.variedad || '', r.grupo || f.grupo || '', planta, esPlanta ? (f.estado || '') : (r.estado || 'Cerrado'), n, etapa];
@@ -676,6 +862,10 @@ Deno.serve(async (req) => {
     let uva: UvaDatos | null = null;
     let uvaError = '';
     try { uva = await leerUva(sb, parametros); } catch (e) { uvaError = (e as Error).message || String(e); }
+    // Estudio de cosechador TOP: mismo aislamiento.
+    let top: TopDatos | null = null;
+    let topError = '';
+    try { top = await leerTop(sb); } catch (e) { topError = (e as Error).message || String(e); }
 
     const colsCiclos: Col[] = [
       TX('fecha', 'Fecha'), NU('semana', 'Semana', 0), TX('codigo', 'Código'), TX('fundo', 'Fundo'), TX('lote', 'Lote'),
@@ -725,6 +915,7 @@ Deno.serve(async (req) => {
       ...pestanasMP(mp),
       ...pestanasSCI(sci),
       ...pestanasUva(uva),
+      ...pestanasTop(top),
       { titulo: 'Sync_Info', valores: [
         ['Dato', 'Valor'],
         ['Última sincronización (hora Lima)', fechaHora(ahora)],
@@ -743,6 +934,9 @@ Deno.serve(async (req) => {
         ['Cliente interno · estado', estadoSCI],
         ['Uva · registros (Integra + Planta + APK continuados)', uva ? uva.filas.length : ''],
         ['Uva · estado', uva ? 'OK' : 'No sincronizada: ' + uvaError],
+        ['Estudio TOP · evaluaciones', top ? top.evals.length : ''],
+        ['Estudio TOP · tomas de tiempo', top ? top.tiempos.length : ''],
+        ['Estudio TOP · estado', top ? 'OK' : 'No sincronizada: ' + topError],
         ['Uva · ámbito', 'UVA_Registros: Campo (no continuado), Ciclo completo (campo continuado en planta, mismo ID que la APK) o Planta (iniciado en planta). Minutos con decimales, como la hoja de la APK.'],
         ['Tiempos', 'Las columnas (min:seg) son duraciones de Sheets: se ven como minutos:segundos y suman/promedian como números. Para pasarlas a minutos con decimales, multiplica por 1440.'],
         ['Nota', 'Estas pestañas se sobrescriben en cada sincronización. Crea tus gráficos o tablas dinámicas en otras pestañas. Las miniaturas de 5S_Observaciones y PM_Hallazgos se renuevan en cada sincronización.'],
@@ -758,10 +952,11 @@ Deno.serve(async (req) => {
       mp_revisiones: mp ? mp.revs.length : 0, mp_hallazgos: mp ? mp.hallazgos.length : 0,
       sci_encuestas: sci ? sci.resultados.length : 0, sci_bd: sci ? sci.bd.length : 0,
       uva: uva ? uva.filas.length : 0,
+      top_evaluaciones: top ? top.evals.length : 0, top_tiempos: top ? top.tiempos.length : 0,
     };
     await fijarParametro(sb, 'ULTIMA_SYNC_SHEETS', ahora);
     const parciales = [s5 ? '' : `Auditoría 5S: ${s5Error}`, mp ? '' : `Plan de mantenimiento: ${mpError}`,
-      sci ? '' : `Cliente interno: ${sciError}`, uva ? '' : `Uva: ${uvaError}`].filter(Boolean);
+      sci ? '' : `Cliente interno: ${sciError}`, uva ? '' : `Uva: ${uvaError}`, top ? '' : `Estudio TOP: ${topError}`].filter(Boolean);
     await fijarParametro(sb, 'ULTIMO_ERROR_SYNC_SHEETS', parciales.length ? `${fechaHora(ahora)} · ${parciales.join(' · ')}` : '');
     await sb.from('bitacora').insert({ usuario_id: usuarioId, modulo: 'SHEETS', accion: 'Sincronización OK', detalle: `${origen} · ${JSON.stringify(filas)}` });
     return responder({ ok: true, hoja: tituloHoja, filas, origen, s5: estadoS5, mp: estadoMP, sci: estadoSCI, duracion_ms: Date.now() - inicio });

@@ -13,24 +13,44 @@ var NUBE = { filas: DR.leer('tcu.nube', []), hora: DR.leer('tcu.nubeHora', ''), 
 
 NUBE.COLS = 'id,origen,ambito,registrador,dispositivo,usuario_id,registro,etapas,fecha,campana,zona,fundo,lote,variedad,grupo,pallet,placa,' +
   'planta,planta_destino,linea,estado,vinculado,hora_llegada,hora_recepcion,ini_descarga,fin_descarga,ini_abastecimiento,planta_usuario,' +
-  't_espera_recepcion,t_espera_descarga,t_descarga,t_espera_abastecimiento,t_en_planta,t_ciclo_completo,actualizado_en';
+  't_espera_recepcion,t_espera_descarga,t_descarga,t_espera_abastecimiento,t_en_planta,t_ciclo_completo,actualizado_en,eliminado,fusionado_en';
 
 /** Trae los ciclos de la base (máx. una vez cada 15 s salvo forzar). Nunca falla: sin señal queda la copia. */
 NUBE.cargar = function (forzar) {
   if (NUBE.cargando) return NUBE.cargando;
   if (!forzar && NUBE._t && Date.now() - NUBE._t < 15000) return Promise.resolve(NUBE.filas);
   if (!SHEETS.configurado() || !SHEETS.hayRed()) return Promise.resolve(NUBE.filas);
-  NUBE.cargando = sb.from('uva_ciclos').select(NUBE.COLS).eq('eliminado', false)
+  // También los que Integra unió a otro por N° de pallet (eliminado + fusionado_en): este equipo adopta el ID vigente.
+  var q = sb.from('uva_ciclos').select(NUBE.COLS);
+  q = NUBE._viejo ? q.eq('eliminado', false) : q.or('eliminado.eq.false,fusionado_en.not.is.null');
+  NUBE.cargando = q
     .order('fecha', { ascending: false }).limit(3000).then(function (r) {
       NUBE.cargando = null;
+      if (r.error && /fusionado_en/.test(r.error.message)) { NUBE.COLS = NUBE.COLS.replace(',eliminado,fusionado_en', ''); NUBE._viejo = true; return NUBE.cargar(true); }
       if (r.error) { NUBE.error = r.error.message; return NUBE.filas; }
       NUBE.error = ''; NUBE._t = Date.now();
-      NUBE.filas = (r.data || []).map(NUBE.aRegistro);
+      var datos = r.data || [];
+      datos.filter(function (f) { return f.fusionado_en && TC.obtener(f.id); }).forEach(function (f) { TC.renombrar(f.id, f.fusionado_en); });
+      NUBE.filas = datos.filter(function (f) { return !f.eliminado; }).map(NUBE.aRegistro);
+      NUBE.adoptar(NUBE.filas);
       NUBE.hora = new Date().toISOString();
       DR.guardar('tcu.nube', NUBE.filas); DR.guardar('tcu.nubeHora', NUBE.hora);
       return NUBE.filas;
     }, function (e) { NUBE.cargando = null; NUBE.error = String(e && e.message || e); return NUBE.filas; });
   return NUBE.cargando;
+};
+
+/**
+ * Lo que otra persona llenó en un ciclo que también está en este equipo (ej. el auxiliar de carga
+ * subió las etapas 7 y 8) se junta aquí dato por dato, por hora de toma. No cambia «por subir».
+ */
+NUBE.adoptar = function (filas) {
+  var porId = {};
+  filas.forEach(function (n) { porId[n.id] = n; });
+  TC.registros().forEach(function (l) {
+    var n = porId[l.id];
+    if (n && n.origen === 'integra' && TC.fusionar(l, n)) TC.guardarRegistro(l, true);
+  });
 };
 
 /** Fila de uva_ciclos → registro con la forma de TC.nuevo (+ origen, ámbito y la parte de planta). */
@@ -49,6 +69,7 @@ NUBE.aRegistro = function (f) {
     lote: CAT.limpiar(f.lote || g.lote), sublote: txt(g.sublote) || '-', pasada: txt(g.pasada), color: txt(g.color),
     variedad: CAT.normVariedad(f.variedad || g.variedad), grupo: CAT.limpiar(f.grupo || g.grupo), pallet: txt(f.pallet || g.pallet),
     jabas: txt(g.jabas), zunchos: txt(g.zunchos), placa: txt(f.placa || g.placa), palletsTot: txt(g.palletsTot), palletsCarg: txt(g.palletsCarg),
+    cargaTot: txt(g.cargaTot), cargaCarg: txt(g.cargaCarg), t: g.marcas && typeof g.marcas === 'object' ? g.marcas : {}, union: g.union === true || undefined,
     planta: CAT.limpiar(f.planta_destino || f.planta || g.planta), observacion: txt(g.observacion),
     // «Cerrado» en campo, o en planta cuando el camión ya abasteció.
     estado: /cerrad/i.test(f.estado || g.estado || '') ? 'cerrado' : 'borrador',
@@ -111,29 +132,31 @@ NUBE.verDetalle = function (r) {
     '<p class="ayuda-campo">' + DR.esc(NUBE.etiqueta(r)[0]) + ' · registró ' + DR.esc(r.registrador || '—') + (r.dispositivo ? ' (' + DR.esc(r.dispositivo) + ')' : '') + ' · ' + DR.esc(r.id) + '</p>' +
     '<div style="max-height:52vh;overflow:auto"><table class="tabla"><tr><th>Tramo</th><th class="n">Hora</th><th class="n">min:seg</th></tr>' + filas + '</table></div>' +
     '<p style="margin:10px 0 14px"><b>Ciclo de campo: ' + RSU.mmss(c.total) + '</b>' + (p.cicloCompleto !== null && p.cicloCompleto !== undefined ? ' · Ciclo completo (hasta abastecimiento): <b>' + RSU.mmss(p.cicloCompleto) + '</b>' : '') + '</p>' +
-    (NUBE.puedeContinuar(r) ? '<button class="btn verde bloque" id="hSeguir" type="button" style="margin-bottom:8px">Continuar este pallet en este equipo</button>' +
-      '<p class="ayuda-campo" style="margin:-2px 0 10px">Úsalo si el otro celular ya no lo va a seguir (sin batería, cambio de turno). Si los dos lo siguen, vale el último cambio que llegue a Integra.</p>' : '') +
+    (NUBE.puedeContinuar(r) ? '<button class="btn verde bloque" id="hSeguir" type="button" style="margin-bottom:8px">' + (r.estado === 'cerrado' ? 'Corregir este pallet en este equipo' : 'Continuar este pallet en este equipo') + '</button>' +
+      '<p class="ayuda-campo" style="margin:-2px 0 10px">Los dos equipos pueden seguirlo a la vez (ej. el auxiliar desde la carga), aunque estén sin señal: Integra junta lo de ambos y, si los dos cambian la misma hora, vale la que se tomó después.</p>' : '') +
     '<button class="btn bloque" id="hCerrar" type="button">Cerrar</button>', function () {
       DR.$('#hCerrar').onclick = DR.cerrarHoja;
       if (DR.$('#hSeguir')) DR.$('#hSeguir').onclick = function () { DR.cerrarHoja(); NUBE.continuar(r); };
     });
 };
 
-/** Solo pallets de Integra (la APK escribe en su propia hoja) en curso, del mismo usuario o con rol admin (igual que la base). */
+/** Pallets de Integra (la APK escribe en su propia hoja) de cualquier persona: si se ven aquí, el usuario
+ *  tiene asignado su fundo (la base filtra igual al leer y al guardar). Los cerrados, para corregirlos. */
 NUBE.puedeContinuar = function (r) {
-  return !TC.obtener(r.id) && r.origen === 'integra' && r.estado !== 'cerrado' && !!AT.perfil &&
-    (r.usuario_id === AT.perfil.id || AT.esAdmin());
+  return !TC.obtener(r.id) && r.origen === 'integra' && !!AT.perfil;
 };
 /** Copia el pallet de Integra a este equipo (ya «subido»: no se reenvía hasta que se marque algo) y lo abre. */
 NUBE.continuar = function (r) {
   var ahora = new Date().toISOString(), base = TC.nuevo(), local = {};
   Object.keys(base).forEach(function (k) { local[k] = r[k] !== undefined ? r[k] : base[k]; });
   local.etapas = JSON.parse(JSON.stringify(r.etapas));
-  local.estado = 'borrador';
+  local.t = JSON.parse(JSON.stringify(r.t || {}));
+  if (r.union) local.union = true;
+  local.estado = r.estado === 'cerrado' ? 'cerrado' : 'borrador';
   local.creado = r.creado || ahora;
   local.actualizado = ahora; local.subidoMod = ahora; local.subido = ahora; local.error = '';
   TC.guardarRegistro(local, true);
-  DR.toast('Pallet ' + TC.titulo(local) + ' traído a este equipo: sigue con la siguiente etapa.', 'ok');
+  DR.toast('Pallet ' + TC.titulo(local) + ' traído a este equipo' + (local.estado === 'cerrado' ? ': toca «Corregir una etapa».' : ': sigue con la siguiente etapa.'), 'ok');
   REG.abrir(local.id);
 };
 

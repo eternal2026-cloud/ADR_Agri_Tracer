@@ -224,6 +224,11 @@ textarea{min-height:70px;resize:vertical}
 .cc-id{display:flex;align-items:baseline;gap:10px;min-width:0}
 .cc-codigo{font-size:18px;font-weight:600;letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cc-placa{font-size:15px;font-weight:700;letter-spacing:.06em;padding:1px 7px;border:1.5px solid var(--c);border-radius:7px;white-space:nowrap}
+.cc-pallet{background:var(--c);color:#fff}
+.datos-pendientes input:placeholder-shown{border-color:var(--alerta,#E67E22);box-shadow:0 0 0 3px rgba(230,126,34,.15)}
+.un-item{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;text-align:left;padding:11px 13px;margin-bottom:6px;border:1px solid var(--borde);border-radius:12px;background:#fff;color:var(--texto);font-family:var(--fuente);cursor:pointer}
+.un-item b{font-size:17px;letter-spacing:.05em}
+.un-item span{font-size:13px;color:var(--texto-3)}
 .cc-hace{font-size:13px;color:var(--texto-3);white-space:nowrap;font-variant-numeric:tabular-nums}
 .cc-hace .vivo{color:var(--azul-med);font-weight:600}
 .cc-sub{font-size:15px;font-weight:500;color:var(--texto-2);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

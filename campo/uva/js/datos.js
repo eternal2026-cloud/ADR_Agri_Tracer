@@ -83,8 +83,76 @@ TC._regs.forEach(function (r) { ['zona', 'fundo', 'variedad'].forEach(function (
 TC.registros = function () { return TC._regs; };
 TC.obtener = function (id) { return TC._regs.filter(function (r) { return r.id === id; })[0] || null; };
 TC.persistir = function () { return DR.guardar('tcu.registros', TC._regs); };
+
+/* ------------------------------ hora de toma de cada dato ------------------------------
+ * Varias personas pueden llevar el mismo ciclo (ej. etapas 1–6 en un celular y 7–8 en otro,
+ * muchas veces sin señal). Cada dato guarda en r.t la hora en que se tomó EN EL CELULAR:
+ * al juntar dos versiones (Integra al subir, o este equipo al leer Integra) vale el dato
+ * tomado después, no el que se subió después. Un dato vacío sin hora nunca borra otro. */
+TC.CAMPOS = ['fecha', 'zona', 'fundo', 'lote', 'sublote', 'pasada', 'color', 'variedad', 'grupo', 'pallet', 'jabas', 'zunchos',
+  'palletsTot', 'palletsCarg', 'cargaTot', 'cargaCarg', 'placa', 'planta', 'observacion', 'estado'];
+TC.CAMPOS_ETAPA = ['ini', 'fin', 'com', 'causa'];
+/** {clave: valor} de todo lo que se marca: «fundo», «pallet», «cos.ini», «car.fin»… */
+TC.valores = function (r) {
+  var v = {}, t = function (x) { return x === undefined || x === null ? '' : String(x); };
+  TC.CAMPOS.forEach(function (k) { v[k] = t(r[k]); });
+  TC.ETAPAS.forEach(function (e) { var x = r.etapas[e.id] || {}; TC.CAMPOS_ETAPA.forEach(function (k) { v[e.id + '.' + k] = t(x[k]); }); });
+  return v;
+};
+TC._antes = {};
+TC._regs && TC._regs.forEach(function (r) { TC._antes[r.id] = TC.valores(r); });
+/** Pone la hora de toma a los datos que cambiaron desde la última vez que se guardó el registro. */
+TC.marcarCambios = function (r) {
+  var antes = TC._antes[r.id] || {}, ahora = TC.valores(r), hora = new Date().toISOString();
+  r.t = r.t || {};
+  Object.keys(ahora).forEach(function (k) { if (ahora[k] !== (antes[k] || '') ) r.t[k] = hora; });
+};
+/** ¿Gana el dato b (con hora tb) sobre a (con hora ta)? Igual que fn_uva_gana en la base;
+ *  bManda: sin horas, el valor no vacío de b reemplaza al de a (b es la versión de Integra). */
+TC.gana = function (va, ta, vb, tb, bManda) {
+  if (ta && tb) return tb > ta || (tb === ta && !va && !!vb);
+  if (tb) return true;
+  if (ta) return false;
+  return bManda ? !!vb && vb !== va : !va && !!vb;
+};
+/**
+ * Junta en el registro local r lo que trae otra versión del mismo ciclo (ej. la de Integra después
+ * de que otra persona llenó sus etapas), dato por dato según la hora de toma. Devuelve true si cambió.
+ */
+TC.fusionar = function (r, o) {
+  var a = TC.valores(r), b = TC.valores(o), ta = r.t || {}, tb = o.t || {}, cambio = false;
+  r.t = r.t || {};
+  Object.keys(b).forEach(function (k) {
+    if (a[k] === b[k] && (ta[k] || '') >= (tb[k] || '')) return;
+    if (!TC.gana(a[k], ta[k], b[k], tb[k], true)) return;
+    var p = k.split('.');
+    if (p.length === 2) {
+      r.etapas[p[0]][p[1]] = b[k];
+      if (p[1] === 'fin') { r.etapas[p[0]].editado = !!o.etapas[p[0]].editado; delete r.etapas[p[0]].porPlanta; }
+    } else if (k === 'estado') r.estado = b[k] === 'cerrado' ? 'cerrado' : 'borrador';
+    else r[k] = b[k];
+    if (tb[k]) r.t[k] = tb[k]; else delete r.t[k];
+    if (a[k] !== b[k]) cambio = true;
+  });
+  if (r.union && !o.union && o.fundo) { delete r.union; cambio = true; }
+  return cambio;
+};
+/** Cambia el ID local (Integra juntó este ciclo con otro del mismo N° de pallet). */
+TC.renombrar = function (viejo, nuevo) {
+  var r = TC.obtener(viejo), ya = TC.obtener(nuevo);
+  if (!r || viejo === nuevo) return ya || r;
+  if (ya) { TC.fusionar(ya, r); TC._regs = TC._regs.filter(function (x) { return x !== r; }); r = ya; }
+  else r.id = nuevo;
+  delete TC._antes[viejo];
+  TC._antes[r.id] = TC.valores(r);
+  TC.persistir();
+  if (window.REG && REG.id === viejo) REG.id = r.id;
+  return r;
+};
+
 TC.guardarRegistro = function (r, sinTocarFecha) {
-  if (!sinTocarFecha) r.actualizado = new Date().toISOString();
+  if (!sinTocarFecha) { r.actualizado = new Date().toISOString(); TC.marcarCambios(r); }
+  TC._antes[r.id] = TC.valores(r);
   var i = TC._regs.findIndex(function (x) { return x.id === r.id; });
   if (i < 0) TC._regs.unshift(r); else TC._regs[i] = r;
   TC.persistir();
@@ -107,8 +175,8 @@ TC.nuevo = function () {
     id: 'UV-' + TC.cfg.dispositivo + '-' + Date.now().toString(36).toUpperCase(),
     campana: TC.cfg.campana, fecha: DR.hoyISO(), zona: PERM.zonaDe(fundo), fundo: fundo, lote: '', sublote: '-', pasada: '',
     color: '', variedad: '', grupo: u.grupo || '', pallet: '',
-    jabas: '', zunchos: '', placa: '', palletsTot: '', palletsCarg: '', planta: u.planta || '',
-    etapas: etapas, observacion: '', estado: 'borrador',
+    jabas: '', zunchos: '', placa: '', palletsTot: '', palletsCarg: '', cargaTot: '', cargaCarg: '', planta: u.planta || '',
+    etapas: etapas, observacion: '', estado: 'borrador', t: {},
     registrador: TC.cfg.usuario, dispositivo: TC.cfg.dispositivo, creado: ahora, actualizado: ahora, subidoMod: '', error: ''
   };
 };
@@ -192,11 +260,11 @@ TC.validar = function (r, paraCerrar) {
   var imposible = TC.horaImposible(r);
   if (imposible) return imposible;
   if (paraCerrar) {
-    if (!r.fundo) return 'Elige el fundo.';
-    if (!r.lote) return 'Escribe o elige el lote.';
-    if (!String(r.pallet || '').trim()) return 'Escribe el código de pallet (etapa Cosecha).';
-    if (!r.variedad) return 'Indica la variedad.';
-    if (!r.grupo) return 'Indica el grupo (líder).';
+    if (!r.fundo) return 'Elige el fundo (datos iniciales, etapa Cosecha).';
+    if (!r.lote) return 'Escribe o elige el lote (datos iniciales, etapa Cosecha).';
+    if (!r.variedad) return 'Indica la variedad (datos iniciales, etapa Cosecha).';
+    if (!r.grupo) return 'Indica el grupo o líder (datos iniciales, etapa Cosecha).';
+    if (!String(r.pallet || '').trim()) return 'Escribe el código de pallet (etapa Lecturado).';
   }
   for (var i = 0; i < TC.ETAPAS.length; i++) {
     var e = TC.ETAPAS[i], x = r.etapas[e.id], pf = TC.finPrevio(r, e);
@@ -211,10 +279,12 @@ TC.validar = function (r, paraCerrar) {
     if (!(Number(r.jabas) > 0)) return 'Indica el N° de jabas del pallet (etapa Armado de pallet).';
     if (!(Number(r.zunchos) > 0)) return 'Indica el N° de zunchos (etapa Enzunchado).';
     if (!(Number(r.palletsTot) > 0) || !(Number(r.palletsCarg) > 0)) return 'Indica el N° total de pallets y de pallets cargados (etapa Portabin).';
-    if (!String(r.placa).trim()) return 'Indica la placa del camión (etapa Carga).';
+    if (!(Number(r.cargaCarg) > 0) || !(Number(r.cargaTot) > 0)) return 'Indica el N° de pallets cargados y el N° de pallets total (etapa Carga).';
+    if (!String(r.placa || '').trim()) return 'Indica la placa del camión (etapa Carga).';
     if (!r.planta) return 'Indica la planta destino (etapa Traslado a planta).';
   }
-  if (r.palletsTot && r.palletsCarg && Number(r.palletsCarg) > Number(r.palletsTot)) return 'Los pallets cargados no pueden ser más que los pallets totales.';
+  if (r.palletsTot && r.palletsCarg && Number(r.palletsCarg) > Number(r.palletsTot)) return 'Los pallets cargados no pueden ser más que los pallets totales (etapa Portabin).';
+  if (r.cargaTot && r.cargaCarg && Number(r.cargaCarg) > Number(r.cargaTot)) return 'Los pallets cargados no pueden ser más que los pallets totales (etapa Carga).';
   return '';
 };
 
@@ -224,7 +294,7 @@ TC.enProceso = function (r) { return r.estado !== 'cerrado' && TC.ETAPAS.some(fu
 TC.pendiente = function (r) { return r.subidoMod !== r.actualizado; };
 /** Etapa bloqueada: su etapa previa aún no termina (ej. Lecturado se habilita después del armado).
  *  Las etapas libres (traslado de jaba y armado) nunca se bloquean. */
-TC.bloqueada = function (r, e) { return !!e.dep && !e.libre && !r.etapas[e.dep].fin && !r.etapas[e.id].ini; };
+TC.bloqueada = function (r, e) { return !r.union && !!e.dep && !e.libre && !r.etapas[e.dep].fin && !r.etapas[e.id].ini; };
 
 /** Dónde está el pallet ahora: etapa en curso (la más avanzada) o la siguiente que espera. */
 TC.situacion = function (r) {

@@ -175,14 +175,14 @@ RES.filaBD = function (r, n) {
 /** CSV (abre en Excel): mismas columnas que la BD + ciclo, estado, comentarios y quién registró. */
 RES.csv = function (l) {
   if (!l.length) { DR.toast('No hay registros para exportar.', 'error'); return; }
-  var cab = RES.CAB_BD.concat(['T. CICLO TOTAL', 'EN META', 'ESTADO', 'ID', 'REGISTRADO POR', 'COMENTARIOS', 'OBSERVACIÓN']);
+  var cab = RES.CAB_BD.concat(['T. CICLO TOTAL', 'EN META', 'ESTADO', 'ID', 'REGISTRADO POR', 'COMENTARIOS', 'OBSERVACIÓN', 'PALLET', 'N° PALLETS CARGADOS (CARGA)', 'N° PALLETS TOTAL (CARGA)']);
   var q = function (v) { v = v === null || v === undefined ? '' : String(v); return /[;"\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
   var n = function (v) { return v === null || v === undefined ? '' : String(v).replace('.', ','); };
   var filas = l.map(function (r) {
     var c = TC.calcular(r);
     var com = TC.ETAPAS.filter(function (e) { return r.etapas[e.id].com || r.etapas[e.id].causa; })
       .map(function (e) { var x = r.etapas[e.id]; return e.nombre + ': ' + [x.causa, x.com].filter(Boolean).join(' - '); }).join(' | ');
-    return RES.filaBD(r, n).concat([n(c.total), c.enMeta === null ? '' : (c.enMeta ? 'Sí' : 'No'), NUBE.etiqueta(r)[0], r.id, r.registrador, com, r.observacion]).map(q).join(';');
+    return RES.filaBD(r, n).concat([n(c.total), c.enMeta === null ? '' : (c.enMeta ? 'Sí' : 'No'), NUBE.etiqueta(r)[0], r.id, r.registrador, com, r.observacion, r.pallet, r.cargaCarg, r.cargaTot]).map(q).join(';');
   });
   DR.entregarArchivo('TiempoCiclo_Uva_' + DR.hoyISO() + '.csv', '﻿' + [cab.map(q).join(';')].concat(filas).join('\r\n'), 'text/csv;charset=utf-8')
     .then(function (donde) { DR.toast(l.length + ' registro(s) exportado(s): ' + donde, 'ok'); }, function (e) { DR.toast('No se pudo exportar: ' + e.message, 'error'); });

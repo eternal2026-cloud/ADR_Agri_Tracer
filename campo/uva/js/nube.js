@@ -143,7 +143,7 @@ NUBE.verDetalle = function (r) {
 /** Pallets de Integra (la APK escribe en su propia hoja) de cualquier persona: si se ven aquí, el usuario
  *  tiene asignado su fundo (la base filtra igual al leer y al guardar). Los cerrados, para corregirlos. */
 NUBE.puedeContinuar = function (r) {
-  return !TC.obtener(r.id) && r.origen === 'integra' && !!AT.perfil;
+  return !TC.obtener(r.id) && r.origen === 'integra' && !!AT.perfil && (!PERM.soloPropios() || PERM.esMio(r));
 };
 /** Copia el pallet de Integra a este equipo (ya «subido»: no se reenvía hasta que se marque algo) y lo abre. */
 NUBE.continuar = function (r) {

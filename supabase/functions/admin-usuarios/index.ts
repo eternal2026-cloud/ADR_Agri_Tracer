@@ -11,7 +11,8 @@
  * fundos: lista de fundos donde puede registrar ciclos ([] = todos).
  * accesos: claves grupo.modulo.funcion que puede ver (null = acceso completo; ver AT.ACCESOS).
  * horarios: { modulo: { desde: 'HH:MM', hasta: 'HH:MM' } } en que puede usar cada módulo (null = todo el día; 0049).
- * ciclos_solo_propios: true = en Tiempos de ciclo solo ve los ciclos que él creó (false = todos).
+ * ciclos_solo_propios: true = en Tiempos de ciclo (Arándano) solo ve los ciclos que él creó (false = todos).
+ * uva_solo_propios: lo mismo para Tiempo de ciclo Uva (0058): solo ve y edita los suyos y no se une con ciclos de otros.
  * ==========================================================================*/
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
@@ -110,6 +111,7 @@ async function crear(sb: SupabaseClient, yo: Perfil, b: Record<string, unknown>)
   const { error: insErr } = await sb.from('perfiles').insert({
     id: nuevo.user.id, usuario, nombre, area: String(b.area || '').trim(), rol, activo: true, debe_cambiar_password: true,
     fundos: limpiarFundos(b.fundos), accesos, horarios: rol === 'admin' ? null : limpiarHorarios(b.horarios), ciclos_solo_propios: rol !== 'admin' && b.ciclos_solo_propios === true,
+    uva_solo_propios: rol !== 'admin' && b.uva_solo_propios === true,
   });
   if (insErr) {
     await sb.auth.admin.deleteUser(nuevo.user.id).catch(() => {});
@@ -146,6 +148,7 @@ async function actualizar(sb: SupabaseClient, yo: Perfil, b: Record<string, unkn
   if (b.area !== undefined) cambios.area = String(b.area).trim();
   if (b.fundos !== undefined) cambios.fundos = limpiarFundos(b.fundos);
   if (b.ciclos_solo_propios !== undefined) cambios.ciclos_solo_propios = b.ciclos_solo_propios === true;
+  if (b.uva_solo_propios !== undefined) cambios.uva_solo_propios = b.uva_solo_propios === true;
   if (b.horarios !== undefined) cambios.horarios = limpiarHorarios(b.horarios);
   if (b.accesos !== undefined) {
     cambios.accesos = limpiarAccesos(b.accesos);

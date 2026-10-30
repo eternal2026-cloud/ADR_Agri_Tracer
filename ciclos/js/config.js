@@ -4,7 +4,7 @@
  * (admin-usuarios, sync-sheets): no dependen de variables en Vercel.
  * ==========================================================================*/
 
-var CONFIG = { tab: 'usuarios', parametros: {}, listas: [], usuarios: [], areas: [], sync: null, rolNuevo: 'captura', usuarioEditado: false, fundosNuevo: [], soloPropiosNuevo: false, accesosNuevo: { completo: false, lista: [] } };
+var CONFIG = { tab: 'usuarios', parametros: {}, listas: [], usuarios: [], areas: [], sync: null, rolNuevo: 'captura', usuarioEditado: false, fundosNuevo: [], soloPropiosNuevo: false, soloPropiosUvaNuevo: false, accesosNuevo: { completo: false, lista: [] } };
 
 CONFIG.TABS = [
   { id: 'usuarios', t: 'Usuarios', ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.8-3.2 3-5 5.5-5s4.7 1.8 5.5 5"/><path d="M17 8v6M14 11h6"/></svg>' },
@@ -127,8 +127,9 @@ CONFIG.tabUsuarios = function (c) {
     '<div class="campo ancho' + (CONFIG.rolNuevo === 'admin' ? ' oculto' : '') + '" id="nuAccesosCampo"><label>¿Qué podrá ver?</label>' + CONFIG.selectorAccesos('nuAccesos', CONFIG.accesosNuevo) + '</div>' +
     '<div class="campo ancho"><label>Fundos donde registra ciclos</label>' + CONFIG.selectorFundos('nuFundos', CONFIG.fundosNuevo) +
       '<div class="ayuda-campo">Marca uno o más para que solo pueda elegir esos. Sin marcar = todos los fundos.</div></div>' +
-    '<div class="campo ancho' + (CONFIG.rolNuevo === 'admin' ? ' oculto' : '') + '" id="nuCiclosCampo"><label>Ciclos que ve</label>' + CONFIG.selectorVerCiclos('nuVerCiclos', CONFIG.soloPropiosNuevo) +
-      '<div class="ayuda-campo">«Solo los suyos»: en Captura y Resumen solo ve los ciclos que él creó (dentro de sus fundos).</div></div>' +
+    '<div class="campo ancho' + (CONFIG.rolNuevo === 'admin' ? ' oculto' : '') + '" id="nuCiclosCampo"><label>Ciclos que ve · Arándano</label>' + CONFIG.selectorVerCiclos('nuVerCiclos', CONFIG.soloPropiosNuevo) +
+      '<label style="margin-top:10px">Ciclos que ve · Uva</label>' + CONFIG.selectorVerCiclos('nuVerCiclosUva', CONFIG.soloPropiosUvaNuevo) +
+      '<div class="ayuda-campo">«Solo los suyos»: solo ve (y en Uva solo edita) los ciclos que él creó, dentro de sus fundos. «Todos»: en Uva puede continuar y completar ciclos de otras personas de sus fundos (ej. el auxiliar de carga).</div></div>' +
     '<div class="campo ancho"><label for="nuClave">Contraseña (opcional)</label><input id="nuClave" placeholder="Déjalo vacío y se genera una temporal" autocomplete="off"></div>' +
     '</div><div class="acciones"><button type="button" class="btn verde grande" id="btnCrearUsuario">' + DR.ICONOS.mas + '<span>Crear usuario</span></button></div>';
 
@@ -141,7 +142,8 @@ CONFIG.tabUsuarios = function (c) {
       (u.rol === 'admin' ? '' : ' <span class="pill ' + (u.accesos ? 'azul' : 'gris') + '">' + DR.esc(CONFIG.textoAccesos(u.accesos)) + '</span>') +
       (u.rol === 'admin' || !CONFIG.textoHorariosUsuario(u.accesos) ? '' : ' <span class="pill naranja">' + DR.esc(CONFIG.textoHorariosUsuario(u.accesos)) + '</span>') +
       (u.rol === 'admin' ? '' : ' <span class="pill ' + ((u.fundos || []).length ? 'azul' : 'gris') + '">' + DR.esc(CONFIG.textoFundos(u.fundos)) + '</span>') +
-      (u.rol === 'admin' ? '' : ' <span class="pill ' + (u.ciclos_solo_propios ? 'azul' : 'gris') + '">' + CONFIG.textoVerCiclos(u.ciclos_solo_propios) + '</span>');
+      (u.rol === 'admin' ? '' : ' <span class="pill ' + (u.ciclos_solo_propios ? 'azul' : 'gris') + '">Arándano: ' + CONFIG.textoVerCiclos(u.ciclos_solo_propios).toLowerCase() + '</span>' +
+        ' <span class="pill ' + (CONFIG.soloUva(u) ? 'azul' : 'gris') + '">Uva: ' + CONFIG.textoVerCiclos(CONFIG.soloUva(u)).toLowerCase() + '</span>');
     var selector = '<select data-rol-de="' + u.id + '"' + (u.id === yo ? ' disabled' : '') + ' aria-label="Rol de ' + DR.esc(u.nombre) + '">' +
       CONFIG.ROLES.map(function (r) { return '<option value="' + r.id + '"' + (r.id === u.rol ? ' selected' : '') + '>' + r.t + '</option>'; }).join('') + '</select>';
     return '<div class="usuario-card' + (u.activo ? '' : ' inactivo') + '"><div class="ini">' + CONFIG.iniciales(u.nombre || u.usuario) + '</div>' +
@@ -179,6 +181,7 @@ CONFIG.tabUsuarios = function (c) {
   CONFIG.enlazarSelectorFundos('nuFundos', function (lista) { CONFIG.fundosNuevo = lista; });
   CONFIG.enlazarSelectorAccesos('nuAccesos', CONFIG.accesosNuevo);
   CONFIG.enlazarSelectorVerCiclos('nuVerCiclos', function (v) { CONFIG.soloPropiosNuevo = v; });
+  CONFIG.enlazarSelectorVerCiclos('nuVerCiclosUva', function (v) { CONFIG.soloPropiosUvaNuevo = v; });
   DR.$$('[data-ciclos-de]', c).forEach(function (b) {
     b.onclick = function () { CONFIG.editarVerCiclos(CONFIG.buscarUsuario(this.getAttribute('data-ciclos-de'))); };
   });
@@ -322,7 +325,10 @@ CONFIG.editarFundos = function (u) {
   };
 };
 
-/* ---- ciclos que ve: todos (de sus fundos) o solo los que él creó (perfiles.ciclos_solo_propios, 0042) ---- */
+/* ---- ciclos que ve: todos (de sus fundos) o solo los que él creó. Arándano: perfiles.ciclos_solo_propios (0042);
+ *      Uva: perfiles.uva_solo_propios (0058, antes usaba el mismo de Arándano). ---- */
+/** Uva sin la columna propia (base sin 0058) usa el valor de Arándano, que es el que rige. */
+CONFIG.soloUva = function (u) { return u.uva_solo_propios !== undefined && u.uva_solo_propios !== null ? !!u.uva_solo_propios : !!u.ciclos_solo_propios; };
 CONFIG.textoVerCiclos = function (soloPropios) { return soloPropios ? 'Solo sus ciclos' : 'Todos los ciclos'; };
 CONFIG.selectorVerCiclos = function (id, soloPropios) {
   return '<div class="opciones" id="' + id + '">' + [[false, 'Todos los ciclos'], [true, 'Solo los suyos']].map(function (o) {
@@ -342,23 +348,25 @@ CONFIG.enlazarSelectorVerCiclos = function (id, alCambiar) {
 };
 CONFIG.editarVerCiclos = function (u) {
   if (!u) return;
-  var solo = !!u.ciclos_solo_propios;
+  var solo = !!u.ciclos_solo_propios, soloUva = CONFIG.soloUva(u);
   UI.abrirHoja('<div class="asa"></div>' +
     '<div class="res-nombre">' + DR.esc(u.nombre) + '</div>' +
     '<div class="res-dni">Ciclos que puede ver en Tiempos de ciclo</div>' +
-    '<div style="margin-top:14px">' + CONFIG.selectorVerCiclos('hojaVerCiclos', solo) + '</div>' +
-    '<div class="aviso" style="margin-top:14px"><b>Todos los ciclos:</b> ve los ciclos de cualquier persona en sus fundos asignados.<br>' +
-      '<b>Solo los suyos:</b> en Captura y en Resumen solo ve (y sigue) los ciclos que él mismo creó. Los fundos asignados se siguen aplicando.</div>' +
+    '<div class="sep-titulo" style="margin-top:14px">Arándano</div>' + CONFIG.selectorVerCiclos('hojaVerCiclos', solo) +
+    '<div class="sep-titulo" style="margin-top:14px">Uva</div>' + CONFIG.selectorVerCiclos('hojaVerCiclosUva', soloUva) +
+    '<div class="aviso" style="margin-top:14px"><b>Todos los ciclos:</b> ve los ciclos de cualquier persona en sus fundos asignados. En Uva además puede continuarlos y completarlos (ej. el auxiliar de carga) y su ciclo se une con el del mismo N° de pallet del día.<br>' +
+      '<b>Solo los suyos:</b> solo ve (y sigue) los ciclos que él mismo creó; en Uva no puede editar ni unirse a ciclos de otras personas. Los fundos asignados se siguen aplicando.</div>' +
     '<div class="acciones"><button type="button" class="btn sec" id="btnVerCiclosCancelar" style="flex:1">Cancelar</button>' +
     '<button type="button" class="btn verde" id="btnVerCiclosGuardar" style="flex:1">Guardar</button></div>');
   CONFIG.enlazarSelectorVerCiclos('hojaVerCiclos', function (v) { solo = v; });
+  CONFIG.enlazarSelectorVerCiclos('hojaVerCiclosUva', function (v) { soloUva = v; });
   DR.$('#btnVerCiclosCancelar').onclick = UI.cerrarHoja;
   DR.$('#btnVerCiclosGuardar').onclick = function () {
     var btn = this;
     btn.disabled = true;
-    AT.llamarFuncion('admin-usuarios', { accion: 'actualizar', id: u.id, ciclos_solo_propios: solo }).then(function () {
+    AT.llamarFuncion('admin-usuarios', { accion: 'actualizar', id: u.id, ciclos_solo_propios: solo, uva_solo_propios: soloUva }).then(function () {
       UI.cerrarHoja();
-      DR.toast(u.nombre + ': ' + CONFIG.textoVerCiclos(solo).toLowerCase() + '.');
+      DR.toast(u.nombre + ': Arándano ' + CONFIG.textoVerCiclos(solo).toLowerCase() + ' · Uva ' + CONFIG.textoVerCiclos(soloUva).toLowerCase() + '.');
       return CONFIG.refrescar();
     }).catch(function (e) { btn.disabled = false; DR.toast(e.message, 'error'); });
   };
@@ -505,10 +513,12 @@ CONFIG.crearUsuario = function () {
   AT.llamarFuncion('admin-usuarios', {
     accion: 'crear', nombre: nombre, usuario: usuario, area: DR.$('#nuArea').value.trim(),
     rol: CONFIG.rolNuevo, password: DR.$('#nuClave').value, fundos: CONFIG.rolNuevo === 'admin' ? [] : CONFIG.fundosNuevo,
-    accesos: accesos, ciclos_solo_propios: CONFIG.rolNuevo !== 'admin' && CONFIG.soloPropiosNuevo
+    accesos: accesos, ciclos_solo_propios: CONFIG.rolNuevo !== 'admin' && CONFIG.soloPropiosNuevo,
+    uva_solo_propios: CONFIG.rolNuevo !== 'admin' && CONFIG.soloPropiosUvaNuevo
   }).then(function (r) {
     CONFIG.fundosNuevo = [];
     CONFIG.soloPropiosNuevo = false;
+    CONFIG.soloPropiosUvaNuevo = false;
     CONFIG.accesosNuevo = { completo: false, lista: [] };
     CONFIG.mostrarCredenciales(r, 'creado');
     return CONFIG.refrescar();

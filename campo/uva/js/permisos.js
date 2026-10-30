@@ -46,6 +46,10 @@ PERM.estandarTraslado = function (zona, fundo, planta) {
   return mejor;
 };
 
+/** Usuario en «Solo sus ciclos» para Uva: no continúa ni se une a ciclos de otras personas. */
+PERM.soloPropios = function () { var p = PERM.datos(); return !!(p && p.soloPropios) && !(window.AT && AT.esAdmin && AT.esAdmin()); };
+PERM.esMio = function (r) { return !!(window.AT && AT.perfil) && r.usuario_id === AT.perfil.id; };
+
 PERM.nombrePerfil = function () { return 'Integra'; };
 PERM.traza = function () { return { perfil: 'Integra', version: '', firma: '', hash: '' }; };
 
@@ -63,7 +67,9 @@ PERM.cargar = function () {
       lineas: Array.isArray(c.lineas) ? c.lineas : [],
       lideres: Array.isArray(c.lideres) ? c.lideres : [],
       traslados: Array.isArray(c.traslados) ? c.traslados : [],
-      campana: c.campana || ''
+      campana: c.campana || '',
+      // «Solo sus ciclos» de Uva (Config › Usuarios › Ciclos que ve, 0058).
+      soloPropios: r.data.solo_propios === true
     };
     DR.guardar(PERM.CLAVE, p);
     if (p.campana) { TC.cfg.campana = CAT.limpiar(p.campana); TC.guardarCfg(); }

@@ -4,7 +4,7 @@
  * sin señal se abre la copia guardada. Solo archivos del sitio (GET); las llamadas
  * a Supabase nunca se guardan (los registros viven en el equipo y suben luego).
  * ==========================================================================*/
-var CACHE = 'integra-uva-v6';
+var CACHE = 'integra-uva-v7';
 var BASE = [
   './', 'index.html', 'css/app.css', 'img/icono.svg',
   'fonts/jost-latin-400-normal.woff2', 'fonts/jost-latin-500-normal.woff2', 'fonts/jost-latin-600-normal.woff2', 'fonts/jost-latin-700-normal.woff2',

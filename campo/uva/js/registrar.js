@@ -413,13 +413,16 @@ REG.enfocarDato = function (r, e) {
   if (c) { c.scrollIntoView({ behavior: 'smooth', block: 'center' }); if (c.focus) c.focus(); }
 };
 
-/** Otro ciclo (de cualquier equipo) con el mismo N° de pallet y fecha ±1 día: Integra los junta al subir. */
+/** Otro ciclo con el mismo N° de pallet, la MISMA fecha y el mismo fundo: Integra los junta al subir (0058).
+ *  Los N° cortos (0014, 0020…) se repiten de un día a otro: por eso ya no se mira el día anterior.
+ *  Con «Solo sus ciclos» solo se une con los suyos. */
 REG.mismoPallet = function (r) {
   var k = String(r.pallet || '').replace(/\s+/g, '').toUpperCase();
   if (!k) return null;
-  var dia = function (f) { return f ? new Date(f + 'T00:00:00').getTime() : 0; }, d0 = dia(r.fecha);
+  var fu = DR.sinTildes(r.fundo || '');
   return NUBE.todos().filter(function (o) {
-    return o.id !== r.id && o.origen !== 'planta' && o.origen !== 'apk' && String(o.pallet || '').replace(/\s+/g, '').toUpperCase() === k && Math.abs(dia(o.fecha) - d0) <= 864e5;
+    return o.id !== r.id && o.origen === 'integra' && String(o.pallet || '').replace(/\s+/g, '').toUpperCase() === k && o.fecha === r.fecha &&
+      (!fu || !o.fundo || DR.sinTildes(o.fundo) === fu) && (!PERM.soloPropios() || PERM.esMio(o));
   })[0] || null;
 };
 REG.avisoPallet = function (r) {
@@ -439,7 +442,8 @@ REG.unirse = function () {
   var lista = function () {
     var k = q.replace(/\s+/g, '').toUpperCase();
     return NUBE.todos().filter(function (r) {
-      return r.origen === 'integra' && r.estado !== 'cerrado' && r.pallet && (!k || String(r.pallet).toUpperCase().indexOf(k) > -1);
+      return r.origen === 'integra' && r.estado !== 'cerrado' && r.pallet && r.fecha === hoy && (!PERM.soloPropios() || PERM.esMio(r) || !!TC.obtener(r.id)) &&
+        (!k || String(r.pallet).toUpperCase().indexOf(k) > -1);
     }).slice(0, 30);
   };
   var pintar = function () {

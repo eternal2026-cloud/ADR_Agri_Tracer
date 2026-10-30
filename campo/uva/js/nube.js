@@ -21,6 +21,7 @@ NUBE.cargar = function (forzar) {
   if (!forzar && NUBE._t && Date.now() - NUBE._t < 15000) return Promise.resolve(NUBE.filas);
   if (!SHEETS.configurado() || !SHEETS.hayRed()) return Promise.resolve(NUBE.filas);
   // También los que Integra unió a otro por N° de pallet (eliminado + fusionado_en): este equipo adopta el ID vigente.
+  var inicio = new Date().toISOString();
   var q = sb.from('uva_ciclos').select(NUBE.COLS);
   q = NUBE._viejo ? q.eq('eliminado', false) : q.or('eliminado.eq.false,fusionado_en.not.is.null');
   NUBE.cargando = q
@@ -33,6 +34,7 @@ NUBE.cargar = function (forzar) {
       datos.filter(function (f) { return f.fusionado_en && TC.obtener(f.id); }).forEach(function (f) { TC.renombrar(f.id, f.fusionado_en); });
       NUBE.filas = datos.filter(function (f) { return !f.eliminado; }).map(NUBE.aRegistro);
       NUBE.adoptar(NUBE.filas);
+      NUBE.limpiar(datos, inicio);
       NUBE.hora = new Date().toISOString();
       DR.guardar('tcu.nube', NUBE.filas); DR.guardar('tcu.nubeHora', NUBE.hora);
       return NUBE.filas;
@@ -51,6 +53,19 @@ NUBE.adoptar = function (filas) {
     var n = porId[l.id];
     if (n && n.origen === 'integra' && TC.fusionar(l, n)) TC.guardarRegistro(l, true);
   });
+};
+
+/**
+ * Copias del equipo que ya se subieron, sin cambios pendientes, y que Integra ya no devuelve: se
+ * eliminaron allá o son de otra persona y el usuario está en «Solo sus ciclos» (la base no se las
+ * muestra). Se borran del equipo para que no se vean ni se vuelvan a subir.
+ */
+NUBE.limpiar = function (datos, inicio) {
+  var ids = {};
+  datos.forEach(function (f) { ids[f.id] = true; });
+  var quitados = TC.registros().filter(function (l) { return l.subidoMod && l.subido && l.subido < inicio && !TC.pendiente(l) && !ids[l.id]; }).map(function (l) { return l.id; });
+  quitados.forEach(TC.olvidar);
+  if (quitados.length) DR.toast(quitados.length + ' pallet(s) quitados de este equipo: ya no están en Integra o son de otra persona.', 'info');
 };
 
 /** Fila de uva_ciclos → registro con la forma de TC.nuevo (+ origen, ámbito y la parte de planta). */

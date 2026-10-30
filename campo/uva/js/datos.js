@@ -137,6 +137,15 @@ TC.fusionar = function (r, o) {
   if (r.union && !o.union && o.fundo) { delete r.union; cambio = true; }
   return cambio;
 };
+/** Borra la copia del equipo de un ciclo que ya está en Integra (eliminado allá o de otra persona). No avisa a Integra. */
+TC.olvidar = function (id) {
+  var antes = TC._regs.length;
+  TC._regs = TC._regs.filter(function (x) { return x.id !== id; });
+  delete TC._antes[id];
+  if (TC._regs.length !== antes) TC.persistir();
+  if (window.REG && REG.id === id) { REG.id = null; REG.vista = 'lista'; }
+  return TC._regs.length !== antes;
+};
 /** Cambia el ID local (Integra juntó este ciclo con otro del mismo N° de pallet). */
 TC.renombrar = function (viejo, nuevo) {
   var r = TC.obtener(viejo), ya = TC.obtener(nuevo);

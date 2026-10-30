@@ -93,6 +93,13 @@ SHEETS.subirPendientes = function (aviso) {
     var r = pend[i], modEnviado = r.actualizado;
     aviso({ total: pend.length, hechos: hechos });
     return SHEETS.llamar(SHEETS.paquete(r)).then(function (res) {
+      // Eliminado en Integra o de otra persona (usuario en «Solo sus ciclos»): se borra la copia del equipo.
+      if (res && (res.eliminado || res.ajeno)) {
+        TC.olvidar(r.id);
+        DR.toast('Pallet ' + TC.titulo(r) + (res.eliminado ? ' ya fue eliminado en Integra' : ' es de ' + (res.registrador || 'otra persona')) + ': se quitó de este equipo.', 'info');
+        hechos++;
+        return siguiente(i + 1);
+      }
       // Integra pudo unirlo a otro ciclo del mismo N° de pallet (otro ID) y devuelve el ciclo combinado.
       var act = res && res.id && res.id !== r.id ? TC.renombrar(r.id, res.id) : TC.obtener(r.id);
       if (act) {

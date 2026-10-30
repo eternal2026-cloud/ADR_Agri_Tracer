@@ -9,6 +9,9 @@
 --   · Unión por N° de pallet (0057): ahora exige la MISMA fecha (antes ±1 día) y el mismo fundo cuando
 --     los dos lo tienen. Los N° de pallet cortos (0014, 0020…) se repiten de un día a otro y el 30/10
 --     se juntaron ciclos de hoy con los de ayer.
+--   · Un ciclo ELIMINADO no revive: si otro celular aún lo tiene guardado y lo vuelve a subir, Integra
+--     no lo toca y responde eliminado = true para que ese celular borre su copia (antes la subida lo
+--     reactivaba). Igual cuando el ciclo es de otra persona y el usuario está en «Solo sus ciclos».
 --   · uva_ciclos_cambios: cada vez que un ciclo de campo cambia queda quién lo subió, cuándo y qué
 --     datos cambiaron (valor anterior, valor nuevo y hora de toma). Solo lectura para admin.
 --
@@ -83,6 +86,8 @@ begin
     select * into x from public.uva_ciclos where id = v_id for update;
     hay := found;
   end loop;
+  -- Eliminado en Integra (no unido): la copia de otro celular no lo revive.
+  if hay and x.eliminado and x.fusionado_en is null then return v_id; end if;
   if hay then
     if x.origen <> p_origen then raise exception 'El registro % ya existe con otro origen (%). No se sobrescribe.', v_id, x.origen; end if;
     if p_origen = 'apk' and (x.registrador is distinct from v_reg or x.dispositivo is distinct from v_disp) then
@@ -91,9 +96,8 @@ begin
     if p_origen = 'integra' and coalesce(btrim(x.fundo), '') <> '' and not public.fn_uva_fundo_permitido(x.fundo) then
       raise exception 'El ciclo % es del fundo «%», que no tienes asignado. No se sobrescribe.', v_id, x.fundo;
     end if;
-    if not v_todos and x.usuario_id is distinct from p_usuario then
-      raise exception 'El ciclo % es de %. Tu usuario está en «Solo sus ciclos» para Uva: no puedes editar ciclos de otras personas.', v_id, coalesce(x.registrador, 'otra persona');
-    end if;
+    -- «Solo sus ciclos»: el ciclo de otra persona no se toca (rpc_uva_guardar_campo avisa ajeno = true).
+    if not v_todos and x.usuario_id is distinct from p_usuario then return v_id; end if;
   end if;
 
   if p_origen = 'integra' then
@@ -165,6 +169,35 @@ begin
 end;
 $$;
 revoke execute on function public.fn_uva_aplicar_campo(jsonb, text, uuid) from public, anon, authenticated;
+
+/** Integra campo: ID vigente, ciclo combinado y si el celular debe borrar su copia (eliminado o ajeno). */
+create or replace function public.rpc_uva_guardar_campo(p_payload jsonb)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_id text; c public.uva_ciclos; v_fundo text := p_payload->'registro'->>'fundo';
+begin
+  perform public.fn_uva_exigir('campo.uva', 'Tiempo de ciclo Uva');
+  if coalesce(p_payload->'registro'->>'id', '') !~ '^UV-IN-' then raise exception 'Los registros de Integra empiezan con UV-IN-.'; end if;
+  if p_payload->>'accion' = 'eliminar' then
+    return jsonb_build_object('ok', true, 'resultado', public.fn_uva_quitar_campo(p_payload->'registro'->>'id', 'integra'));
+  end if;
+  if coalesce(btrim(v_fundo), '') <> '' and not public.fn_uva_fundo_permitido(v_fundo) then
+    raise exception 'No tienes asignado el fundo «%». Pide a un administrador que te lo asigne en Config › Usuarios › Fundos.', v_fundo;
+  end if;
+  v_id := public.fn_uva_aplicar_campo(p_payload, 'integra', auth.uid());
+  select * into c from public.uva_ciclos where id = v_id;
+  if c.eliminado and c.fusionado_en is null then
+    return jsonb_build_object('ok', true, 'id', v_id, 'eliminado', true);
+  end if;
+  if not public.fn_uva_ver_todos() and c.usuario_id is distinct from auth.uid() then
+    return jsonb_build_object('ok', true, 'id', v_id, 'ajeno', true, 'registrador', c.registrador);
+  end if;
+  return jsonb_build_object('ok', true, 'id', v_id, 'llegada', c.hora_llegada, 'llegada_por', c.llegada_por,
+    'planta', coalesce(c.planta_destino, c.planta),
+    'fila', to_jsonb(c) - 'planta_detalle' - 'planta_obs');
+end;
+$$;
+revoke execute on function public.rpc_uva_guardar_campo(jsonb) from public, anon;
+grant execute on function public.rpc_uva_guardar_campo(jsonb) to authenticated;
 
 -- ================================================================ historial de cambios
 create table if not exists public.uva_ciclos_cambios (

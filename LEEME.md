@@ -118,7 +118,7 @@ incluidos los módulos que se agreguen después.
   ciclos, 5S, mantenimiento y cliente interno); la lectura no se restringe en la base.
 - Módulo nuevo: agregarlo a `AT.ACCESOS` y ponerle `acceso: '…'` a su tarjeta en `index.html`.
 
-**Horario de uso** (migraciones 0049 y 0050): pestaña **Config › Accesos**. Por cada módulo,
+**Horario de uso** (migraciones 0049, 0050 y 0059): pestaña **Config › Accesos**. Por cada módulo,
 «Todo el día» o «⏰ Con horario» con hora de inicio y fin (hora de Perú); vale para todo el
 personal (quién ve cada módulo se sigue eligiendo en Usuarios › Accesos). Al activar el horario
 se propone el sugerido (`horario` en `AT.ACCESOS`): **Arándano 07:00–18:00 · Uva 06:00–18:00**.
@@ -129,6 +129,9 @@ se propone el sugerido (`horario` en `AT.ACCESOS`): **Arándano 07:00–18:00 ·
   la portada (`AT.vigilarHorario`, revisa cada minuto). Si el horario termina con un ciclo sin
   guardar, solo avisa: la base acepta registros hasta 30 min después del cierre
   (`fn_fuera_de_horario` dentro de `fn_exigir_acceso`).
+- **Excepciones** (0059): a la derecha de la hora de fin, el desplegable «Excepciones» elige los
+  usuarios con acceso al módulo que entran todo el día. Se guardan en el mismo parámetro
+  (`"excepciones": ["<perfiles.id>", …]`) y las respetan `AT.horarioDe` y `fn_fuera_de_horario`.
 - Reubicación no se limita por horario (abre sin sesión). `perfiles.horarios` (0049) quedó sin uso.
 
 **Fundos asignados** (migración 0018): al crear el usuario o con el botón *Fundos*

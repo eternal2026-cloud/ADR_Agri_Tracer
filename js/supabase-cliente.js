@@ -113,7 +113,8 @@ AT.tieneAcceso = function (clave, perfil) {
 
 /**
  * Horario por módulo, igual para todo el personal (Config › Accesos; parametros.HORARIOS_ACCESO, 0050):
- * { 'campo.arandano': { desde: '07:00', hasta: '18:00' } }. Módulo ausente = todo el día.
+ * { 'campo.arandano': { desde: '07:00', hasta: '18:00', excepciones: [perfiles.id, …] } }. Módulo ausente = todo el día.
+ * excepciones (opcional, 0059): usuarios que entran todo el día a ese módulo aunque tenga horario.
  * Mismo criterio que fn_fuera_de_horario: hora de Lima; desde > hasta cruza la medianoche; admin sin horario.
  * La base da 30 min de tolerancia al registrar, para que suba lo hecho justo antes del cierre.
  */
@@ -129,7 +130,8 @@ AT.horarioDe = function (clave, perfil) {
   var r = null;
   Object.keys(hs).forEach(function (k) {
     var h = hs[k];
-    if ((clave === k || clave.indexOf(k + '.') === 0) && h && h.desde && h.hasta && h.desde !== h.hasta) r = h;
+    if ((clave === k || clave.indexOf(k + '.') === 0) && h && h.desde && h.hasta && h.desde !== h.hasta &&
+        !(Array.isArray(h.excepciones) && h.excepciones.indexOf(p.id) >= 0)) r = h;
   });
   return r;
 };

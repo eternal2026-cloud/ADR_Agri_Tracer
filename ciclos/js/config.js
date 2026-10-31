@@ -140,7 +140,7 @@ CONFIG.tabUsuarios = function (c) {
       (u.activo && u.debe_cambiar_password ? ' <span class="pill gris">Aún no crea su contraseña</span>' : '') +
       (u.id === yo ? ' <span class="pill gris">Tú</span>' : '') +
       (u.rol === 'admin' ? '' : ' <span class="pill ' + (u.accesos ? 'azul' : 'gris') + '">' + DR.esc(CONFIG.textoAccesos(u.accesos)) + '</span>') +
-      (u.rol === 'admin' || !CONFIG.textoHorariosUsuario(u.accesos) ? '' : ' <span class="pill naranja">' + DR.esc(CONFIG.textoHorariosUsuario(u.accesos)) + '</span>') +
+      (u.rol === 'admin' || !CONFIG.textoHorariosUsuario(u) ? '' : ' <span class="pill naranja">' + DR.esc(CONFIG.textoHorariosUsuario(u)) + '</span>') +
       (u.rol === 'admin' ? '' : ' <span class="pill ' + ((u.fundos || []).length ? 'azul' : 'gris') + '">' + DR.esc(CONFIG.textoFundos(u.fundos)) + '</span>') +
       (u.rol === 'admin' ? '' : ' <span class="pill ' + (u.ciclos_solo_propios ? 'azul' : 'gris') + '">Arándano: ' + CONFIG.textoVerCiclos(u.ciclos_solo_propios).toLowerCase() + '</span>' +
         ' <span class="pill ' + (CONFIG.soloUva(u) ? 'azul' : 'gris') + '">Uva: ' + CONFIG.textoVerCiclos(CONFIG.soloUva(u)).toLowerCase() + '</span>');
@@ -395,12 +395,14 @@ CONFIG.funcionesPorDefecto = function (k, lista) {
 };
 CONFIG.valorAccesos = function (estado) { return estado.completo ? null : estado.lista.slice(); };
 /** «⏰ Arándano 07:00–18:00 · …» con los horarios (Config › Accesos) de los módulos que ve; '' si ninguno. */
-CONFIG.textoHorariosUsuario = function (accesos) {
-  var hs = CONFIG.horariosGuardados(), p = { rol: 'captura', accesos: accesos }, r = [];
+CONFIG.textoHorariosUsuario = function (u) {
+  var hs = CONFIG.horariosGuardados(), p = { rol: 'captura', accesos: u.accesos }, r = [];
   AT.ACCESOS.forEach(function (g) {
     g.modulos.forEach(function (m) {
       var h = hs[m.id];
-      if (h && h.desde && h.hasta && AT.tieneAcceso(m.id, p)) r.push(m.t.replace(/^.*· /, '') + ' ' + h.desde + '–' + h.hasta);
+      if (!h || !h.desde || !h.hasta || !AT.tieneAcceso(m.id, p)) return;
+      var excepcion = (h.excepciones || []).indexOf(u.id) >= 0;
+      r.push(m.t.replace(/^.*· /, '') + ' ' + (excepcion ? 'todo el día (excepción)' : h.desde + '–' + h.hasta));
     });
   });
   return r.length ? '⏰ ' + r.join(' · ') : '';
@@ -1012,7 +1014,7 @@ CONFIG.cargarPapelera = function () {
 
 /* ============================================================ AJUSTES */
 /* ============================================================ ACCESOS (horario de uso por módulo, 0050) */
-/** parametros.HORARIOS_ACCESO = { 'campo.arandano': { desde: '07:00', hasta: '18:00' } } — vale para todos menos administradores. */
+/** parametros.HORARIOS_ACCESO = { 'campo.arandano': { desde: '07:00', hasta: '18:00', excepciones: [perfiles.id] } } — vale para todos menos administradores y excepciones (0059). */
 CONFIG.horariosGuardados = function () {
   try { var h = JSON.parse(CONFIG.parametros.HORARIOS_ACCESO || '{}'); return h && typeof h === 'object' ? h : {}; } catch (e) { return {}; }
 };
@@ -1020,20 +1022,35 @@ CONFIG.tabAccesos = function (c) {
   var horarios = CONFIG.horariosGuardados();
   var modulos = [];
   AT.ACCESOS.forEach(function (g) { g.modulos.forEach(function (m) { if (!m.sinHorario) modulos.push({ g: g, m: m }); }); });
+  /** Quienes pueden ser excepción en el módulo: activos con acceso a él; los ya elegidos no se pierden al guardar. */
+  var candidatos = function (m, elegidos) {
+    return CONFIG.usuarios.filter(function (u) {
+      return u.rol !== 'admin' && (elegidos.indexOf(u.id) >= 0 || (u.activo && AT.tieneAcceso(m.id, u)));
+    }).sort(function (a, b) { return String(a.nombre || a.usuario).localeCompare(String(b.nombre || b.usuario), 'es'); });
+  };
   c.innerHTML = UI.panel('Horario de uso de la app',
-    'Define en qué horas el personal puede entrar a cada módulo (hora de Perú). Fuera de ese horario el módulo aparece cerrado en la portada. Si alguien estaba registrando cuando termina el horario, tiene 30 minutos para guardar. Los administradores no tienen límite.',
+    'Define en qué horas el personal puede entrar a cada módulo (hora de Perú). Fuera de ese horario el módulo aparece cerrado en la portada. Si alguien estaba registrando cuando termina el horario, tiene 30 minutos para guardar. Los administradores y las excepciones de cada módulo no tienen límite.',
     '<div class="accesos" id="cfgHorarios">' + AT.ACCESOS.map(function (g) {
       var ms = modulos.filter(function (x) { return x.g === g; });
       if (!ms.length) return '';
       return '<div class="acc-grupo"><div class="acc-grupo-cab"><b>' + DR.esc(g.t) + '</b></div>' + ms.map(function (x) {
         var m = x.m, h = horarios[m.id] || null, sug = m.horario || ['07:00', '18:00'];
+        var elegidos = (h && h.excepciones) || [], lista = candidatos(m, elegidos);
         return '<div class="acc-mod"><span>' + DR.esc(m.t) + '</span><div class="acc-horario" data-hor-mod="' + m.id + '">' +
           '<button type="button" class="opcion" data-hor-toggle data-on="' + (h ? '1' : '') + '"></button>' +
           '<span class="acc-horas"><input type="time" data-hor="desde" aria-label="Desde" value="' + DR.esc(h ? h.desde : sug[0]) + '"> a ' +
-          '<input type="time" data-hor="hasta" aria-label="Hasta" value="' + DR.esc(h ? h.hasta : sug[1]) + '"></span></div></div>';
+          '<input type="time" data-hor="hasta" aria-label="Hasta" value="' + DR.esc(h ? h.hasta : sug[1]) + '">' +
+          '<button type="button" class="opcion" data-exc-toggle aria-expanded="false"></button></span>' +
+          '<div class="acc-exc oculto" data-exc-lista>' +
+            '<div class="ayuda-campo">Estas personas entran a este módulo todo el día:</div>' +
+            (lista.length > 8 ? '<input type="search" data-exc-buscar placeholder="Buscar usuario…" aria-label="Buscar usuario">' : '') +
+            (lista.length ? '<div class="opciones">' + lista.map(function (u) {
+              return '<button type="button" class="opcion' + (elegidos.indexOf(u.id) >= 0 ? ' activa' : '') + '" data-exc="' + u.id + '">' + DR.esc(u.nombre || u.usuario) + '</button>';
+            }).join('') + '</div>' : '<div class="ayuda-campo">Ningún usuario tiene acceso a este módulo.</div>') +
+          '</div></div></div>';
       }).join('') + '</div>';
     }).join('') + '</div>' +
-    '<div class="ayuda-campo" style="margin-top:12px">«Todo el día» = sin límite. Si la hora de inicio es mayor que la de fin, el horario cruza la medianoche. Quién ve cada módulo se sigue eligiendo en Usuarios › Accesos.</div>' +
+    '<div class="ayuda-campo" style="margin-top:12px">«Todo el día» = sin límite. Si la hora de inicio es mayor que la de fin, el horario cruza la medianoche. En «Excepciones» aparecen los usuarios con acceso a ese módulo. Quién ve cada módulo se sigue eligiendo en Usuarios › Accesos.</div>' +
     '<div class="acciones"><button type="button" class="btn" id="btnGuardarHorarios">Guardar horarios</button></div>');
   var cont = DR.$('#cfgHorarios');
   var pintar = function () {
@@ -1042,13 +1059,25 @@ CONFIG.tabAccesos = function (c) {
       b.textContent = on ? '⏰ Con horario' : 'Todo el día';
       b.classList.toggle('activa', on);
       DR.$('.acc-horas', fila).classList.toggle('oculto', !on);
+      var t = DR.$('[data-exc-toggle]', fila), lista = DR.$('[data-exc-lista]', fila);
+      var abierta = on && t.getAttribute('aria-expanded') === 'true', n = DR.$$('[data-exc].activa', fila).length;
+      t.textContent = 'Excepciones' + (n ? ' (' + n + ')' : '') + (abierta ? ' ▴' : ' ▾');
+      t.classList.toggle('activa', n > 0);
+      lista.classList.toggle('oculto', !abierta);
     });
   };
   cont.onclick = function (ev) {
-    var b = ev.target.closest('[data-hor-toggle]');
-    if (!b) return;
-    b.setAttribute('data-on', b.getAttribute('data-on') ? '' : '1');
+    var b = ev.target.closest('[data-hor-toggle]'), t = ev.target.closest('[data-exc-toggle]'), u = ev.target.closest('[data-exc]');
+    if (!b && !t && !u) return;
+    if (b) b.setAttribute('data-on', b.getAttribute('data-on') ? '' : '1');
+    if (t) t.setAttribute('aria-expanded', t.getAttribute('aria-expanded') === 'true' ? 'false' : 'true');
+    if (u) u.classList.toggle('activa');
     pintar();
+  };
+  cont.oninput = function (ev) {
+    if (!ev.target.matches('[data-exc-buscar]')) return;
+    var q = ev.target.value.trim().toLowerCase();
+    DR.$$('[data-exc]', ev.target.parentNode).forEach(function (o) { o.classList.toggle('oculto', o.textContent.toLowerCase().indexOf(q) < 0); });
   };
   pintar();
   DR.$('#btnGuardarHorarios').onclick = function () {
@@ -1057,7 +1086,10 @@ CONFIG.tabAccesos = function (c) {
       if (!DR.$('[data-hor-toggle]', fila).getAttribute('data-on')) return;
       var desde = DR.$('[data-hor="desde"]', fila).value, hasta = DR.$('[data-hor="hasta"]', fila).value;
       if (!desde || !hasta || desde === hasta) { error = 'Revisa las horas: inicio y fin deben ser distintos.'; return; }
-      r[fila.getAttribute('data-hor-mod')] = { desde: desde, hasta: hasta };
+      var h = { desde: desde, hasta: hasta };
+      var excepciones = DR.$$('[data-exc].activa', fila).map(function (o) { return o.getAttribute('data-exc'); });
+      if (excepciones.length) h.excepciones = excepciones;
+      r[fila.getAttribute('data-hor-mod')] = h;
     });
     if (error) { DR.toast(error, 'error'); return; }
     var btn = this; btn.disabled = true;

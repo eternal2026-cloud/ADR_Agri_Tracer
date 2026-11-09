@@ -527,7 +527,7 @@ const TOP_ENC: Record<string, [unknown, string][]> = {
   p3: [['SI', 'Sí'], ['PARTE', 'En parte'], ['NO', 'No']],
   p4: [['GRANEL', 'Granel'], ['JARRA', 'Jarra'], ['IGUAL', 'Igual en ambas'], ['NA', 'No aplica (solo trabaja una)']],
   p6: [[1, 'Esperar envases o bandejas'], [2, 'Traslados'], [3, 'Uso del tamiz'], [4, 'Calidad de la fruta'],
-    [5, 'Calibre de la fruta'], [6, 'Indicaciones del supervisor'], [7, 'Calor'], [8, 'Otro']],
+    [6, 'Indicaciones del supervisor'], [7, 'Calor'], [8, 'Otro']],
   p8: [['CAPACITACION', 'Capacitación de la empresa'], ['COMPANERO', 'Un compañero'], ['CUENTA', 'Por mi cuenta'], ['OTRA', 'Otra campaña o empresa']],
 };
 const encTxt = (k: string, v: unknown) => (TOP_ENC[k] || []).find((o) => String(o[0]) === String(v))?.[1] ?? txt(v);

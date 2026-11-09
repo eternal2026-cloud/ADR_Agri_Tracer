@@ -526,8 +526,8 @@ const TOP_ENC: Record<string, [unknown, string][]> = {
   p1: [['<1', 'Menos de 1 campaña'], ['1-2', '1 a 2 campañas'], ['3-5', '3 a 5 campañas'], ['>5', 'Más de 5 campañas']],
   p3: [['SI', 'Sí'], ['PARTE', 'En parte'], ['NO', 'No']],
   p4: [['GRANEL', 'Granel'], ['JARRA', 'Jarra'], ['IGUAL', 'Igual en ambas'], ['NA', 'No aplica (solo trabaja una)']],
-  p6: [[1, 'Esperar envases o bandejas'], [2, 'Traslados'], [3, 'Uso del tamiz'], [4, 'Calidad de la planta'],
-    [5, 'Calibre o estado de la fruta'], [6, 'Indicaciones del supervisor'], [7, 'Calor'], [8, 'Otro']],
+  p6: [[1, 'Esperar envases o bandejas'], [2, 'Traslados'], [3, 'Uso del tamiz'], [4, 'Calidad de la fruta'],
+    [5, 'Calibre de la fruta'], [6, 'Indicaciones del supervisor'], [7, 'Calor'], [8, 'Otro']],
   p8: [['CAPACITACION', 'Capacitación de la empresa'], ['COMPANERO', 'Un compañero'], ['CUENTA', 'Por mi cuenta'], ['OTRA', 'Otra campaña o empresa']],
 };
 const encTxt = (k: string, v: unknown) => (TOP_ENC[k] || []).find((o) => String(o[0]) === String(v))?.[1] ?? txt(v);
@@ -589,7 +589,7 @@ function pestanasTop(d: TopDatos | null): Pestana[] {
   const colsTiempos: Col[] = [...B,
     ['Actividad', (f) => txt(act.get(Number(f.actividad_id))?.nombre)],
     ['Clase', (f) => TOP_CLASES[act.get(Number(f.actividad_id))?.clase] || ''],
-    TS('inicio', 'Inicio'), TS('fin', 'Fin'), ['Duración (min:seg)', (f) => segDur(f.duracion_seg), 'dur'], NU('duracion_seg', 'Duración (s)', 0), TX('nota', 'Nota')];
+    TS('inicio', 'Inicio'), TS('fin', 'Fin'), ['Duración (min:seg)', (f) => segDur(f.duracion_seg), 'dur'], NU('duracion_seg', 'Duración (s)', 0), NU('envases', 'Envases', 0), TX('nota', 'Nota')];
 
   const colsCump: Col[] = [...B, NU('ronda', 'Ronda', 0),
     ['Tipo', (f) => txt(item.get(Number(f.item_id))?.tipo)], ['Presentación', (f) => txt(item.get(Number(f.item_id))?.presentacion)],

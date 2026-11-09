@@ -1,17 +1,26 @@
 /* ============================================================================
  * resumen.js — RESUMEN DEL ESTUDIO TOP
- * Tiempo estándar por actividad (mediana TOP + suplemento), distribución de la
- * jornada (productivo / soporte / espera / personal), cumplimiento por ítem con
- * las prácticas TOP, REBA y checklist ergonómico. Desde aquí se exporta el
- * Excel y el informe técnico en PDF.
+ * Resultados por cosechador (cada persona pesa igual): tiempo productivo,
+ * cumplimiento por documento del estándar, REBA con tarjetas por cosechador
+ * (filtro al tocar, como en Power BI), checklist ergonómico con los aspectos
+ * más desfavorables y la encuesta. Desde aquí se exporta el Excel y el PDF.
  * ==========================================================================*/
-var RES = { D: null, A: null };
+var RES = { D: null, A: null, base: null, claveBase: '', rebaSel: '', rebaNivel: null };
+
+/** Suplemento del tiempo estándar: ya no se muestra en el Resumen, pero lo usan la Propuesta y los reportes. */
+RES.SUPLEMENTO = 10;
+/** «Exigencia por segmento corporal» quedó oculta (PPT de mejoras); el cálculo se conserva. */
+RES.MOSTRAR_SEGMENTOS = false;
 
 RES.filtro = function () {
   var f = TOP.leer('filtro', null);
-  if (!f) f = { desde: TOP.localDe(new Date(Date.now() - 90 * 86400000)).substring(0, 10), hasta: '', presentacion: '', fundo: '', suplemento: 10 };
+  if (!f) f = { desde: TOP.localDe(new Date(Date.now() - 90 * 86400000)).substring(0, 10), hasta: '', presentacion: '', fundo: '' };
+  if (f.suplemento === undefined || f.suplemento === '') f.suplemento = RES.SUPLEMENTO;
+  delete f.material;
   return f;
 };
+
+RES.opcion = function (v, t, sel) { return '<option value="' + DR.esc(v) + '"' + (sel === v ? ' selected' : '') + '>' + DR.esc(t) + '</option>'; };
 
 RES.pintar = function (cont) {
   var f = RES.filtro();
@@ -23,17 +32,27 @@ RES.pintar = function (cont) {
       '<section class="panel entra"><div class="form" id="frmFiltro">' +
       '<div class="campo"><label>Desde</label><input type="date" data-campo="desde" value="' + DR.esc(f.desde) + '"></div>' +
       '<div class="campo"><label>Hasta</label><input type="date" data-campo="hasta" value="' + DR.esc(f.hasta) + '"></div>' +
-      '<div class="campo"><label>Estándar</label><select data-campo="presentacion"><option value="">Jarra y granel</option>' + ['JARRA', 'BANDEJA'].map(function (p) {
-        return '<option value="' + p + '"' + (f.presentacion === p ? ' selected' : '') + '>' + (p === 'JARRA' ? 'Jarra cosechera' : 'Granel (bandeja y bulk)') + '</option>'; }).join('') + '</select></div>' +
-      '<div class="campo"><label>Material</label><select data-campo="material"><option value="">Todos</option>' + TOP.listas.material.map(function (m) {
-        return '<option value="' + DR.esc(m) + '"' + (f.material === m ? ' selected' : '') + '>' + DR.esc(TOP.materialTxt(m)) + '</option>'; }).join('') + '</select></div>' +
-      '<div class="campo"><label>Fundo</label><select data-campo="fundo"><option value="">Todos</option>' + TOP.misFundos().map(function (x) {
-        return '<option' + (f.fundo === x ? ' selected' : '') + '>' + DR.esc(x) + '</option>'; }).join('') + '</select></div>' +
-      '<div class="campo"><label>Suplemento % <em>fatiga y necesidades</em></label><input type="number" min="0" max="50" step="1" data-campo="suplemento" value="' + DR.esc(f.suplemento) + '"></div>' +
+      '<div class="campo"><label>Presentación</label><select data-campo="presentacion">' +
+        RES.opcion('', 'Todos', f.presentacion) + RES.opcion('JARRA', 'Jarra cosechera', f.presentacion) +
+        RES.opcion('BANDEJA', 'Granel (bandeja y bulk)', f.presentacion) + RES.opcion('MIXTO', 'Mixto (jarra y granel)', f.presentacion) + '</select></div>' +
+      '<div class="campo"><label>Kg</label><select data-campo="kg">' + RES.opcion('', 'Todos', f.kg || '') +
+        TOP.kgOpciones().map(function (k) { return RES.opcion(k, k, f.kg); }).join('') + '</select></div>' +
+      '<div class="campo"><label>Fundo</label><select data-campo="fundo">' + RES.opcion('', 'Todos', f.fundo) +
+        TOP.misFundos().map(function (x) { return RES.opcion(x, x, f.fundo); }).join('') + '</select></div>' +
+      '<div class="campo"><label>Semana</label><select data-campo="semana" data-dinamico><option value="">Todas</option></select></div>' +
+      '<div class="campo"><label>Líder</label><select data-campo="lider" data-dinamico><option value="">Todos</option></select></div>' +
+      '<div class="campo"><label>Cosechador TOP</label><select data-campo="cosechador" data-dinamico><option value="">Todos</option></select></div>' +
       '</div></section><div id="resCuerpo"><div class="vacio">Cargando información…</div></div></div>';
     DR.entrarPaneles('#contenido');
     DR.$$('#frmFiltro [data-campo]').forEach(function (el) {
-      el.onchange = function () { var nf = UI.leerForm('frmFiltro'); TOP.escribir('filtro', nf); RES.cargar(nf); };
+      el.onchange = function () {
+        var nf = UI.leerForm('frmFiltro');
+        nf.suplemento = f.suplemento;
+        f = nf;
+        TOP.escribir('filtro', nf);
+        RES.rebaSel = ''; RES.rebaNivel = null;
+        RES.cargar(nf);
+      };
     });
     DR.$('#btnExcel').onclick = function () { RES.exportar('excel', this); };
     DR.$('#btnPdf').onclick = function () { RES.exportar('pdf', this); };
@@ -49,61 +68,82 @@ RES.exportar = function (tipo, btn) {
     .then(function () { btn.classList.remove('cargando'); });
 };
 
+/** Desde, Hasta, Presentación y Fundo van al servidor; Semana, Líder, Cosechador y Kg se filtran aquí. */
 RES.cargar = function (f) {
   var c = DR.$('#resCuerpo');
-  c.innerHTML = '<div class="vacio">Cargando información…</div>';
-  TOP.cargarDatos(f).then(function (D) {
-    RES.D = D;
-    RES.A = TOP.analizar(D, f.suplemento);
-    RES.dibujar(c, D, RES.A, f);
+  var clave = [f.desde, f.hasta, f.presentacion, f.fundo].join('|');
+  var enCache = RES.base && RES.claveBase === clave;
+  if (!enCache) c.innerHTML = '<div class="vacio">Cargando información…</div>';
+  var pr = enCache ? Promise.resolve(RES.base) : TOP.cargarDatos(f);
+  pr.then(function (base) {
+    RES.base = base; RES.claveBase = clave;
+    RES.llenarOpciones(base, f);
+    RES.D = TOP.filtrarDatos(base, f);
+    RES.D.filtro = f;
+    RES.A = TOP.analizar(RES.D, f.suplemento);
+    RES.dibujar(c, RES.D, RES.A, f);
   }).catch(function (e) { UI.error(c, e); });
 };
 
-/** Barras horizontales de duración (segundos) con el estilo de ciclos/js/grafico.js. */
+/** Semanas, líderes y cosechadores que existen en el rango cargado. */
+RES.llenarOpciones = function (base, f) {
+  var sem = {}, lid = {}, cos = {};
+  base.evals.forEach(function (e) {
+    sem[TOP.semanaDe(e.fecha)] = true;
+    if (e.lider) lid[e.lider] = true;
+    cos[TOP.claveCos(e)] = e.cosechador || '—';
+  });
+  var llenar = function (campo, todos, ops) {
+    var sel = DR.$('#frmFiltro [data-campo="' + campo + '"]');
+    if (!sel) return;
+    var actual = f[campo] || '';
+    if (actual && !ops.some(function (o) { return o[0] === actual; })) ops.unshift([actual, ops.length ? actual : actual]);
+    sel.innerHTML = RES.opcion('', todos, actual) + ops.map(function (o) { return RES.opcion(o[0], o[1], actual); }).join('');
+  };
+  llenar('semana', 'Todas', Object.keys(sem).filter(Boolean).sort().reverse().map(function (s) { return [s, TOP.semanaTxt(s)]; }));
+  llenar('lider', 'Todos', Object.keys(lid).sort(function (a, b) { return a.localeCompare(b, 'es'); }).map(function (l) { return [l, l]; }));
+  llenar('cosechador', 'Todos', Object.keys(cos).sort(function (a, b) { return cos[a].localeCompare(cos[b], 'es'); }).map(function (k) { return [k, cos[k]]; }));
+};
+
+/** Barras horizontales (segundos o %) con el estilo de ciclos/js/grafico.js. */
 RES.barras = function (items) {
   var max = items.reduce(function (m, i) { return Math.max(m, i.valor || 0, i.marca || 0); }, 0) * 1.05 || 1;
+  if (items.some(function (i) { return i.max; })) max = items[0].max;
   return '<div class="gf-barras">' + items.map(function (it) {
-    return '<div class="gf-fila"><div class="gf-nombre">' + DR.esc(it.etq) + (it.sub ? '<small>' + DR.esc(it.sub) + '</small>' : '') + '</div>' +
+    return '<div class="gf-fila' + (it.clic ? ' res-clic' : '') + '"' + (it.clic ? ' ' + it.clic : '') + '><div class="gf-nombre">' + DR.esc(it.etq) + (it.sub ? '<small>' + DR.esc(it.sub) + '</small>' : '') + '</div>' +
       '<div class="gf-pista">' + (it.marca ? '<span class="gf-meta" style="left:' + (it.marca / max * 100).toFixed(1) + '%"></span>' : '') +
-      '<span class="gf-barra" style="width:' + ((it.valor || 0) / max * 100).toFixed(1) + '%;background:' + (it.color || 'linear-gradient(90deg,#0097CE,#76B729)') + '"></span></div>' +
+      '<span class="gf-barra" style="width:' + Math.min(100, (it.valor || 0) / max * 100).toFixed(1) + '%;background:' + (it.color || 'linear-gradient(90deg,#0097CE,#76B729)') + '"></span></div>' +
       '<div class="gf-cifra">' + (it.texto || TOP.seg(it.valor)) + '</div></div>';
   }).join('') + '</div>';
 };
 
+RES.colorCump = function (p) { return p === null || p === undefined ? '#A89A8C' : (p < 50 ? '#E5484D' : (p < 80 ? '#EF7C3B' : '#76B729')); };
+RES.colorNC = function (p) { return p === null || p === undefined ? '#A89A8C' : (p > 50 ? '#E5484D' : (p > 20 ? '#EF7C3B' : '#76B729')); };
+RES.pct = function (v) { return v === null || v === undefined ? '—' : DR.num(v, 0) + '%'; };
+RES.presTxt = function (p) { return p === 'JARRA' ? 'Jarra' : (p === 'BANDEJA' ? 'Granel' : (p === 'MIXTO' ? 'Mixto (jarra y granel)' : 'Todas')); };
+
 RES.dibujar = function (c, D, A, f) {
   if (!D.evals.length) { c.innerHTML = '<div class="panel entra"><div class="vacio">No hay evaluaciones TOP para este filtro.</div></div>'; DR.entrarPaneles('#resCuerpo'); return; }
-  var cosechadores = {};
-  D.evals.forEach(function (e) { cosechadores[e.cosechador] = true; });
-  var esp = A.clases.filter(function (x) { return x.clase === 'espera'; })[0], prod = A.clases.filter(function (x) { return x.clase === 'productiva'; })[0];
+  var K = A.kpi, nvReba = K.reba === null ? null : TOP.rebaNivel(K.reba);
   var h = '<div class="kpis entra">' +
-    UI.kpi('Cosechadores TOP', DR.num(Object.keys(cosechadores).length), D.evals.length + ' evaluaciones', '#0097CE') +
-    UI.kpi('Tomas de tiempo', DR.num(D.tiempos.length), A.jornadas.length + ' jornadas medidas', '#76B729') +
-    UI.kpi('Tiempo productivo', prod.pct ? DR.num(prod.pct, 0) + '<small>%</small>' : '—', esp.pct ? DR.num(esp.pct, 0) + '% en esperas eliminables' : 'del tiempo medido', '#76B729') +
-    UI.kpi('Cumplimiento', A.cumplimiento === null ? '—' : DR.num(A.cumplimiento, 0) + '<small>%</small>', 'de los estándares actuales', '#EF7C3B') +
-    UI.kpi('REBA promedio', A.reba.n ? DR.num(A.reba.prom.prom, 1) : '—', A.reba.n ? A.reba.n + ' posturas · máx. ' + A.reba.prom.max : 'sin evaluaciones', '#E5484D') +
+    UI.kpi('Cosechadores TOP', DR.num(A.porCos.length), D.evals.length + ' evaluaciones', '#0097CE') +
+    UI.kpi('Tiempo productivo', K.prod === null ? '—' : DR.num(K.prod, 0) + '<small>%</small>',
+      K.prod === null ? 'sin jornadas medidas' : 'promedio de ' + K.nProd + ' cosechadores' + (K.espera ? ' · ' + DR.num(K.espera, 0) + '% en esperas' : ''), '#76B729') +
+    UI.kpi('Cumplimiento', K.cump === null ? '—' : DR.num(K.cump, 0) + '<small>%</small>',
+      K.cump === null ? 'sin estándares evaluados' : 'promedio de ' + K.nCump + ' cosechadores (sus rondas)', '#EF7C3B') +
+    UI.kpi('REBA promedio', K.reba === null ? '—' : DR.num(K.reba, 1),
+      K.reba === null ? 'sin evaluaciones' : '<b style="color:' + TOP.RIESGOS[nvReba].c + '">' + TOP.RIESGOS[nvReba].t + '</b> · ' + DR.esc(TOP.RIESGOS[nvReba].accion), '#E5484D') +
     '</div>';
 
-  // 1. Tiempo estándar por actividad.
+  // 1. Tiempo por actividad: promedio del tiempo acumulado por jornada.
   var acts = A.actividades.filter(function (x) { return x.n; });
-  h += UI.panel('Tiempo estándar por actividad', 'Mediana de las tomas TOP × (1 + ' + (Number(f.suplemento) || 0) + '% de suplemento). La línea es el estándar propuesto.',
+  h += UI.panel('Tiempo por actividad', 'Promedio del tiempo acumulado por jornada en cada actividad (suma de todos sus registros del día).',
     acts.length ? RES.barras(acts.map(function (x) {
-      return { etq: x.actividad.nombre, sub: x.n + ' tomas · ' + TOP.CLASES[x.actividad.clase].t, valor: x.prom, marca: x.estandar, color: TOP.CLASES[x.actividad.clase].c,
-        texto: TOP.seg(x.prom) + ' <small>prom.</small>' };
-    })) + UI.tabla([
-      { t: 'Actividad', r: function (x) {
-        return '<span class="top-punto" style="background:' + TOP.CLASES[x.actividad.clase].c + '"></span>' + DR.esc(x.actividad.nombre) +
-          (x.actividad.sustento ? '<br><small class="ayuda-campo">Etapa nueva: ' + DR.esc(x.actividad.sustento) + '</small>' : '');
-      } },
-      { t: 'Tomas', k: 'n', num: true }, { t: 'TOP', k: 'nEval', num: true },
-      { t: 'Promedio', num: true, r: function (x) { return TOP.seg(x.prom); } },
-      { t: 'Mediana', num: true, r: function (x) { return TOP.seg(x.med); } },
-      { t: 'P25 – P75', num: true, r: function (x) { return TOP.seg(x.p25) + ' – ' + TOP.seg(x.p75); } },
-      { t: 'Mín – Máx', num: true, r: function (x) { return TOP.seg(x.min) + ' – ' + TOP.seg(x.max); } },
-      { t: 'CV', num: true, r: function (x) { return DR.num(x.cv, 0) + '%'; } },
-      { t: 'Estándar', num: true, r: function (x) { return '<b>' + TOP.seg(x.estandar) + '</b>'; } }
-    ], acts) : '<div class="vacio">Aún no hay tomas de tiempo cerradas.</div>');
+      return { etq: x.actividad.nombre, sub: x.n + ' registros · ' + x.nJornadas + ' jornada' + (x.nJornadas === 1 ? '' : 's') + ' · ' + TOP.CLASES[x.actividad.clase].t,
+        valor: x.acum, color: TOP.CLASES[x.actividad.clase].c, texto: TOP.seg(x.acum) + ' <small>prom.</small>' };
+    })) : '<div class="vacio">Aún no hay registros de tiempo cerrados.</div>');
 
-  // 2. Distribución de la jornada.
+  // 2. Distribución de la jornada (sin cambios).
   h += UI.panel('¿En qué se va la jornada del TOP?', 'Promedio por jornada evaluada. Lo naranja es tiempo que el estándar debería eliminar o reducir.',
     A.jornadas.length ? '<div class="top-apilada">' + A.clases.filter(function (x) { return x.pct; }).map(function (x) {
       return '<span style="width:' + x.pct.toFixed(2) + '%;background:' + TOP.CLASES[x.clase].c + '" title="' + DR.esc(TOP.CLASES[x.clase].t) + '">' + (x.pct >= 9 ? DR.num(x.pct, 0) + '%' : '') + '</span>';
@@ -112,65 +152,168 @@ RES.dibujar = function (c, D, A, f) {
         DR.num(x.pct, 1) + '% · ' + TOP.segTexto(x.promJornada) + ' por jornada<small>' + DR.esc(TOP.CLASES[x.clase].d) + '</small></div>';
     }).join('') + '</div>' : '<div class="vacio">Sin jornadas medidas.</div>');
 
-  // 3. Cumplimiento por ítem.
-  var items = A.items.slice().sort(function (a, b) { return (a.pct === null ? 101 : a.pct) - (b.pct === null ? 101 : b.pct); });
-  h += UI.panel('Cumplimiento de estándares por los TOP', 'Ordenado de menor a mayor cumplimiento. Bajo 80%: los TOP lo hacen distinto y el estándar debería revisarse.',
-    items.length ? '<div class="top-cump">' + items.map(function (x) {
-      var col = x.pct === null ? '#A89A8C' : (x.pct < 50 ? '#E5484D' : (x.pct < 80 ? '#EF7C3B' : '#76B729'));
-      return '<div class="top-cump-item"><div class="top-cump-cab"><span class="pill gris">' + DR.esc(x.item.tipo + ' · ' + x.item.presentacion) + '</span>' +
-        '<b style="color:' + col + '">' + (x.pct === null ? 'N/A' : DR.num(x.pct, 0) + '%') + '</b></div>' +
-        '<div class="top-cump-txt">' + DR.esc(x.item.descripcion) + '</div>' +
-        '<div class="lc-pista"><span class="lc-barra" style="width:' + (x.pct || 0).toFixed(1) + '%;background:' + col + '"></span></div>' +
-        '<div class="top-cump-pie">' + x.C + ' cumplen · ' + x.NC + ' no cumplen · ' + x.NA + ' no aplica</div>' +
-        (x.practicas.length ? '<div class="top-practicas"><b>Cómo lo hacen los TOP:</b>' + x.practicas.map(function (p) {
-          return '<span>«' + DR.esc(p.t) + '»' + (p.n > 1 ? ' ×' + p.n : '') + '</span>'; }).join('') + '</div>' : '') +
-        (x.fotos.length ? FOTOS.galeriaHtml(x.fotos.slice(0, 6)) : '') + '</div>';
-    }).join('') + '</div>' : '<div class="vacio">Aún no hay estándares evaluados.</div>');
+  // 3. Cumplimiento por documento del estándar, con detalle por actividad.
+  h += UI.panel('Cumplimiento de estándares por los TOP', 'Presentación: ' + RES.presTxt(f.presentacion) +
+    '. % por documento = promedio por cosechador. Toca «Ver detalle» para ver las actividades ordenadas por % de no cumplimiento.',
+    A.docs.length ? '<div class="res-docs">' + A.docs.map(RES.docHtml).join('') + '</div>' : '<div class="vacio">Aún no hay estándares evaluados.</div>');
 
-  // 4. REBA.
-  if (A.reba.n) {
-    h += UI.panel('Riesgo ergonómico REBA', A.reba.n + ' posturas evaluadas. Puntaje final promedio ' + DR.num(A.reba.prom.prom, 1) + ' (mediana ' + DR.num(A.reba.prom.med, 1) + ').',
-      RES.barras(TOP.RIESGOS.map(function (r, i) {
-        return { etq: r.t, sub: r.accion, valor: A.reba.niveles[i], color: r.c, texto: A.reba.niveles[i] + ' <small>(' + DR.num(A.reba.niveles[i] / A.reba.n * 100, 0) + '%)</small>' };
-      })) + '<div class="sep-titulo">Exigencia por segmento corporal</div>' +
-      RES.barras(A.reba.segmentos.map(function (s) {
-        return { etq: s.t, sub: s.nMax + ' en la peor posición', valor: (s.prom || 0) / s.max * 100, color: '#EF7C3B', texto: DR.num(s.prom, 1) + ' <small>de ' + s.max + '</small>' };
-      })) + (A.reba.porActividad.length ? UI.tabla([
-        { t: 'Actividad', r: function (x) { return DR.esc(x.actividad.nombre); } }, { t: 'Posturas', k: 'n', num: true },
-        { t: 'Promedio', num: true, r: function (x) { return DR.num(x.est.prom, 1); } }, { t: 'Máximo', k: 'max', num: true },
-        { t: 'Riesgo máx.', r: function (x) { var nv = TOP.rebaNivel(x.max); return '<span class="top-reba-chip" style="background:' + TOP.RIESGOS[nv].c + '">' + TOP.RIESGOS[nv].t + '</span>'; } }
-      ], A.reba.porActividad) : ''));
-  }
+  // 4. REBA por cosechador.
+  if (A.reba.n) h += '<section class="panel entra" id="panelReba">' + RES.rebaHtml(A, f) + '</section>';
 
-  // 5. Ergonomía.
+  // 5. Checklist ergonómico con los aspectos más desfavorables por sección.
   if (A.ergo.n) {
-    var dolor = A.ergo.secciones.filter(function (s) { return s.dolor; })[0];
-    h += UI.panel('Checklist ergonómico', A.ergo.n + ' entrevistas. % desfavorable = respuestas que indican un problema.',
-      RES.barras(A.ergo.secciones.map(function (s) {
-        return { etq: s.t, valor: s.desfav || 0, color: (s.desfav || 0) >= 50 ? '#E5484D' : ((s.desfav || 0) >= 25 ? '#EF7C3B' : '#76B729'), texto: s.desfav === null ? '—' : DR.num(s.desfav, 0) + '%' };
-      })) + '<div class="sep-titulo">Zonas con dolor</div><div class="grid-2"><div class="top-fig-marco claro"><img class="top-fig" src="img/ergonomia-cuerpo.jpg" alt="Diagrama corporal"></div><div>' +
-      RES.barras(dolor.items.filter(function (i) { return i.SI; }).sort(function (a, b) { return b.SI - a.SI; }).map(function (i) {
-        var mom = TOP.MOMENTOS.filter(function (m, k) { return i.momentos[k]; }).map(function (m) { return m[1].toLowerCase() + ' ' + i.momentos[m[0] - 1]; }).join(', ');
-        return { etq: i.c + ' ' + i.t, sub: mom, valor: i.SI, color: '#E5484D', texto: i.SI + ' <small>de ' + A.ergo.n + '</small>' };
-      })) + (dolor.items.some(function (i) { return i.SI; }) ? '' : '<div class="vacio">Ningún TOP reportó dolor.</div>') + '</div></div>' +
-      '<div class="sep-titulo">Preguntas con más respuestas desfavorables</div>' + UI.tabla([
-        { t: 'Pregunta', r: function (i) { return '<b>' + i.c + '</b> ' + DR.esc(i.t); } },
-        { t: 'Sí', k: 'SI', num: true }, { t: 'No', k: 'NO', num: true }, { t: 'NS', k: 'NS', num: true },
-        { t: 'Desfavorable', num: true, r: function (i) { return i.desfav === null ? '—' : DR.num(i.desfav, 0) + '%'; } }
-      ], A.ergo.secciones.reduce(function (l, s) { return l.concat(s.items); }, []).filter(function (i) { return i.desfav; })
-        .sort(function (a, b) { return b.desfav - a.desfav; }).slice(0, 12)));
+    h += UI.panel('Checklist ergonómico', A.ergo.n + ' entrevistas. % desfavorable de la sección = promedio del % de cada pregunta (todas pesan igual).',
+      A.ergo.secciones.map(function (s) {
+        var col = function (v) { return (v || 0) >= 50 ? '#E5484D' : ((v || 0) >= 25 ? '#EF7C3B' : '#76B729'); };
+        return '<div class="res-ergo">' + RES.barras([{ etq: s.t, valor: s.desfav || 0, max: 100, color: col(s.desfav), texto: '<b>' + RES.pct(s.desfav) + '</b>' }]) +
+          '<div class="res-ergo-top"><div class="res-mini">' + (s.dolor ? 'Partes del cuerpo' : 'Aspectos') + ' con más % desfavorable</div>' +
+          (s.peores.length ? RES.barras(s.peores.map(function (i) {
+            var mom = s.dolor ? TOP.MOMENTOS.filter(function (m, k) { return i.momentos[k]; }).map(function (m) { return m[1].toLowerCase() + ' ' + i.momentos[m[0] - 1]; }).join(', ') : '';
+            return { etq: i.c + ' ' + i.t, sub: 'Desfavorable = «' + (i.malo === 'SI' ? 'Sí' : 'No') + '» · ' + i[i.malo] + ' de ' + (i.SI + i.NO) + (mom ? ' · ' + mom : ''),
+              valor: i.desfav, max: 100, color: col(i.desfav), texto: RES.pct(i.desfav) };
+          })) : '<div class="vacio">Sin respuestas desfavorables.</div>') + '</div></div>';
+      }).join(''));
   }
 
   if (A.enc.n || A.enc.noAcepto) h += RES.panelEncuesta(A.enc);
 
   h += UI.panel('Evaluaciones incluidas', '', UI.tabla([
-    { t: 'Código', k: 'codigo' }, { t: 'Fecha', r: function (e) { return TOP.fecha(e.fecha); } }, { t: 'Cosechador', k: 'cosechador' },
+    { t: 'Código', k: 'codigo' }, { t: 'Fecha', r: function (e) { return TOP.fecha(e.fecha); } },
+    { t: 'Semana', r: function (e) { return Number(TOP.semanaDe(e.fecha).substring(6)) || '—'; } }, { t: 'Cosechador', k: 'cosechador' },
     { t: 'Fundo', k: 'fundo' }, { t: 'Lote', k: 'lote' }, { t: 'Material', r: function (e) { return DR.esc(TOP.materialTxt(e.material || e.presentacion)); } }, { t: 'Líder', k: 'lider' }
   ], D.evals.map(function (e) { e._clic = true; return e; })));
   c.innerHTML = h;
   DR.entrarPaneles('#resCuerpo');
   FOTOS.pintar(c);
+  RES.enlazarReba();
   DR.$$('tr[data-clic]', c).forEach(function (tr, i) { tr.onclick = function () { location.hash = '#evaluar/' + D.evals[i].id; }; });
+};
+
+/** Tarjeta de un documento del estándar con su detalle desplegable. */
+RES.docHtml = function (d) {
+  var col = RES.colorCump(d.pct);
+  return '<div class="res-doc"><div class="top-cump-cab"><div><b class="res-doc-tit">' + DR.esc(d.t) + '</b>' +
+    '<div class="top-cump-pie">' + d.titulos.map(DR.esc).join(' · ') + ' · ' + d.nCos + ' cosechadores</div></div>' +
+    '<b style="color:' + col + '">' + RES.pct(d.pct) + '</b></div>' +
+    '<div class="lc-pista"><span class="lc-barra" style="width:' + (d.pct || 0).toFixed(1) + '%;background:' + col + '"></span></div>' +
+    '<details class="res-det"><summary>Ver detalle · ' + d.items.length + (d.items.length === 1 ? ' actividad' : ' actividades') + '</summary><div class="top-cump">' + d.items.map(function (x) {
+      var cnc = RES.colorNC(x.pctNC), extra = x.practicas.length || x.obs.length || x.fotos.length;
+      return '<div class="top-cump-item"><div class="top-cump-cab"><span class="pill gris">' + DR.esc(x.item.presentacion === 'JARRA' ? 'Jarra' : 'Granel') +
+        (x.item.numero ? ' · N° ' + DR.esc(x.item.numero) : '') + '</span>' +
+        '<b style="color:' + cnc + '">' + (x.pctNC === null ? 'N/A' : DR.num(x.pctNC, 0) + '% <small>no cumple</small>') + '</b></div>' +
+        '<div class="top-cump-txt">' + DR.esc(x.item.descripcion) + '</div>' +
+        '<div class="lc-pista"><span class="lc-barra" style="width:' + (x.pctNC || 0).toFixed(1) + '%;background:' + cnc + '"></span></div>' +
+        '<div class="top-cump-pie">' + x.C + ' cumplen · ' + x.NC + ' no cumplen · ' + x.NA + ' no aplica</div>' +
+        (extra ? '<details class="res-det res-det-chico"><summary>Ver comentarios' + (x.fotos.length ? ' e imágenes' : '') + '</summary>' +
+          (x.practicas.length ? '<div class="top-practicas"><b>Cómo lo hacen los TOP:</b>' + x.practicas.map(function (p) {
+            return '<span>«' + DR.esc(p.t) + '»' + (p.n > 1 ? ' ×' + p.n : '') + '</span>'; }).join('') + '</div>' : '') +
+          (x.obs.length ? '<div class="top-practicas res-obs"><b>Observaciones:</b>' + RES.contar(x.obs).map(function (p) {
+            return '<span>«' + DR.esc(p.t) + '»' + (p.n > 1 ? ' ×' + p.n : '') + '</span>'; }).join('') + '</div>' : '') +
+          (x.fotos.length ? FOTOS.galeriaHtml(x.fotos.slice(0, 9)) : '') + '</details>' : '') + '</div>';
+    }).join('') + '</div></details></div>';
+};
+RES.contar = function (l) {
+  var n = {};
+  l.forEach(function (t) { t = String(t).trim(); if (t) n[t] = (n[t] || 0) + 1; });
+  return Object.keys(n).map(function (t) { return { t: t, n: n[t] }; }).sort(function (a, b) { return b.n - a.n; });
+};
+
+/* ------------------------------------------------ REBA por cosechador (filtro al tocar) */
+RES.figSeg = function (s) {
+  return '<div class="res-reba-fig">' + (s.seg.img ? '<img src="' + s.seg.img + '" alt="' + DR.esc(s.t) + '">' : (s.seg.svg === 'brazo' ? TOP.svgBrazo() : '')) + '</div>';
+};
+RES.chipReba = function (v) {
+  if (v === null || v === undefined) return '';
+  var nv = TOP.rebaNivel(v);
+  return '<span class="top-reba-chip" style="background:' + TOP.RIESGOS[nv].c + '">' + DR.num(v, 1) + ' · ' + TOP.RIESGOS[nv].t + '</span>';
+};
+
+RES.rebaHtml = function (A, f) {
+  var cos = A.porCos.filter(function (c) { return c.rebaProm !== null; }), n = cos.length;
+  // Promedio por presentación: el del filtro y, si se ven ambas, el de cada una.
+  var porPres = { JARRA: [], BANDEJA: [] };
+  cos.forEach(function (c) {
+    c.reba.forEach(function (r) {
+      var e = c.evals.filter(function (x) { return x.id === r.evaluacion_id; })[0];
+      if (e && porPres[e.presentacion]) porPres[e.presentacion].push({ k: c.clave, v: r.puntaje_final });
+    });
+  });
+  var promPres = function (p) {
+    var porC = {};
+    porPres[p].forEach(function (x) { (porC[x.k] = porC[x.k] || []).push(x.v); });
+    return TOP.prom(Object.keys(porC).map(function (k) { return TOP.prom(porC[k]); }));
+  };
+  var ambos = f.presentacion !== 'JARRA' && f.presentacion !== 'BANDEJA';
+  var h = '<h2>Riesgo ergonómico REBA</h2><div class="sub">' + n + ' cosechadores · ' + A.reba.n + ' posturas. Cada cosechador cuenta con el promedio de sus posturas.</div>' +
+    '<div class="res-reba-prom"><div><span class="res-mini">Promedio · ' + DR.esc(RES.presTxt(f.presentacion)) + '</span>' + RES.chipReba(A.kpi.reba) + '</div>' +
+    (ambos ? ['JARRA', 'BANDEJA'].map(function (p) { var v = promPres(p); return v === null ? '' : '<div><span class="res-mini">' + RES.presTxt(p) + '</span>' + RES.chipReba(v) + '</div>'; }).join('') : '') + '</div>' +
+    RES.barras(TOP.RIESGOS.map(function (r, i) {
+      var v = A.reba.nivelesCos[i];
+      return { etq: r.t, sub: r.accion + (v ? ' · ' + (RES.rebaNivel === i ? 'ocultar' : 'ver') + ' cosechadores ' + (RES.rebaNivel === i ? '▲' : '▼') : ''), valor: v, color: r.c,
+        clic: v ? 'data-nivel="' + i + '"' : '', texto: v + ' <small>(' + DR.num(n ? v / n * 100 : 0, 0) + '%)</small>' };
+    }));
+  if (RES.rebaNivel !== null) {
+    var delNivel = cos.filter(function (c) { return c.rebaNivel === RES.rebaNivel; });
+    h += '<div class="res-nivel-lista"><div class="res-mini">Cosechadores en riesgo ' + TOP.RIESGOS[RES.rebaNivel].t.toLowerCase() + '</div>' +
+      delNivel.map(function (c) {
+        return '<button type="button" class="res-nombre' + (RES.rebaSel === c.clave ? ' activo' : '') + '" data-cos="' + DR.esc(c.clave) + '">' + DR.esc(c.nombre) +
+          ' <small>' + DR.num(c.rebaProm, 1) + '</small></button>';
+      }).join('') + '</div>';
+  }
+  if (RES.MOSTRAR_SEGMENTOS) {
+    h += '<div class="sep-titulo">Exigencia por segmento corporal</div>' + RES.barras(A.reba.segmentos.map(function (s) {
+      return { etq: s.t, sub: s.nMax + ' en la peor posición', valor: (s.prom || 0) / s.max * 100, color: '#EF7C3B', texto: DR.num(s.prom, 1) + ' <small>de ' + s.max + '</small>' };
+    }));
+  }
+
+  // Selector de nombres (como un segmentador de Power BI) y tarjetas.
+  var sel = cos.filter(function (c) { return c.clave === RES.rebaSel; })[0];
+  h += '<div class="sep-titulo">Postura con mayor riesgo por cosechador</div><div class="res-nombres">' + cos.map(function (c) {
+    return '<button type="button" class="res-nombre' + (sel === c ? ' activo' : '') + '" data-cos="' + DR.esc(c.clave) + '">' + DR.esc(c.nombre) + '</button>';
+  }).join('') + (sel ? '<button type="button" class="res-nombre res-limpiar" data-cos="">✕ Ver todos</button>' : '') + '</div>';
+  if (sel) {
+    // Una tarjeta por cada parte del cuerpo en riesgo de la persona elegida.
+    h += '<div class="res-reba-grid">' + sel.segmentos.slice(0, 4).map(function (s, i) {
+      return '<div class="res-reba-card' + (i === 0 ? ' peor' : '') + '"><div class="res-reba-cab"><b>' + DR.esc(sel.nombre) + '</b>' + RES.chipReba(sel.rebaProm) + '</div>' +
+        '<div class="res-reba-cuerpo">' + RES.figSeg(s) + '<div><div class="res-reba-parte">' + (i + 1) + '. ' + DR.esc(s.t) + '</div>' +
+        '<div class="res-reba-desc">' + DR.esc(s.desc) + '</div><div class="res-mini">Exigencia ' + DR.num(s.relProm * 100, 0) + '% del máximo · ' +
+        sel.reba.length + ' postura' + (sel.reba.length === 1 ? '' : 's') + '</div></div></div></div>';
+    }).join('') + '</div>' + (sel.reba.some(function (r) { return (r.fotos || []).length; }) ?
+      '<div class="res-mini" style="margin-top:10px">Fotos de las posturas</div>' + FOTOS.galeriaHtml(sel.reba.reduce(function (l, r) { return l.concat(r.fotos || []); }, []).slice(0, 9)) : '');
+  } else {
+    h += '<div class="res-reba-grid">' + cos.slice().sort(function (a, b) { return b.rebaProm - a.rebaProm; }).map(function (c) {
+      var s = c.segmentos[0];
+      return '<button type="button" class="res-reba-card" data-cos="' + DR.esc(c.clave) + '"><div class="res-reba-cab"><b>' + DR.esc(c.nombre) + '</b>' + RES.chipReba(c.rebaProm) + '</div>' +
+        (s ? '<div class="res-reba-cuerpo">' + RES.figSeg(s) + '<div><div class="res-reba-parte">' + DR.esc(s.t) + '</div><div class="res-reba-desc">' + DR.esc(s.desc) + '</div>' +
+          (c.segmentos[1] ? '<div class="res-mini">Luego: ' + DR.esc(c.segmentos[1].t) + (c.segmentos[2] ? ', ' + DR.esc(c.segmentos[2].t) : '') + '</div>' : '') + '</div></div>' : '') + '</button>';
+    }).join('') + '</div>';
+  }
+  return h;
+};
+
+RES.enlazarReba = function () {
+  var p = DR.$('#panelReba');
+  if (!p) return;
+  DR.$$('[data-cos]', p).forEach(function (b) {
+    b.onclick = function () {
+      var k = b.getAttribute('data-cos');
+      RES.rebaSel = RES.rebaSel === k ? '' : k;
+      RES.repintarReba();
+    };
+  });
+  DR.$$('[data-nivel]', p).forEach(function (b) {
+    b.onclick = function () {
+      var i = Number(b.getAttribute('data-nivel'));
+      RES.rebaNivel = RES.rebaNivel === i ? null : i;
+      RES.repintarReba();
+    };
+  });
+};
+RES.repintarReba = function () {
+  var p = DR.$('#panelReba');
+  p.innerHTML = RES.rebaHtml(RES.A, RES.D.filtro || {});
+  FOTOS.pintar(p);
+  RES.enlazarReba();
 };
 
 /** Encuesta de factores de rendimiento: distribuciones, factores que quitan tiempo y respuestas abiertas. */
@@ -186,9 +329,9 @@ RES.panelEncuesta = function (E) {
   };
   return UI.panel('Encuesta de factores de rendimiento', E.n + ' encuestas respondidas' + (E.noAcepto ? ' · ' + E.noAcepto + ' no aceptaron' : '') +
     '. Lo que dicen los propios TOP sobre su método, el tiempo perdido y sus trucos.',
-    (E.factores.length ? '<div class="sep-titulo">¿Qué les quita más tiempo? <small>1º = 3 pts · 2º = 2 · 3º = 1</small></div>' +
+    (E.factores.length ? '<div class="sep-titulo">¿Qué les quita más tiempo?</div>' +
       RES.barras(E.factores.map(function (f) {
-        return { etq: f.t, sub: f.menciones + ' menciones (1º ' + f.pos[0] + ' · 2º ' + f.pos[1] + ' · 3º ' + f.pos[2] + ')', valor: f.puntos, color: '#EF7C3B', texto: f.puntos + ' <small>pts</small>' };
+        return { etq: f.t, valor: f.puntos, color: '#EF7C3B', texto: f.puntos + ' <small>pts</small>' };
       })) : '') +
     '<div class="grid-2"><div><div class="sep-titulo">Experiencia</div>' + barrasDist(E.p1) + '</div>' +
     '<div><div class="sep-titulo">¿Hace algo distinto a la capacitación?</div>' + barrasDist(E.p3) + '</div>' +
@@ -203,5 +346,3 @@ RES.panelEncuesta = function (E) {
     lista('Jarra: qué facilita o complica', E.jarra) +
     lista('Otros factores de tiempo perdido', E.otros));
 };
-
-TOP.rebaNivel = function (f) { return f <= 1 ? 0 : (f <= 3 ? 1 : (f <= 7 ? 2 : (f <= 10 ? 3 : 4))); };

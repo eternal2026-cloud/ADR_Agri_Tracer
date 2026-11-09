@@ -15,8 +15,8 @@ PROP.pintar = function (cont) {
   var f = RES.filtro();
   Promise.all([TOP.cargarDatos(f), sb.from('top_propuestas').select('*').order('creado_en', { ascending: false })]).then(function (r) {
     if (r[1].error) throw new Error(r[1].error.message);
-    RES.D = r[0];
-    RES.A = TOP.analizar(r[0], f.suplemento);
+    RES.D = TOP.filtrarDatos(r[0], f);
+    RES.A = TOP.analizar(RES.D, f.suplemento);
     PROP.lista = r[1].data;
     PROP.dibujar(cont, f);
   }).catch(function (e) { UI.error(cont, e); });

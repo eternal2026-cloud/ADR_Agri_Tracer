@@ -254,3 +254,49 @@ button.top-cos:active{transform:scale(.98)}
   .top-reloj-cifra{font-size:54px}
   .top-guardar{flex-direction:column;align-items:stretch;text-align:center}
 }
+
+/* ---------- Resumen por cosechador (PPT de mejoras) */
+.res-clic{cursor:pointer;border-radius:8px}
+.res-clic:hover .gf-nombre{color:var(--texto)}
+.res-ver{color:var(--texto-3)}
+.res-mini{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--texto-3);font-weight:500;margin:2px 0 6px}
+.res-docs{display:grid;gap:12px}
+.res-doc{padding:14px;border-radius:12px;border:1px solid var(--borde);background:var(--panel-2)}
+.res-doc>.top-cump-cab b:last-child{font-size:22px}
+.res-doc-tit{font-size:15.5px;font-weight:600}
+.res-doc .lc-pista{margin-top:10px}
+.res-det{margin-top:10px}
+.res-det>summary{cursor:pointer;font-size:13.5px;font-weight:600;color:#0097CE;padding:6px 0;list-style-position:inside}
+.res-det .top-cump{margin-top:8px}
+.res-det-chico>summary{font-size:12.5px;font-weight:500}
+.res-obs{background:rgba(239,124,59,.1)}
+.res-obs b{color:#EF7C3B}
+.res-ergo{padding:10px 0 4px;border-bottom:1px solid var(--borde)}
+.res-ergo:last-child{border-bottom:0}
+.res-ergo>.gf-barras .gf-nombre{font-weight:600;color:var(--texto)}
+.res-ergo-top{margin:-4px 0 6px 14px;padding-left:12px;border-left:2px solid var(--borde)}
+.res-ergo-top .gf-fila{margin-bottom:8px;font-size:12.5px}
+.res-reba-prom{display:flex;flex-wrap:wrap;gap:10px 22px;margin:4px 0 14px}
+.res-reba-prom>div{display:flex;flex-direction:column;align-items:flex-start}
+.res-reba-prom .top-reba-chip{font-size:14px;padding:4px 12px}
+.res-nivel-lista{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:-4px 0 12px;padding:10px;border-radius:10px;background:var(--panel-2);border:1px solid var(--borde)}
+.res-nivel-lista .res-mini{width:100%}
+.res-nombres{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.res-nombre{padding:5px 11px;border-radius:999px;border:1px solid var(--borde);background:var(--panel-2);color:var(--texto-2);font:13px var(--fuente);cursor:pointer}
+.res-nombre.activo{background:#0097CE;border-color:#0097CE;color:#fff}
+.res-nombre small{opacity:.7}
+.res-limpiar{border-style:dashed}
+.res-reba-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.res-reba-card{display:block;width:100%;padding:12px;border-radius:12px;border:1px solid var(--borde);background:var(--panel-2);color:var(--texto);font:14px var(--fuente);text-align:left}
+button.res-reba-card{cursor:pointer}
+button.res-reba-card:hover{border-color:#0097CE}
+.res-reba-card.peor{border-color:#EF7C3B}
+.res-reba-cab{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
+.res-reba-cab b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.res-reba-cuerpo{display:grid;grid-template-columns:96px 1fr;gap:10px;align-items:start}
+.res-reba-fig{background:#fff;border-radius:10px;padding:4px;display:flex;justify-content:center;align-items:center;height:96px}
+.res-reba-fig img,.res-reba-fig svg{max-width:100%;max-height:88px;object-fit:contain;display:block}
+.res-reba-parte{font-weight:600;font-size:14.5px}
+.res-reba-card .res-mini{text-transform:none;letter-spacing:0;font-size:12px}
+.res-reba-desc{font-size:13px;line-height:1.4;color:var(--texto-2);margin:2px 0 6px}
+@media (max-width:420px){.res-reba-grid{grid-template-columns:1fr}.res-ergo-top{margin-left:4px}}

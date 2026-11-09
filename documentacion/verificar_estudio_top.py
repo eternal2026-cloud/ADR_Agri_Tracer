@@ -5,6 +5,9 @@ Lee SOLO las hojas de datos del Excel que descarga Integra (Evaluaciones, Tomas,
 (detalle), REBA, Tablas REBA, Ergonomía (respuestas), Encuesta), rehace cada KPI en Python sin
 usar ninguna fórmula del libro y lo compara con la columna «Valor en Integra» de la hoja KPIs.
 También rehace el tiempo estándar de cada actividad y el puntaje REBA de cada postura.
+Los KPI del Resumen se calculan por cosechador (cada persona pesa igual): % productivo de cada
+jornada, % de cumplimiento de cada ronda y REBA de cada postura → promedio del cosechador →
+promedio entre cosechadores.
 
 Uso:
     pip install openpyxl
@@ -14,6 +17,7 @@ Sale con código 0 si todo coincide y 1 si algo no coincide.
 """
 import statistics
 import sys
+import unicodedata
 
 from openpyxl import load_workbook
 
@@ -25,6 +29,18 @@ def filas(wb, hoja):
     it = wb[hoja].iter_rows(values_only=True)
     cab = next(it, None) or []
     return [dict(zip(cab, f)) for f in it if any(v not in (None, '') for v in f)]
+
+
+def clave_cos(nombre):
+    """Igual que TOP.claveCos de la app: sin tildes, minúsculas y espacios simples."""
+    t = unicodedata.normalize('NFD', str(nombre or ''))
+    t = ''.join(ch for ch in t if unicodedata.category(ch) != 'Mn').lower()
+    return ' '.join(t.split())
+
+
+def prom(lista):
+    v = [x for x in lista if x is not None]
+    return sum(v) / len(v) if v else None
 
 
 def num(v):
@@ -100,22 +116,47 @@ def main(ruta):
                 malas_reba += 1
                 problemas.append(f'REBA {r["Código"]} ({r["Actividad"]}): Python {final} vs guardado {r["REBA final"]}')
 
+    # Por cosechador (KPI del Resumen): cada persona pesa igual.
+    cos_de = {e['Código']: clave_cos(e['Cosechador']) for e in evals}
+    pc = {}
+    for cod, d in por_eval.items():
+        tot = sum(d.values())
+        if tot > 0:
+            x = pc.setdefault(cos_de.get(cod), {'prod': [], 'esp': [], 'cump': [], 'reba': []})
+            x['prod'].append(d['Productiva'] / tot * 100)
+            x['esp'].append(d['Espera / eliminable'] / tot * 100)
+    rondas = {}
+    for x in cump:
+        if x['Resultado'] not in ('Cumple', 'No cumple'):
+            continue
+        r = rondas.setdefault((x['Código'], x.get('Ronda') or 1), [0, 0])
+        r[0 if x['Resultado'] == 'Cumple' else 1] += 1
+    for (cod, _), (cc, nn) in rondas.items():
+        pc.setdefault(cos_de.get(cod), {'prod': [], 'esp': [], 'cump': [], 'reba': []})['cump'].append(cc / (cc + nn) * 100)
+    for r in reba:
+        if num(r['REBA final']) is not None:
+            pc.setdefault(cos_de.get(r['Código']), {'prod': [], 'esp': [], 'cump': [], 'reba': []})['reba'].append(r['REBA final'])
+    kpi_cos = lambda k: prom([prom(x[k]) for x in pc.values()])
+
     c = sum(1 for x in cump if x['Resultado'] == 'Cumple')
     nc = sum(1 for x in cump if x['Resultado'] == 'No cumple')
     finales = [x['REBA final'] for x in reba if num(x['REBA final']) is not None]
     calc = {
         'Evaluaciones en el filtro': len(evals),
         'Cosechadores TOP distintos': len({e['Cosechador'] for e in evals if e['Cosechador']}),
+        'Tiempo productivo % (promedio por cosechador)': kpi_cos('prod'),
+        '% en espera / eliminable (promedio por cosechador)': kpi_cos('esp'),
+        'Cumplimiento % (promedio por cosechador)': kpi_cos('cump'),
+        'REBA promedio (por cosechador)': kpi_cos('reba'),
         'Tomas de tiempo registradas': len(tomas),
         'Tomas válidas (con fin)': len(validas),
         'Jornadas medidas': sum(1 for d in por_eval.values() if sum(d.values()) > 0),
-        '% del tiempo productivo': pct('Productiva'),
-        '% del tiempo en espera / eliminable': pct('Espera / eliminable'),
+        '% del tiempo productivo (todas las jornadas juntas)': pct('Productiva'),
         'Actividades con tiempo estándar': len(estandares),
         'Actividades cuyo estándar coincide con Integra': len(estandares) - sum(1 for p in problemas if p.startswith('Tiempo estándar')),
-        'Cumplimiento global de estándares %': c / (c + nc) * 100 if c + nc else None,
+        'Cumplimiento global de estándares % (todas las respuestas juntas)': c / (c + nc) * 100 if c + nc else None,
         'Posturas REBA evaluadas': len(reba),
-        'REBA promedio': statistics.mean(finales) if finales else None,
+        'REBA promedio de todas las posturas': statistics.mean(finales) if finales else None,
         'REBA máximo': max(finales) if finales else None,
         '% posturas en riesgo alto o muy alto': sum(1 for x in reba if x['Riesgo'] in ('Alto', 'Muy alto')) / len(reba) * 100 if reba else None,
         'Posturas REBA recalculadas que coinciden': len(reba) - malas_reba,

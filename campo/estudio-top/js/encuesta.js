@@ -13,8 +13,8 @@ ENC.OP = {
   p1: [['<1', 'Menos de 1 campaña'], ['1-2', '1 a 2 campañas'], ['3-5', '3 a 5 campañas'], ['>5', 'Más de 5 campañas']],
   p3: [['SI', 'Sí'], ['PARTE', 'En parte'], ['NO', 'No']],
   p4: [['GRANEL', 'Granel'], ['JARRA', 'Jarra'], ['IGUAL', 'Igual en ambas'], ['NA', 'No aplica (solo trabaja una)']],
-  p6: [[1, 'Esperar envases o bandejas'], [2, 'Traslados'], [3, 'Uso del tamiz'], [4, 'Calidad de la planta'],
-    [5, 'Calibre o estado de la fruta'], [6, 'Indicaciones del supervisor'], [7, 'Calor'], [8, 'Otro']],
+  p6: [[1, 'Esperar envases o bandejas'], [2, 'Traslados'], [3, 'Uso del tamiz'], [4, 'Calidad de la fruta'],
+    [5, 'Calibre de la fruta'], [6, 'Indicaciones del supervisor'], [7, 'Calor'], [8, 'Otro']],
   p8: [['CAPACITACION', 'Capacitación de la empresa'], ['COMPANERO', 'Un compañero'], ['CUENTA', 'Por mi cuenta'], ['OTRA', 'Otra campaña o empresa']]
 };
 ENC.BLOQUES = [

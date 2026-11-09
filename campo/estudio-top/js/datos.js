@@ -323,9 +323,10 @@ TOP.cargarDatos = function (f) {
   var q = sb.from('top_evaluaciones').select('*').eq('anulada', false).order('fecha', { ascending: false }).limit(1000);
   if (f.desde) q = q.gte('fecha', f.desde);
   if (f.hasta) q = q.lte('fecha', f.hasta);
-  if (f.presentacion) q = q.eq('presentacion', f.presentacion);
+  // MIXTO = jarra y granel juntos (igual que Todos): no filtra.
+  if (f.presentacion === 'JARRA' || f.presentacion === 'BANDEJA') q = q.eq('presentacion', f.presentacion);
   if (f.fundo) q = q.eq('fundo', f.fundo);
-  if (f.material) q = q.eq('material', f.material);
+  // Kg, Semana, Líder y Cosechador se filtran en el navegador (TOP.filtrarDatos).
   return Promise.all([TOP.cargarCatalogos(), q]).then(function (r) {
     if (r[1].error) throw new Error(r[1].error.message);
     var evals = r[1].data, ids = evals.map(function (e) { return e.id; });
@@ -334,6 +335,76 @@ TOP.cargarDatos = function (f) {
       return { evals: evals, tiempos: d[0], cump: d[1], reba: d[2], ergo: d[3], enc: d[4], filtro: f };
     });
   });
+};
+
+/* ------------------------------------------------ filtros del Resumen que se aplican en el navegador */
+/** Kg del material: «JARRA 0.5 KG» → «0.5»; «BANDEJA 2.0-5.0 KG» → «2.0-5.0»; «BULK 3.5» → «3.5». */
+TOP.kgDe = function (material) {
+  var m = String(material || '').replace(/,/g, '.').match(/(\d+(?:\.\d+)?(?:\s*-\s*\d+(?:\.\d+)?)?)/);
+  return m ? m[1].replace(/\s+/g, '') : '';
+};
+TOP.kgOpciones = function () {
+  var v = {};
+  (TOP.listas.material || []).forEach(function (m) { var k = TOP.kgDe(m); if (k) v[k] = true; });
+  return Object.keys(v).sort(function (a, b) { return parseFloat(a) - parseFloat(b) || a.localeCompare(b); });
+};
+/** Semana ISO de una fecha «AAAA-MM-DD» → «AAAA-Sss». */
+TOP.semanaDe = function (fecha) {
+  if (!fecha) return '';
+  var d = new Date(Date.UTC(+fecha.substring(0, 4), +fecha.substring(5, 7) - 1, +fecha.substring(8, 10)));
+  var dia = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dia);
+  var ini = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return d.getUTCFullYear() + '-S' + TOP.pad(Math.ceil(((d - ini) / 86400000 + 1) / 7));
+};
+TOP.semanaTxt = function (s) { return s ? 'Semana ' + Number(s.substring(6)) + ' · ' + s.substring(0, 4) : '—'; };
+/** Clave de un cosechador para promediar por persona (por nombre, como el conteo de «Cosechadores TOP»). */
+TOP.claveCos = function (e) { return TOP.norm(e.cosechador).replace(/\s+/g, ' ').trim() || ('ev:' + e.id); };
+
+/** Deja en D solo lo que cumple Semana, Líder, Cosechador y Kg (los demás filtros van al servidor). */
+TOP.filtrarDatos = function (D, f) {
+  if (!f.semana && !f.lider && !f.cosechador && !f.kg) return D;
+  var evals = D.evals.filter(function (e) {
+    return (!f.semana || TOP.semanaDe(e.fecha) === f.semana) && (!f.lider || (e.lider || '') === f.lider) &&
+      (!f.cosechador || TOP.claveCos(e) === f.cosechador) && (!f.kg || TOP.kgDe(e.material) === f.kg);
+  });
+  var ids = {};
+  evals.forEach(function (e) { ids[e.id] = true; });
+  var de = function (l) { return (l || []).filter(function (x) { return ids[x.evaluacion_id]; }); };
+  return { evals: evals, tiempos: de(D.tiempos), cump: de(D.cump), reba: de(D.reba), ergo: de(D.ergo), enc: de(D.enc), filtro: f };
+};
+
+TOP.prom = function (l) {
+  var v = l.filter(function (x) { return x !== null && x !== undefined && !isNaN(x); });
+  return v.length ? v.reduce(function (a, b) { return a + b; }, 0) / v.length : null;
+};
+/** Nivel REBA de un puntaje (también de un promedio, redondeado). */
+TOP.rebaNivel = function (f) { f = Math.round(f); return f <= 1 ? 0 : (f <= 3 ? 1 : (f <= 7 ? 2 : (f <= 10 ? 3 : 4))); };
+/** Documentos del estándar (top_estandar_items.tipo) en el orden del Resumen. */
+TOP.DOCS = [
+  { tipo: 'LUP', t: 'LUP Guía para la cosecha' },
+  { tipo: 'FORMATO', t: 'Estándar de puesto' },
+  { tipo: 'INSTRUCTIVO', t: 'Instructivo' }
+];
+/** Cuántos aspectos más desfavorables se listan por sección del checklist (PPT de mejoras). */
+TOP.ERGO_TOP = { '1': 2, '2': 5, '3': 2, '8': 2 };
+
+/** Segmentos de una postura REBA con su exigencia relativa (valor con modificadores ÷ máximo posible). */
+TOP.rebaSegmentos = function (r) {
+  var b = function (x) { return x ? 1 : 0; };
+  var val = {
+    cuello: Math.min(3, r.cuello + b(r.cuello_mod)), tronco: Math.min(5, r.tronco + b(r.tronco_mod)),
+    piernas: Math.min(4, r.piernas + (r.piernas_mod || 0)), brazo: Math.max(1, Math.min(6, r.brazo + b(r.brazo_elevado) - b(r.brazo_apoyo))),
+    antebrazo: r.antebrazo, muneca: Math.min(3, r.muneca + b(r.muneca_mod))
+  };
+  var tope = { cuello: 3, tronco: 5, piernas: 4, brazo: 6, antebrazo: 2, muneca: 3 };
+  return Object.keys(val).map(function (k) {
+    var seg = TOP.REBA_SEG.filter(function (s) { return s.k === k; })[0];
+    var op = seg.op.filter(function (o) { return o.v === r[k]; })[0];
+    var mods = seg.mods.filter(function (m) { return m.valor !== undefined ? r[m.k] === m.valor : !!r[m.k]; }).map(function (m) { return m.t; });
+    return { k: k, t: seg.t, seg: seg, valor: val[k], max: tope[k], rel: (val[k] - 1) / (tope[k] - 1),
+      desc: (op ? op.t : '') + (mods.length ? ' · ' + mods.join(' · ') : '') };
+  }).sort(function (a, b) { return b.rel - a.rel || b.valor - a.valor; });
 };
 
 /* ------------------------------------------------ análisis (Resumen, Propuesta y reportes) */
@@ -408,8 +479,17 @@ TOP.analizar = function (D, suplemento) {
       if (s.dolor) D.ergo.forEach(function (e) { ((e.dolor || {})[it[0]] || []).forEach(function (m) { if (m >= 1 && m <= 5) momentos[m - 1]++; }); });
       return { c: it[0], t: it[1], malo: it[2], SI: r.SI, NO: r.NO, NS: r.NS, desfav: resp ? r[it[2]] / resp * 100 : null, momentos: momentos };
     });
-    var resp = items.reduce(function (s2, i) { return s2 + i.SI + i.NO; }, 0), malos = items.reduce(function (s2, i) { return s2 + i[i.malo]; }, 0);
-    return { t: s.t, dolor: !!s.dolor, items: items, desfav: resp ? malos / resp * 100 : null };
+    // % de la sección = promedio simple del % de cada pregunta (cada pregunta pesa igual, como la tabla
+    // del formato: 100/7, 100/13, 100/5). Las sub-preguntas 8.5.1–8.5.4 cuentan juntas como la pregunta 8.5.
+    var grupos = {}, orden = [];
+    items.forEach(function (i) {
+      var g = i.c.split('.').slice(0, 2).join('.');
+      if (!grupos[g]) { grupos[g] = []; orden.push(g); }
+      grupos[g].push(i.desfav);
+    });
+    var top = TOP.ERGO_TOP[s.t.charAt(0)] || 2;
+    return { t: s.t, dolor: !!s.dolor, items: items, desfav: TOP.prom(orden.map(function (g) { return TOP.prom(grupos[g]); })),
+      peores: items.filter(function (i) { return i.desfav; }).sort(function (a, b) { return b.desfav - a.desfav; }).slice(0, top) };
   }) };
 
   // Encuesta de factores de rendimiento (encuesta.js).
@@ -436,7 +516,100 @@ TOP.analizar = function (D, suplemento) {
     otros: textos('p6_otro'), metodo: textos('p2'), distinto: textos('p3_que'), granel: textos('p5_granel'), jarra: textos('p5_jarra'),
     resuelve: textos('p7'), trucos: textos('p9'), mejoras: textos('p10')
   };
+
+  TOP.analizarPorCosechador(D, A, cerrados);
   return A;
+};
+
+/**
+ * Resultados por cosechador (PPT de mejoras): cada persona pesa igual en los KPI del Resumen.
+ *  · Tiempo productivo: % productivo de cada jornada → promedio del cosechador → promedio general.
+ *  · Cumplimiento: % de cada ronda (C ÷ (C + NC)) → promedio del cosechador → promedio general.
+ *  · REBA: promedio de sus posturas → promedio general (con el nivel y la acción del promedio).
+ *  · Tiempo por actividad: tiempo acumulado de la actividad en cada jornada, promediado entre jornadas.
+ */
+TOP.analizarPorCosechador = function (D, A, cerrados) {
+  var cos = {}, lista = [];
+  D.evals.forEach(function (e) {
+    var k = TOP.claveCos(e);
+    if (!cos[k]) { cos[k] = { clave: k, nombre: e.cosechador || '—', evals: [], pctProd: [], pctEspera: [], pctCump: [], reba: [] }; lista.push(cos[k]); }
+    cos[k].evals.push(e);
+  });
+  var cosDe = {};
+  D.evals.forEach(function (e) { cosDe[e.id] = cos[TOP.claveCos(e)]; });
+
+  A.jornadas.forEach(function (j) {
+    var c = cosDe[j.ev.id];
+    c.pctProd.push(j.tot.productiva / j.total * 100);
+    c.pctEspera.push(j.tot.espera / j.total * 100);
+  });
+  var rondas = {};
+  D.cump.forEach(function (x) {
+    if (x.resultado !== 'C' && x.resultado !== 'NC') return;
+    var k = x.evaluacion_id + '|' + (x.ronda || 1), r = rondas[k] = rondas[k] || { ev: x.evaluacion_id, C: 0, NC: 0 };
+    r[x.resultado]++;
+  });
+  Object.keys(rondas).forEach(function (k) { var r = rondas[k]; if (cosDe[r.ev]) cosDe[r.ev].pctCump.push(r.C / (r.C + r.NC) * 100); });
+  D.reba.forEach(function (r) { if (cosDe[r.evaluacion_id] && r.puntaje_final !== null) cosDe[r.evaluacion_id].reba.push(r); });
+
+  lista.forEach(function (c) {
+    c.prod = TOP.prom(c.pctProd);
+    c.espera = TOP.prom(c.pctEspera);
+    c.cump = TOP.prom(c.pctCump);
+    c.rebaProm = TOP.prom(c.reba.map(function (r) { return r.puntaje_final; }));
+    c.rebaNivel = c.rebaProm === null ? null : TOP.rebaNivel(c.rebaProm);
+    // Partes del cuerpo con más riesgo: exigencia relativa promedio de cada segmento en sus posturas.
+    var seg = {};
+    c.reba.forEach(function (r) {
+      TOP.rebaSegmentos(r).forEach(function (s) {
+        var x = seg[s.k] = seg[s.k] || { k: s.k, t: s.t, seg: s.seg, rel: [], peor: null };
+        x.rel.push(s.rel);
+        if (!x.peor || s.rel > x.peor.rel) x.peor = s;
+      });
+    });
+    c.segmentos = Object.keys(seg).map(function (k) { var x = seg[k]; x.relProm = TOP.prom(x.rel); x.desc = x.peor.desc; return x; })
+      .sort(function (a, b) { return b.relProm - a.relProm; });
+  });
+  A.porCos = lista.sort(function (a, b) { return a.nombre.localeCompare(b.nombre, 'es'); });
+  var esp = TOP.prom(lista.map(function (c) { return c.espera; }));
+  A.kpi = {
+    prod: TOP.prom(lista.map(function (c) { return c.prod; })), espera: esp,
+    cump: TOP.prom(lista.map(function (c) { return c.cump; })),
+    reba: TOP.prom(lista.map(function (c) { return c.rebaProm; })),
+    nProd: lista.filter(function (c) { return c.prod !== null; }).length,
+    nCump: lista.filter(function (c) { return c.cump !== null; }).length,
+    nReba: lista.filter(function (c) { return c.rebaProm !== null; }).length
+  };
+  A.reba.nivelesCos = [0, 0, 0, 0, 0];
+  lista.forEach(function (c) { if (c.rebaNivel !== null) A.reba.nivelesCos[c.rebaNivel]++; });
+
+  // Tiempo acumulado por jornada de cada actividad.
+  A.actividades.forEach(function (x) {
+    var porEval = {};
+    cerrados.forEach(function (t) { if (t.actividad_id === x.actividad.id) porEval[t.evaluacion_id] = (porEval[t.evaluacion_id] || 0) + t.duracion_seg; });
+    var sumas = Object.keys(porEval).map(function (k) { return porEval[k]; });
+    x.acum = TOP.prom(sumas);
+    x.nJornadas = sumas.length;
+  });
+
+  // Cumplimiento por documento del estándar (LUP, Estándar de puesto, Instructivo).
+  A.docs = TOP.DOCS.map(function (d) {
+    var its = A.items.filter(function (x) { return x.item.tipo === d.tipo; });
+    var ids = {};
+    its.forEach(function (x) { ids[x.item.id] = true; });
+    var porCos = {};
+    D.cump.forEach(function (x) {
+      if (!ids[x.item_id] || (x.resultado !== 'C' && x.resultado !== 'NC') || !cosDe[x.evaluacion_id]) return;
+      var k = cosDe[x.evaluacion_id].clave, p = porCos[k] = porCos[k] || { C: 0, NC: 0 };
+      p[x.resultado]++;
+    });
+    var titulos = {};
+    its.forEach(function (x) { titulos[x.item.estandar] = true; });
+    its.forEach(function (x) { x.pctNC = x.C + x.NC ? x.NC / (x.C + x.NC) * 100 : null; });
+    return { tipo: d.tipo, t: d.t, titulos: Object.keys(titulos), nCos: Object.keys(porCos).length,
+      pct: TOP.prom(Object.keys(porCos).map(function (k) { return porCos[k].C / (porCos[k].C + porCos[k].NC) * 100; })),
+      items: its.slice().sort(function (a, b) { return (b.pctNC === null ? -1 : b.pctNC) - (a.pctNC === null ? -1 : a.pctNC); }) };
+  }).filter(function (d) { return d.items.length; });
 };
 
 /** Sugerencias de actualización del estándar a partir de lo que hacen los TOP. */

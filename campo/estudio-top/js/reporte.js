@@ -103,8 +103,8 @@ REPORTE.excel = function (D, A) {
     var VERDE = 'FF2E7D32';
 
     // Orden de pestañas: primero los KPI y los resúmenes con fórmulas; luego los datos.
-    ['KPIs', 'Parámetros', 'Tiempo estándar', 'Distribución jornada', 'Clases de tiempo', 'Estándares (resumen)', 'REBA (resumen)',
-      'Ergonomía (resumen)', 'Encuesta (factores)'].forEach(function (n) { wb.addWorksheet(n); });
+    ['KPIs', 'Parámetros', 'Por cosechador', 'Tiempo estándar', 'Distribución jornada', 'Clases de tiempo', 'Cumplimiento por ronda', 'Estándares (resumen)', 'REBA (resumen)',
+      'Ergonomía (resumen)', 'Ergonomía (preguntas)', 'Encuesta (factores)'].forEach(function (n) { wb.addWorksheet(n); });
 
     /* ============================== hojas de datos ============================== */
     hoja('Evaluaciones', colsBase.concat([['Labor', 'labor', 14], ['Herramienta', 'herramienta', 14], ['Evaluador', 'evaluador', 22],
@@ -118,11 +118,11 @@ REPORTE.excel = function (D, A) {
     var tomas = D.tiempos.slice().sort(function (a, b) { return a.inicio < b.inicio ? -1 : 1; });
     var wsT = hoja('Tomas', colsBase.concat([['ID actividad', 'actId', 9], ['Actividad', 'act', 34], ['Clase', 'clase', 16], ['Inicio', 'ini', 18, FH], ['Fin', 'fin', 18, FH],
       ['Duración (s)', 'seg', 11], ['Válida (1 = entra en la estadística)', 'val', 12], ['Primera toma de este TOP en la actividad', 'pri', 14],
-      ['Duración (min:seg)', 'mmss', 11, MMSS], ['Nota', 'nota', 30]]),
+      ['Duración (min:seg)', 'mmss', 11, MMSS], ['Envases (Cosecha)', 'env', 10], ['Nota', 'nota', 30]]),
       tomas.map(function (t) {
         var f = base(REPORTE.evalDe(D, t.evaluacion_id)), a = TOP.actividad(t.actividad_id);
         f.actId = Number(t.actividad_id); f.act = a.nombre; f.clase = TOP.CLASES[a.clase].t; f.ini = fechaX(t.inicio); f.fin = fechaX(t.fin);
-        f.seg = t.duracion_seg; f.nota = t.nota;
+        f.seg = t.duracion_seg; f.env = t.envases; f.nota = t.nota;
         return f;
       }), 'FF6E6155');
     tomas.forEach(function (t, i) {
@@ -262,7 +262,9 @@ REPORTE.excel = function (D, A) {
     wsP.columns = [{ header: 'Parámetro', key: 'k', width: 34 }, { header: 'Valor', key: 'v', width: 22 }, { header: 'Nota', key: 'n', width: 80 }];
     [['Suplemento % (fatiga y necesidades)', Number(F.suplemento) || 0, 'Cámbialo aquí: el tiempo estándar se recalcula en «Tiempo estándar» (las marcas ✘ indican que ya no coincide con Integra).'],
       ['Desde', F.desde || 'inicio', 'Filtros con los que se descargó (pestaña Resumen del módulo).'],
-      ['Hasta', F.hasta || TOP.hoy(), ''], ['Estándar', F.presentacion || 'jarra y granel', ''], ['Material', F.material || 'todos', ''], ['Fundo', F.fundo || 'todos', ''],
+      ['Hasta', F.hasta || TOP.hoy(), ''], ['Presentación', F.presentacion === 'JARRA' ? 'Jarra' : (F.presentacion === 'BANDEJA' ? 'Granel' : (F.presentacion === 'MIXTO' ? 'Mixto' : 'Todos')), ''],
+      ['Kg', F.kg || 'todos', ''], ['Fundo', F.fundo || 'todos', ''], ['Semana', F.semana ? TOP.semanaTxt(F.semana) : 'todas', ''], ['Líder', F.lider || 'todos', ''],
+      ['Cosechador TOP', F.cosechador ? ((A.porCos[0] || {}).nombre || F.cosechador) : 'todos', ''],
       ['Generado', TOP.fecha(TOP.hoy()) + ' · ' + ((AT.perfil && AT.perfil.nombre) || '—'), ''],
       ['Cómo auditar', '', 'Verde = cálculo de Excel con fórmulas sobre las hojas de datos. «Integra» = lo que muestra la app. ✔ = coinciden. Toca una celda para ver su fórmula.'],
       ['Verificación externa', '', 'python documentacion/verificar_estudio_top.py Estudio_TOP_AAAA-MM-DD.xlsx rehace los KPI desde las hojas de datos.']
@@ -379,9 +381,31 @@ REPORTE.excel = function (D, A) {
       }
     });
 
-    // Ergonomía: % de respuestas desfavorables por sección.
-    var EZ = 'Ergonomía (resumen)', EL = 'Ergonomía (respuestas)';
-    var wsEZ = hoja(EZ, [['Sección', 'sec', 32], ['Respuestas Sí/No', 'resp', 10], ['Desfavorables', 'desf', 11], ['% desfavorable', 'pct', 11, '0.0'],
+    // Ergonomía: % desfavorable de cada pregunta; la sección promedia sus preguntas (todas pesan igual;
+    // 8.5.1–8.5.4 pesan 1/4 cada una porque juntas son la pregunta 8.5).
+    var EP = 'Ergonomía (preguntas)', EZ = 'Ergonomía (resumen)', EL = 'Ergonomía (respuestas)';
+    var preguntas = [];
+    A.ergo.secciones.forEach(function (s) {
+      var grupos = {};
+      s.items.forEach(function (i) { var g = i.c.split('.').slice(0, 2).join('.'); grupos[g] = (grupos[g] || 0) + 1; });
+      s.items.forEach(function (i) {
+        preguntas.push({ sec: s.t, num: i.c, preg: i.t, malo: i.malo, peso: 1 / grupos[i.c.split('.').slice(0, 2).join('.')], iPct: i.desfav });
+      });
+    });
+    var wsEP = hoja(EP, [['Sección', 'sec', 30], ['N°', 'num', 7], ['Pregunta', 'preg', 50], ['Respuesta desfavorable (SI/NO)', 'malo', 11], ['Respuestas Sí/No', 'resp', 10],
+      ['Desfavorables', 'desf', 11], ['% desfavorable', 'pct', 11, '0.0'], ['Peso en la sección', 'peso', 9, '0.00'], ['% × peso', 'pp', 10, '0.00'],
+      ['Peso con respuestas', 'pn', 10, '0.00'], ['Integra: %', 'iPct', 10, '0.0'], ['✔', 'ok', 6]], preguntas, VERDE);
+    verde(wsEP, ['resp', 'desf', 'pct', 'pp', 'pn']);
+    preguntas.forEach(function (x, i) {
+      var n = i + 2, k = function (key) { return c(EP, key, n); };
+      fo(wsEP, k('resp'), 'COUNTIFS(' + rg(EL, 'num') + ',' + k('num') + ',' + rg(EL, 'resp') + ',"SI")+COUNTIFS(' + rg(EL, 'num') + ',' + k('num') + ',' + rg(EL, 'resp') + ',"NO")');
+      fo(wsEP, k('desf'), 'SUMIFS(' + rg(EL, 'desf') + ',' + rg(EL, 'num') + ',' + k('num') + ')');
+      fo(wsEP, k('pct'), 'IF(' + k('resp') + '>0,' + k('desf') + '/' + k('resp') + '*100,"")', x.iPct);
+      fo(wsEP, k('pp'), 'IF(ISNUMBER(' + k('pct') + '),' + k('pct') + '*' + k('peso') + ',0)');
+      fo(wsEP, k('pn'), 'IF(ISNUMBER(' + k('pct') + '),' + k('peso') + ',0)');
+      fo(wsEP, k('ok'), chk(k('pct'), k('iPct'), 0.1));
+    });
+    var wsEZ = hoja(EZ, [['Sección', 'sec', 32], ['Respuestas Sí/No', 'resp', 10], ['Desfavorables', 'desf', 11], ['% desfavorable = promedio de sus preguntas', 'pct', 13, '0.0'],
       ['Integra: %', 'iPct', 10, '0.0'], ['✔', 'ok', 6]],
       A.ergo.secciones.map(function (s) { return { sec: s.t, iPct: s.desfav }; }), VERDE);
     verde(wsEZ, ['resp', 'desf', 'pct']);
@@ -389,7 +413,8 @@ REPORTE.excel = function (D, A) {
       var n = i + 2, k = function (key) { return c(EZ, key, n); };
       fo(wsEZ, k('resp'), 'COUNTIFS(' + rg(EL, 'sec') + ',' + k('sec') + ',' + rg(EL, 'resp') + ',"SI")+COUNTIFS(' + rg(EL, 'sec') + ',' + k('sec') + ',' + rg(EL, 'resp') + ',"NO")');
       fo(wsEZ, k('desf'), 'SUMIFS(' + rg(EL, 'desf') + ',' + rg(EL, 'sec') + ',' + k('sec') + ')');
-      fo(wsEZ, k('pct'), 'IF(' + k('resp') + '>0,' + k('desf') + '/' + k('resp') + '*100,"")', s.desfav);
+      fo(wsEZ, k('pct'), 'IF(SUMIFS(' + rg(EP, 'pn') + ',' + rg(EP, 'sec') + ',' + k('sec') + ')>0,SUMIFS(' + rg(EP, 'pp') + ',' + rg(EP, 'sec') + ',' + k('sec') + ')/SUMIFS(' +
+        rg(EP, 'pn') + ',' + rg(EP, 'sec') + ',' + k('sec') + '),"")', s.desfav);
       fo(wsEZ, k('ok'), chk(k('pct'), k('iPct'), 0.1));
     });
 
@@ -408,6 +433,56 @@ REPORTE.excel = function (D, A) {
       fo(wsF, k('ok'), chk(k('pts'), k('iPts'), 0));
     });
 
+    // Cumplimiento por ronda (una fila por evaluación y ronda): base del promedio por cosechador.
+    var CR = 'Cumplimiento por ronda', rondas = [], vistos = {};
+    D.cump.forEach(function (x) {
+      if (x.resultado !== 'C' && x.resultado !== 'NC') return;
+      var k0 = x.evaluacion_id + '|' + (x.ronda || 1);
+      if (vistos[k0]) return;
+      vistos[k0] = true;
+      var e = REPORTE.evalDe(D, x.evaluacion_id);
+      rondas.push({ codigo: e.codigo, cosechador: e.cosechador, ronda: x.ronda || 1 });
+    });
+    rondas.sort(function (a, b) { return String(a.codigo).localeCompare(String(b.codigo)) || a.ronda - b.ronda; });
+    var wsCR = hoja(CR, [['Código', 'codigo', 11], ['Cosechador', 'cosechador', 28], ['Ronda', 'ronda', 7], ['Cumple', 'C', 8], ['No cumple', 'NC', 9],
+      ['% cumplimiento de la ronda', 'pct', 12, '0.0']], rondas, VERDE);
+    verde(wsCR, ['C', 'NC', 'pct']);
+    rondas.forEach(function (x, i) {
+      var n = i + 2, k = function (key) { return c(CR, key, n); };
+      ['C', 'NC'].forEach(function (res) {
+        fo(wsCR, k(res), 'COUNTIFS(' + rg(ED, 'codigo') + ',' + k('codigo') + ',' + rg(ED, 'ronda') + ',' + k('ronda') + ',' + rg(ED, 'res') + ',"' + RES[res] + '")');
+      });
+      fo(wsCR, k('pct'), 'IF(' + k('C') + '+' + k('NC') + '>0,' + k('C') + '/(' + k('C') + '+' + k('NC') + ')*100,"")');
+    });
+
+    // Por cosechador: cada persona pesa igual en los KPI del Resumen.
+    var PC = 'Por cosechador';
+    var wsPC = hoja(PC, [['Cosechador', 'cosechador', 30], ['Evaluaciones', 'nEv', 10], ['% productivo (promedio de sus jornadas)', 'prod', 13, '0.0'],
+      ['% espera (promedio de sus jornadas)', 'esp', 12, '0.0'], ['% cumplimiento (promedio de sus rondas)', 'cump', 13, '0.0'],
+      ['REBA (promedio de sus posturas)', 'reba', 12, '0.00'], ['Nivel REBA', 'nivel', 12], ['Acción', 'accion', 34], ['Parte del cuerpo con más riesgo', 'parte', 40],
+      ['Integra: % productivo', 'iProd', 10, '0.0'], ['Integra: % cumplimiento', 'iCump', 10, '0.0'], ['Integra: REBA', 'iReba', 10, '0.00'], ['✔', 'ok', 6]],
+      A.porCos.map(function (x) {
+        var s0 = x.segmentos[0];
+        return { cosechador: x.nombre, iProd: x.prod, iCump: x.cump, iReba: x.rebaProm, parte: s0 ? s0.t + ': ' + s0.desc : '' };
+      }), VERDE);
+    verde(wsPC, ['nEv', 'prod', 'esp', 'cump', 'reba', 'nivel', 'accion']);
+    var accionesX = '{"' + TOP.RIESGOS.map(function (r) { return r.accion; }).join('","') + '"}', nivelesX = '{"' + TOP.RIESGOS.map(function (r) { return r.t; }).join('","') + '"}';
+    A.porCos.forEach(function (x, i) {
+      var n = i + 2, k = function (key) { return c(PC, key, n); };
+      var prom = function (h, col) { return 'IFERROR(AVERAGEIFS(' + rg(h, col) + ',' + rg(h, 'cosechador') + ',' + k('cosechador') + '),"")'; };
+      fo(wsPC, k('nEv'), 'COUNTIF(' + rg('Evaluaciones', 'cosechador') + ',' + k('cosechador') + ')', x.evals.length);
+      fo(wsPC, k('prod'), prom(DJ, 'pct'), x.prod);
+      fo(wsPC, k('esp'), 'IFERROR(SUMPRODUCT((' + rg(DJ, 'cosechador') + '=' + k('cosechador') + ')*(' + rg(DJ, 'total') + '>0),' + rg(DJ, 'espera') + '/(' + rg(DJ, 'total') +
+        '+(' + rg(DJ, 'total') + '=0)))*100/COUNTIFS(' + rg(DJ, 'cosechador') + ',' + k('cosechador') + ',' + rg(DJ, 'total') + ',">0"),"")', x.espera);
+      fo(wsPC, k('cump'), prom(CR, 'pct'), x.cump);
+      fo(wsPC, k('reba'), prom('REBA', 'puntaje_final'), x.rebaProm);
+      var rr = 'ROUND(' + k('reba') + ',0)';
+      fo(wsPC, k('nivel'), 'IF(' + k('reba') + '="","",IF(' + rr + '<=1,"Inapreciable",IF(' + rr + '<=3,"Bajo",IF(' + rr + '<=7,"Medio",IF(' + rr + '<=10,"Alto","Muy alto")))))',
+        x.rebaNivel === null ? '' : TOP.RIESGOS[x.rebaNivel].t);
+      fo(wsPC, k('accion'), 'IFERROR(INDEX(' + accionesX + ',MATCH(' + k('nivel') + ',' + nivelesX + ',0)),"")', x.rebaNivel === null ? '' : TOP.RIESGOS[x.rebaNivel].accion);
+      fo(wsPC, k('ok'), 'IF(AND(' + chk(k('prod'), k('iProd'), 0.1) + '="✔",' + chk(k('cump'), k('iCump'), 0.1) + '="✔",' + chk(k('reba'), k('iReba'), 0.01) + '="✔"),"✔","✘")', '✔');
+    });
+
     /* ============================== KPIs ============================== */
     var cos = {};
     D.evals.forEach(function (e) { cos[e.cosechador] = true; });
@@ -421,14 +496,20 @@ REPORTE.excel = function (D, A) {
       ['Tomas de tiempo registradas', 'COUNTA(' + rg('Tomas', 'codigo') + ')', D.tiempos.length, 0, 'Filas de la hoja Tomas.', 'Tomas'],
       ['Tomas válidas (con fin)', 'SUM(' + rg('Tomas', 'val') + ')', cerr, 0, 'Tomas con duración ≥ 0: son las que entran en la mediana.', 'Tomas'],
       ['Jornadas medidas', 'COUNT(' + rg(DJ, 'total') + ')', A.jornadas.length, 0, 'Evaluaciones con al menos una toma válida.', DJ],
-      ['% del tiempo productivo', "'" + CT + "'!$" + L[CT].pct + '$' + claseRow('productiva'), A.clases[0].pct, 0.1, 'Suma de minutos productivos ÷ total medido de todas las jornadas × 100.', CT],
-      ['% del tiempo en espera / eliminable', "'" + CT + "'!$" + L[CT].pct + '$' + claseRow('espera'), A.clases[2].pct, 0.1, 'Igual que el anterior para la clase Espera / eliminable.', CT],
+      ['Tiempo productivo % (promedio por cosechador)', 'IFERROR(AVERAGE(' + rg(PC, 'prod') + '),"")', A.kpi.prod, 0.1,
+        '% productivo de cada jornada → promedio de cada cosechador → promedio entre cosechadores (KPI del Resumen).', PC],
+      ['% en espera / eliminable (promedio por cosechador)', 'IFERROR(AVERAGE(' + rg(PC, 'esp') + '),"")', A.kpi.espera, 0.1, 'Igual que el anterior para la clase Espera / eliminable.', PC],
+      ['% del tiempo productivo (todas las jornadas juntas)', "'" + CT + "'!$" + L[CT].pct + '$' + claseRow('productiva'), A.clases[0].pct, 0.1,
+        'Suma de minutos productivos ÷ total medido de todas las jornadas × 100 (referencia).', CT],
       ['Actividades con tiempo estándar', 'COUNT(' + rg(TE, 'est') + ')', acts.length, 0, 'Actividades con al menos una toma válida.', TE],
       ['Actividades cuyo estándar coincide con Integra', 'COUNTIF(' + rg(TE, 'okEst') + ',"✔")', acts.length, 0, 'Estándar = ROUND(mediana × (1 + suplemento %)). Si cambias el suplemento en Parámetros, deja de coincidir.', TE],
-      ['Cumplimiento global de estándares %', 'IF(SUM(' + rg(ER, 'C') + ')+SUM(' + rg(ER, 'NC') + ')>0,SUM(' + rg(ER, 'C') + ')/(SUM(' + rg(ER, 'C') + ')+SUM(' + rg(ER, 'NC') + '))*100,"")',
+      ['Cumplimiento % (promedio por cosechador)', 'IFERROR(AVERAGE(' + rg(PC, 'cump') + '),"")', A.kpi.cump, 0.1,
+        '% de cada ronda (Cumple ÷ (Cumple + No cumple)) → promedio de cada cosechador → promedio general (KPI del Resumen).', PC],
+      ['Cumplimiento global de estándares % (todas las respuestas juntas)', 'IF(SUM(' + rg(ER, 'C') + ')+SUM(' + rg(ER, 'NC') + ')>0,SUM(' + rg(ER, 'C') + ')/(SUM(' + rg(ER, 'C') + ')+SUM(' + rg(ER, 'NC') + '))*100,"")',
         A.cumplimiento, 0.1, 'Cumple ÷ (Cumple + No cumple) × 100; «No aplica» no cuenta.', ER],
       ['Posturas REBA evaluadas', 'COUNTA(' + rg('REBA', 'codigo') + ')', A.reba.n, 0, 'Filas de la hoja REBA.', 'REBA'],
-      ['REBA promedio', 'IFERROR(AVERAGE(' + rg('REBA', 'puntaje_final') + '),"")', A.reba.n ? A.reba.prom.prom : null, 0.01, 'Promedio del puntaje final.', 'REBA'],
+      ['REBA promedio (por cosechador)', 'IFERROR(AVERAGE(' + rg(PC, 'reba') + '),"")', A.kpi.reba, 0.01, 'Promedio de las posturas de cada cosechador → promedio general (KPI del Resumen).', PC],
+      ['REBA promedio de todas las posturas', 'IFERROR(AVERAGE(' + rg('REBA', 'puntaje_final') + '),"")', A.reba.n ? A.reba.prom.prom : null, 0.01, 'Promedio del puntaje final (referencia).', 'REBA'],
       ['REBA máximo', 'IFERROR(MAX(' + rg('REBA', 'puntaje_final') + '),"")', A.reba.n ? A.reba.prom.max : null, 0, 'Mayor puntaje final.', 'REBA'],
       ['% posturas en riesgo alto o muy alto', 'IF(COUNTA(' + rg('REBA', 'codigo') + ')>0,(COUNTIF(' + rg('REBA', 'riesgo') + ',"Alto")+COUNTIF(' + rg('REBA', 'riesgo') + ',"Muy alto"))/COUNTA(' + rg('REBA', 'codigo') + ')*100,"")',
         alto, 0.1, 'Alto (8–10) + Muy alto (11+) ÷ posturas × 100.', RR],
@@ -577,8 +658,10 @@ REPORTE.pdf = function (D, A) {
     D.evals.forEach(function (e) { cos[e.cosechador] = true; });
     y = 66;
     parrafo('Periodo: ' + (f.desde ? TOP.fecha(f.desde) : 'inicio') + ' al ' + (f.hasta ? TOP.fecha(f.hasta) : TOP.fecha(TOP.hoy())) +
-      ' · Estándar: ' + (f.presentacion ? (f.presentacion === 'JARRA' ? 'jarra cosechera' : 'granel') : 'jarra y granel') + (f.material ? ' · Material: ' + TOP.materialTxt(f.material) : '') + ' · Fundo: ' + (f.fundo || 'todos') + '.', 10.5);
-    parrafo(Object.keys(cos).length + ' cosechadores TOP · ' + D.evals.length + ' evaluaciones · ' + D.tiempos.length + ' tomas de tiempo · ' +
+      ' · Presentación: ' + (f.presentacion === 'JARRA' ? 'jarra cosechera' : (f.presentacion === 'BANDEJA' ? 'granel' : (f.presentacion === 'MIXTO' ? 'mixto (jarra y granel)' : 'todas'))) +
+      (f.kg ? ' · Kg: ' + f.kg : '') + ' · Fundo: ' + (f.fundo || 'todos') + (f.semana ? ' · ' + TOP.semanaTxt(f.semana) : '') + (f.lider ? ' · Líder: ' + f.lider : '') +
+      (f.cosechador && A.porCos[0] ? ' · Cosechador: ' + A.porCos[0].nombre : '') + '.', 10.5);
+    parrafo(A.porCos.length + ' cosechadores TOP · ' + D.evals.length + ' evaluaciones · ' + D.tiempos.length + ' registros de tiempo · ' +
       D.cump.length + ' verificaciones de estándar · ' + D.reba.length + ' posturas REBA · ' + D.ergo.length + ' entrevistas ergonómicas · ' +
       (D.enc || []).length + ' encuestas de factores de rendimiento.', 10.5);
     parrafo('Emitido el ' + TOP.fecha(TOP.hoy()) + ' por ' + ((AT.perfil && AT.perfil.nombre) || '—') + '.', 9, colores.gris);
@@ -603,16 +686,20 @@ REPORTE.pdf = function (D, A) {
     parrafo('Actualizar los estándares de cosecha a partir del método del personal TOP, con un sustento medible. A cada cosechador TOP se le observa durante su jornada y se registra:');
     parrafo('a) Tiempo por actividad (inicio y fin con segundos; dentro de una jornada con inicio y fin fijos; las etapas van una tras otra y el lapso entre ellas se registra como tiempo muerto) de las ' + TOP.actividades.length + ' actividades del seguimiento al cosechador, clasificadas en productiva, soporte necesario, espera/eliminable y personal.');
     parrafo('b) Cumplimiento (cumple / no cumple / no aplica) del instructivo, la LUP y el formato de puesto de trabajo de su presentación, anotando cómo lo hace el TOP cuando difiere del estándar.');
-    parrafo('c) Evaluación postural REBA (tablas A, B y C) y checklist ergonómico de síntomas, fatiga, carga mental, ritmo y jornada.');
+    parrafo('c) Evaluación postural REBA (tablas A, B y C) y checklist ergonómico de puesto de trabajo, síntomas por postura, fatiga física y traumatismos repetidos.');
     parrafo('d) Encuesta de factores de rendimiento (1 por cosechador y día): experiencia, método, presentación, tiempo perdido, aprendizaje, trucos y mejoras.');
-    parrafo('Tiempo estándar = mediana de las tomas TOP × (1 + suplemento ' + (Number(f.suplemento) || 0) + '%). Se usa la mediana para que una toma atípica no distorsione el estándar.');
+    parrafo('Los resultados se calculan por cosechador para que cada persona pese igual: tiempo productivo (promedio de sus jornadas), cumplimiento (promedio de sus rondas) y REBA (promedio de sus posturas); luego se promedian entre cosechadores.');
+    var K = A.kpi, nvK = K.reba === null ? null : TOP.rebaNivel(K.reba);
+    tabla([{ t: 'Indicador (promedio por cosechador)', w: 80 }, { t: 'Resultado', w: 98 }], [
+      ['Tiempo productivo', K.prod === null ? '-' : DR.num(K.prod, 0) + '% (' + K.nProd + ' cosechadores)'],
+      ['Cumplimiento de estándares', K.cump === null ? '-' : DR.num(K.cump, 0) + '% (' + K.nCump + ' cosechadores)'],
+      ['REBA promedio', K.reba === null ? '-' : DR.num(K.reba, 1) + ' · ' + TOP.RIESGOS[nvK].t + ': ' + TOP.RIESGOS[nvK].accion]]);
 
-    titulo('2. Tiempo estándar por actividad');
+    titulo('2. Tiempo por actividad');
     var acts = A.actividades.filter(function (x) { return x.n; });
-    if (acts.length) tabla([{ t: 'Actividad', w: 58 }, { t: 'Tomas', w: 13, al: 'r' }, { t: 'Promedio', w: 18, al: 'r' }, { t: 'Mediana', w: 18, al: 'r' },
-      { t: 'P25-P75', w: 26, al: 'r' }, { t: 'CV', w: 12, al: 'r' }, { t: 'Estándar', w: 18, al: 'r' }, { t: 'Clase', w: 15 }],
-      acts.map(function (x) { return [x.actividad.nombre, x.n, TOP.seg(x.prom), TOP.seg(x.med), TOP.seg(x.p25) + '-' + TOP.seg(x.p75), DR.num(x.cv, 0) + '%', TOP.seg(x.estandar), TOP.CLASES[x.actividad.clase].t.split(' ')[0]]; }));
-    else parrafo('Sin tomas de tiempo en el periodo.');
+    if (acts.length) tabla([{ t: 'Actividad', w: 78 }, { t: 'Registros', w: 20, al: 'r' }, { t: 'Jornadas', w: 20, al: 'r' }, { t: 'Promedio acumulado por jornada', w: 36, al: 'r' }, { t: 'Clase', w: 24 }],
+      acts.map(function (x) { return [x.actividad.nombre, x.n, x.nJornadas, TOP.seg(x.acum), TOP.CLASES[x.actividad.clase].t.split(' ')[0]]; }));
+    else parrafo('Sin registros de tiempo en el periodo.');
 
     titulo('3. Distribución de la jornada');
     if (A.jornadas.length) {
@@ -631,22 +718,30 @@ REPORTE.pdf = function (D, A) {
     } else parrafo('Sin jornadas medidas.');
 
     titulo('4. Cumplimiento de estándares por los TOP');
-    if (A.cumplimiento !== null) parrafo('Cumplimiento global de los estándares actuales: ' + DR.num(A.cumplimiento, 0) + '%. Los ítems con menos de 80% indican que los TOP trabajan distinto al estándar.');
-    var items = A.items.filter(function (x) { return x.pct !== null || x.practicas.length; }).sort(function (a, b) { return (a.pct === null ? 101 : a.pct) - (b.pct === null ? 101 : b.pct); });
-    if (items.length) tabla([{ t: 'Ítem', w: 70 }, { t: 'C/NC/NA', w: 18, al: 'r' }, { t: '%', w: 11, al: 'r' }, { t: 'Cómo lo hacen los TOP', w: 79 }],
-      items.map(function (x) {
-        return [x.item.presentacion.substring(0, 1) + ' · ' + x.item.tipo + ' ' + (x.item.numero || '') + ': ' + x.item.descripcion, x.C + '/' + x.NC + '/' + x.NA,
-          x.pct === null ? '-' : DR.num(x.pct, 0), x.practicas.map(function (p) { return p.t + (p.n > 1 ? ' (x' + p.n + ')' : ''); }).join('; ')];
-      }));
-    else parrafo('Sin verificaciones de estándar en el periodo.');
+    if (A.docs.length) {
+      parrafo('Resultado general por documento del estándar (promedio por cosechador). Dentro de cada documento, las actividades van ordenadas por % de no cumplimiento.');
+      tabla([{ t: 'Documento', w: 60 }, { t: 'Cumplimiento', w: 30, al: 'r' }, { t: 'Cosechadores', w: 28, al: 'r' }, { t: 'Estándares incluidos', w: 60 }],
+        A.docs.map(function (d) { return [d.t, d.pct === null ? '-' : DR.num(d.pct, 0) + '%', d.nCos, d.titulos.join('; ')]; }));
+      A.docs.forEach(function (d) {
+        tabla([{ t: d.t + ': actividad', w: 70 }, { t: 'C/NC/NA', w: 18, al: 'r' }, { t: '% NC', w: 13, al: 'r' }, { t: 'Cómo lo hacen los TOP', w: 77 }],
+          d.items.map(function (x) {
+            return [x.item.presentacion.substring(0, 1) + ' ' + (x.item.numero || '') + ': ' + x.item.descripcion, x.C + '/' + x.NC + '/' + x.NA,
+              x.pctNC === null ? '-' : DR.num(x.pctNC, 0), x.practicas.map(function (p) { return p.t + (p.n > 1 ? ' (x' + p.n + ')' : ''); }).join('; ')];
+          }));
+      });
+    } else parrafo('Sin verificaciones de estándar en el periodo.');
 
     titulo('5. Evaluación ergonómica REBA');
     if (A.reba.n) {
-      parrafo(A.reba.n + ' posturas evaluadas. Puntaje final promedio ' + DR.num(A.reba.prom.prom, 1) + ', máximo ' + A.reba.prom.max + '.');
-      tabla([{ t: 'Nivel de riesgo', w: 40 }, { t: 'Posturas', w: 22, al: 'r' }, { t: '%', w: 16, al: 'r' }, { t: 'Acción', w: 100 }],
-        TOP.RIESGOS.map(function (rg, i) { return [rg.t, A.reba.niveles[i], DR.num(A.reba.niveles[i] / A.reba.n * 100, 0) + '%', rg.accion]; }));
-      tabla([{ t: 'Segmento', w: 50 }, { t: 'Promedio', w: 28, al: 'r' }, { t: 'Máximo posible', w: 30, al: 'r' }, { t: 'En la peor posición', w: 70, al: 'r' }],
-        A.reba.segmentos.map(function (s) { return [s.t, DR.num(s.prom, 1), s.max, s.nMax]; }));
+      var cosR = A.porCos.filter(function (c) { return c.rebaProm !== null; });
+      parrafo(cosR.length + ' cosechadores · ' + A.reba.n + ' posturas. REBA promedio por cosechador ' + DR.num(A.kpi.reba, 1) + ' (' + TOP.RIESGOS[TOP.rebaNivel(A.kpi.reba)].t + ').');
+      tabla([{ t: 'Nivel de riesgo', w: 40 }, { t: 'Cosechadores', w: 26, al: 'r' }, { t: '%', w: 16, al: 'r' }, { t: 'Acción', w: 96 }],
+        TOP.RIESGOS.map(function (rg, i) { return [rg.t, A.reba.nivelesCos[i], DR.num(cosR.length ? A.reba.nivelesCos[i] / cosR.length * 100 : 0, 0) + '%', rg.accion]; }));
+      tabla([{ t: 'Cosechador', w: 52 }, { t: 'REBA', w: 16, al: 'r' }, { t: 'Nivel', w: 22 }, { t: 'Parte del cuerpo con mayor riesgo', w: 88 }],
+        cosR.slice().sort(function (a, b) { return b.rebaProm - a.rebaProm; }).map(function (c) {
+          var s0 = c.segmentos[0];
+          return [c.nombre, DR.num(c.rebaProm, 1), TOP.RIESGOS[c.rebaNivel].t, s0 ? s0.t + ': ' + s0.desc : ''];
+        }));
       if (A.reba.porActividad.length) tabla([{ t: 'Actividad', w: 80 }, { t: 'Posturas', w: 25, al: 'r' }, { t: 'Promedio', w: 25, al: 'r' }, { t: 'Máximo', w: 48, al: 'r' }],
         A.reba.porActividad.map(function (x) { return [x.actividad.nombre, x.n, DR.num(x.est.prom, 1), x.max + ' (' + TOP.RIESGOS[TOP.rebaNivel(x.max)].t + ')']; }));
       // Imágenes de referencia de la hoja REBA (cuello, tronco, piernas, antebrazo, muñeca).
@@ -667,9 +762,11 @@ REPORTE.pdf = function (D, A) {
 
     titulo('6. Checklist ergonómico');
     if (A.ergo.n) {
-      parrafo(A.ergo.n + ' entrevistas. Porcentaje de respuestas desfavorables por sección:');
-      tabla([{ t: 'Sección', w: 110 }, { t: '% desfavorable', w: 68, al: 'r' }],
-        A.ergo.secciones.map(function (s) { return [s.t, s.desfav === null ? '-' : DR.num(s.desfav, 0) + '%']; }));
+      parrafo(A.ergo.n + ' entrevistas. % desfavorable de la sección = promedio del % de cada pregunta. La respuesta desfavorable depende de la pregunta (por ejemplo «No» en «¿puede apoyar los brazos?» y «Sí» en «¿siente dolor?»).');
+      tabla([{ t: 'Sección', w: 60 }, { t: '%', w: 14, al: 'r' }, { t: 'Aspectos con más % desfavorable', w: 104 }],
+        A.ergo.secciones.map(function (s) {
+          return [s.t, s.desfav === null ? '-' : DR.num(s.desfav, 0) + '%', s.peores.map(function (i) { return i.c + ' ' + i.t + ' (' + DR.num(i.desfav, 0) + '%)'; }).join('\n') || '-'];
+        }));
       var dol = A.ergo.secciones.filter(function (s) { return s.dolor; })[0].items.filter(function (i) { return i.SI; }).sort(function (a, b) { return b.SI - a.SI; });
       if (dol.length) {
         if (fig[5]) { espacio(48); try { doc.addImage(fig[5], 'JPEG', M, y, 60, 44, undefined, 'FAST'); } catch (e) { /* sin imagen */ } y += 48; }
@@ -684,8 +781,8 @@ REPORTE.pdf = function (D, A) {
     var E = A.enc;
     if (E && E.n) {
       parrafo(E.n + ' cosechadores TOP respondieron' + (E.noAcepto ? ' (' + E.noAcepto + ' no aceptaron)' : '') + '.');
-      if (E.factores.length) tabla([{ t: 'Factor que quita tiempo', w: 80 }, { t: '1º', w: 14, al: 'r' }, { t: '2º', w: 14, al: 'r' }, { t: '3º', w: 14, al: 'r' }, { t: 'Puntos', w: 20, al: 'r' }, { t: 'Menciones', w: 36, al: 'r' }],
-        E.factores.map(function (x) { return [x.t, x.pos[0], x.pos[1], x.pos[2], x.puntos, x.menciones]; }));
+      if (E.factores.length) tabla([{ t: 'Factor que quita tiempo', w: 140 }, { t: 'Puntos', w: 38, al: 'r' }],
+        E.factores.map(function (x) { return [x.t, x.puntos]; }));
       tabla([{ t: 'Pregunta', w: 60 }, { t: 'Respuestas', w: 118 }], [
         ['Experiencia (campañas)', E.p1.map(function (o) { return o.t + ': ' + o.n; }).join(' · ')],
         ['Hace algo distinto a la capacitación', E.p3.map(function (o) { return o.t + ': ' + o.n; }).join(' · ')],

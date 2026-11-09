@@ -11,6 +11,33 @@ var TIEMPOS = { _ini: {} };
 
 /** Un tiempo muerto más corto que esto (y sin nota) es solo el toque entre etapas: no se guarda. */
 TIEMPOS.MUERTO_MIN_SEG = 5;
+/** Etapa Cosecha: al cerrarla se exige la cantidad de envases (0060). */
+TIEMPOS.ID_COSECHA = 4;
+TIEMPOS.esCosecha = function (r) { return r && Number(r.actividad_id) === TIEMPOS.ID_COSECHA; };
+
+/** Pide los envases (bandejas o jarras) de una Cosecha antes de cerrarla; `listo(n)` recibe el número. */
+TIEMPOS.pedirEnvases = function (r, listo) {
+  if (!TIEMPOS.esCosecha(r)) { listo(null); return; }
+  var tipo = EVAL.ev && EVAL.ev.presentacion === 'JARRA' ? 'jarras' : 'bandejas';
+  UI.abrirHoja('<h2>Cantidad de envases</h2><div class="sub">¿Cuántas ' + tipo + ' llenó el cosechador en esta cosecha?</div>' +
+    '<div class="form" id="frmEnvases" style="margin-top:12px"><div class="campo ancho"><label>Envases (' + tipo + ') <em>obligatorio</em></label>' +
+    '<input type="number" inputmode="numeric" min="0" max="5000" step="1" data-campo="envases" value="' + (r.envases !== undefined && r.envases !== null ? r.envases : '') + '"></div></div>' +
+    '<div class="acciones"><button type="button" class="btn verde" id="btnEnvasesOk">Guardar</button>' +
+    '<button type="button" class="btn sec" onclick="UI.cerrarHoja()">Cancelar</button></div>');
+  var inp = DR.$('#frmEnvases input');
+  setTimeout(function () { try { inp.focus(); } catch (e) { /* sin foco */ } }, 120);
+  DR.$('#btnEnvasesOk').onclick = function () {
+    var n = TIEMPOS.leerEnvases(inp.value);
+    if (n === null) { DR.toast('Escribe la cantidad de envases (0 o más).', 'error'); return; }
+    UI.cerrarHoja();
+    listo(n);
+  };
+};
+TIEMPOS.leerEnvases = function (v) {
+  if (v === '' || v === null || v === undefined) return null;
+  var n = Number(v);
+  return isNaN(n) || n < 0 || n > 5000 || Math.floor(n) !== n ? null : n;
+};
 
 TIEMPOS.clave = function () { return 'reloj.' + EVAL.ev.id; };
 TIEMPOS.clavePend = function () { return 'pend.' + EVAL.ev.id; };
@@ -112,7 +139,8 @@ TIEMPOS.pintar = function (cont) {
     lista.length ? '<div class="top-tomas">' + lista.map(function (t) {
       var a2 = TOP.actividad(t.actividad_id), cl = TOP.CLASES[a2.clase] || TOP.CLASES.espera;
       return '<button type="button" class="top-toma" data-toma="' + t.id + '"' + (edita ? '' : ' disabled') + ' style="--c:' + cl.c + '">' +
-        '<span class="top-toma-nom">' + DR.esc(a2.nombre) + (t.nota ? '<small>' + DR.esc(t.nota) + '</small>' : '') + '</span>' +
+        '<span class="top-toma-nom">' + DR.esc(a2.nombre) + (t.envases !== null && t.envases !== undefined ? '<small>' + t.envases + ' envases</small>' : '') +
+          (t.nota ? '<small>' + DR.esc(t.nota) + '</small>' : '') + '</span>' +
         '<span class="top-toma-hora">' + TOP.horaSeg(t.inicio) + ' → ' + (t.fin ? TOP.horaSeg(t.fin) : 'en curso') + '</span>' +
         '<b>' + (t.duracion_seg !== null ? TOP.seg(t.duracion_seg) : '—') + '</b></button>';
     }).join('') + '</div>' : '<div class="vacio">Aún no hay tomas.</div>');
@@ -180,11 +208,13 @@ TIEMPOS.finJornada = function () {
   var etapa = TIEMPOS.etapa();
   if (!window.confirm('¿Marcar el fin de la jornada?' + (etapa ? ' Se terminará «' + TOP.actividad(etapa.actividad_id).nombre + '».' : ''))) return;
   var ahora = new Date().toISOString();
-  TIEMPOS.relojes().forEach(function (r) { TIEMPOS.cerrar(r, ahora); });
-  TIEMPOS.guardarJornada({ inicio: TIEMPOS.jornada().inicio, fin: ahora });
-  DR.vibrar([30, 40, 30]); DR.sonar(true);
-  DR.toast('Jornada cerrada a las ' + TOP.horaSeg(ahora) + '.');
-  TIEMPOS.pintar(DR.$('#seccion'));
+  TIEMPOS.pedirEnvases(etapa, function (n) {
+    TIEMPOS.relojes().forEach(function (r) { if (TIEMPOS.esCosecha(r)) r.envases = n; TIEMPOS.cerrar(r, ahora); });
+    TIEMPOS.guardarJornada({ inicio: TIEMPOS.jornada().inicio, fin: ahora });
+    DR.vibrar([30, 40, 30]); DR.sonar(true);
+    DR.toast('Jornada cerrada a las ' + TOP.horaSeg(ahora) + '.');
+    TIEMPOS.pintar(DR.$('#seccion'));
+  });
 };
 
 TIEMPOS.editarJornada = function () {
@@ -199,13 +229,21 @@ TIEMPOS.editarJornada = function () {
     if (!nj.inicio) { DR.toast('Falta la hora de inicio.', 'error'); return; }
     if (nj.fin && nj.fin < nj.inicio) { DR.toast('El fin no puede ser antes del inicio.', 'error'); return; }
     var antes = j.inicio;
-    TIEMPOS.guardarJornada(nj);
-    // Jornada nueva a mano: desde el inicio corre tiempo muerto hasta la primera etapa.
-    if (!antes && !nj.fin && !TIEMPOS.relojes().length) TIEMPOS.abrir(TOP.ID_MUERTO, nj.inicio);
-    if (nj.fin) { var fin = nj.fin; TIEMPOS.relojes().forEach(function (r) { TIEMPOS.cerrar(r, fin < r.inicio ? r.inicio : fin); }); }
-    UI.cerrarHoja();
-    DR.toast('Jornada guardada.');
-    TIEMPOS.pintar(DR.$('#seccion'));
+    var seguir = function (n) {
+      TIEMPOS.guardarJornada(nj);
+      // Jornada nueva a mano: desde el inicio corre tiempo muerto hasta la primera etapa.
+      if (!antes && !nj.fin && !TIEMPOS.relojes().length) TIEMPOS.abrir(TOP.ID_MUERTO, nj.inicio);
+      if (nj.fin) {
+        var fin = nj.fin;
+        TIEMPOS.relojes().forEach(function (r) { if (TIEMPOS.esCosecha(r)) r.envases = n; TIEMPOS.cerrar(r, fin < r.inicio ? r.inicio : fin); });
+      }
+      UI.cerrarHoja();
+      DR.toast('Jornada guardada.');
+      TIEMPOS.pintar(DR.$('#seccion'));
+    };
+    // Cerrar la jornada termina la Cosecha en curso: primero se piden sus envases.
+    var cos = nj.fin ? TIEMPOS.relojes().filter(TIEMPOS.esCosecha)[0] : null;
+    if (cos) TIEMPOS.pedirEnvases(cos, seguir); else seguir(null);
   };
 };
 
@@ -227,13 +265,17 @@ TIEMPOS.iniciar = function (actividadId) {
 TIEMPOS.terminar = function (inicio, btn) {
   var r = TIEMPOS.relojes().filter(function (x) { return x.inicio === inicio; })[0];
   if (!r) return;
+  // La hora de fin es la del toque, aunque los envases se escriban después.
   var ahora = new Date().toISOString();
-  if (btn) btn.classList.add('cargando');
-  TIEMPOS.cerrar(r, ahora);
-  if (TIEMPOS.jornadaAbierta()) TIEMPOS.abrir(TOP.ID_MUERTO, ahora);
-  DR.vibrar([30, 40, 30]); DR.sonar(true);
-  DR.toast(TOP.actividad(r.actividad_id).nombre + ': ' + TOP.seg((new Date(ahora) - new Date(r.inicio)) / 1000));
-  TIEMPOS.pintar(DR.$('#seccion'));
+  TIEMPOS.pedirEnvases(r, function (n) {
+    if (btn) btn.classList.add('cargando');
+    if (TIEMPOS.esCosecha(r)) r.envases = n;
+    TIEMPOS.cerrar(r, ahora);
+    if (TIEMPOS.jornadaAbierta()) TIEMPOS.abrir(TOP.ID_MUERTO, ahora);
+    DR.vibrar([30, 40, 30]); DR.sonar(true);
+    DR.toast(TOP.actividad(r.actividad_id).nombre + ': ' + TOP.seg((new Date(ahora) - new Date(r.inicio)) / 1000) + (n !== null ? ' · ' + n + ' envases' : ''));
+    TIEMPOS.pintar(DR.$('#seccion'));
+  });
 };
 
 /** Abre un reloj: primero en el celular y luego crea la fila abierta en Supabase. */
@@ -267,6 +309,7 @@ TIEMPOS.cerrar = function (r, fin) {
   var seg = (new Date(fin) - new Date(r.inicio)) / 1000;
   if (TIEMPOS.esMuerto(r) && seg < TIEMPOS.MUERTO_MIN_SEG && !(r.nota || '').trim()) { TIEMPOS.borrarServidor(r); return; }
   var p = { id: null, evaluacion_id: EVAL.ev.id, actividad_id: r.actividad_id, inicio: r.inicio, fin: fin, nota: r.nota || '' };
+  if (TIEMPOS.esCosecha(r)) p.envases = r.envases === undefined ? null : r.envases;
   TIEMPOS.idDe(r).then(function (id) {
     p.id = id || null;
     return AT.rpc('rpc_top_guardar_tiempo', { p: p });
@@ -353,15 +396,26 @@ TIEMPOS.editar = function (t) {
     }).join('') + '</select></div>' +
     '<div class="campo"><label>Inicio</label><input type="datetime-local" step="1" data-campo="inicio" value="' + (t ? TOP.aLocal(t.inicio) : ahora) + '"></div>' +
     '<div class="campo"><label>Fin</label><input type="datetime-local" step="1" data-campo="fin" value="' + (t ? TOP.aLocal(t.fin) : ahora) + '"></div>' +
+    '<div class="campo ancho" id="campoEnvases"><label>Cantidad de envases (bandejas o jarras) <em>obligatorio en Cosecha</em></label>' +
+      '<input type="number" inputmode="numeric" min="0" max="5000" step="1" data-campo="envases" value="' + (t && t.envases !== null && t.envases !== undefined ? t.envases : '') + '"></div>' +
     '<div class="campo ancho"><label>Nota <em>opcional</em></label><input data-campo="nota" maxlength="200" value="' + DR.esc(t ? t.nota : '') + '" placeholder="Ej. lote con mucha fruta, interrupción…"></div></div>' +
     '<div class="acciones"><button type="button" class="btn verde" id="btnGuardarToma">Guardar</button>' +
     (nueva ? '' : '<button type="button" class="btn sec btn-peligro" id="btnBorrarToma">Borrar toma</button>') +
     '<button type="button" class="btn sec" onclick="UI.cerrarHoja()">Cancelar</button></div>');
+  // El campo de envases solo se ve (y se exige) cuando la etapa es Cosecha.
+  var selEtapa = DR.$('#frmToma [data-campo="actividad_id"]');
+  var verEnvases = function () { DR.$('#campoEnvases').style.display = TIEMPOS.esCosecha({ actividad_id: selEtapa.value }) ? '' : 'none'; };
+  selEtapa.onchange = verEnvases;
+  verEnvases();
   DR.$('#btnGuardarToma').onclick = function () {
     var f = UI.leerForm('frmToma'), btn = this;
     var p = { id: t ? t.id : null, evaluacion_id: EVAL.ev.id, actividad_id: Number(f.actividad_id), inicio: TOP.aIso(f.inicio), fin: TOP.aIso(f.fin), nota: f.nota };
     if (!p.inicio) { DR.toast('Falta la hora de inicio.', 'error'); return; }
     if (p.fin && p.fin < p.inicio) { DR.toast('El fin no puede ser antes del inicio.', 'error'); return; }
+    if (TIEMPOS.esCosecha(p)) {
+      p.envases = TIEMPOS.leerEnvases(f.envases);
+      if (p.fin && p.envases === null) { DR.toast('Indica la cantidad de envases (bandejas o jarras) de la cosecha.', 'error'); return; }
+    }
     btn.classList.add('cargando');
     AT.rpc('rpc_top_guardar_tiempo', { p: p }).then(function () { UI.cerrarHoja(); DR.toast('Toma guardada.'); EVAL.recargar(); })
       .catch(function (e) { btn.classList.remove('cargando'); DR.toast(e.message, 'error'); });

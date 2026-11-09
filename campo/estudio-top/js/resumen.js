@@ -11,6 +11,8 @@ var RES = { D: null, A: null, base: null, claveBase: '', rebaSel: '', rebaNivel:
 RES.SUPLEMENTO = 10;
 /** «Exigencia por segmento corporal» quedó oculta (PPT de mejoras); el cálculo se conserva. */
 RES.MOSTRAR_SEGMENTOS = false;
+/** Tarjetas REBA que se ven sin filtro (las de mayor riesgo). */
+RES.REBA_TOP = 6;
 
 RES.filtro = function () {
   var f = TOP.leer('filtro', null);
@@ -281,7 +283,10 @@ RES.rebaHtml = function (A, f) {
     }).join('') + '</div>' + (sel.reba.some(function (r) { return (r.fotos || []).length; }) ?
       '<div class="res-mini" style="margin-top:10px">Fotos de las posturas</div>' + FOTOS.galeriaHtml(sel.reba.reduce(function (l, r) { return l.concat(r.fotos || []); }, []).slice(0, 9)) : '');
   } else {
-    h += '<div class="res-reba-grid">' + cos.slice().sort(function (a, b) { return b.rebaProm - a.rebaProm; }).map(function (c) {
+    // Sin filtro: solo los de mayor riesgo; el resto se ve tocando su nombre.
+    var top = cos.slice().sort(function (a, b) { return b.rebaProm - a.rebaProm; }).slice(0, RES.REBA_TOP);
+    if (cos.length > RES.REBA_TOP) h += '<div class="res-mini" style="text-transform:none;letter-spacing:0">Se muestran los ' + RES.REBA_TOP + ' de mayor riesgo de ' + cos.length + '. Toca un nombre para ver a cualquier cosechador.</div>';
+    h += '<div class="res-reba-grid">' + top.map(function (c) {
       var s = c.segmentos[0];
       return '<button type="button" class="res-reba-card" data-cos="' + DR.esc(c.clave) + '"><div class="res-reba-cab"><b>' + DR.esc(c.nombre) + '</b>' + RES.chipReba(c.rebaProm) + '</div>' +
         (s ? '<div class="res-reba-cuerpo">' + RES.figSeg(s) + '<div><div class="res-reba-parte">' + DR.esc(s.t) + '</div><div class="res-reba-desc">' + DR.esc(s.desc) + '</div>' +

@@ -27,7 +27,7 @@ create index if not exists uva_ciclos_placa_llave_idx on public.uva_ciclos (uppe
 /** Recalcula las llegadas copiadas de una placa (p_placa ya normalizada: mayúsculas, sin espacios ni guiones). */
 create or replace function public.fn_uva_camion_propagar(p_placa text)
 returns int language plpgsql security definer set search_path = public as $$
-declare t record; s record; n int := 0;
+declare t record; v_sid text; v_sll timestamptz; n int := 0;
 begin
   if coalesce(p_placa, '') = '' then return 0; end if;
   for t in
@@ -37,9 +37,9 @@ begin
       and not c.eliminado and c.origen <> 'planta'
       and (c.hora_llegada is null or c.llegada_por = 'camion')
   loop
-    s := null;
+    v_sid := null; v_sll := null;
     if t.sal is not null then
-      select o.id, o.hora_llegada into s
+      select o.id, o.hora_llegada into v_sid, v_sll
       from public.uva_ciclos o
       where upper(regexp_replace(coalesce(o.placa, ''), '[^A-Za-z0-9]', '', 'g')) = p_placa
         and o.id <> t.id and not o.eliminado and o.origen <> 'planta'
@@ -49,9 +49,9 @@ begin
       order by abs(extract(epoch from public.fn_uva_salida(o.etapas, o.fin_carga) - t.sal)), o.hora_llegada
       limit 1;
     end if;
-    if s.id is not null then
-      if t.hora_llegada is distinct from s.hora_llegada or t.llegada_ref is distinct from s.id or t.llegada_por is distinct from 'camion' then
-        update public.uva_ciclos set hora_llegada = s.hora_llegada, llegada_por = 'camion', llegada_ref = s.id where id = t.id;
+    if v_sid is not null then
+      if t.hora_llegada is distinct from v_sll or t.llegada_ref is distinct from v_sid or t.llegada_por is distinct from 'camion' then
+        update public.uva_ciclos set hora_llegada = v_sll, llegada_por = 'camion', llegada_ref = v_sid where id = t.id;
         n := n + 1;
       end if;
     elsif t.llegada_por = 'camion' then

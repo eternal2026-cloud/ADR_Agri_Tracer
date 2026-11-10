@@ -33,3 +33,7 @@
 .chk input{width:22px;height:22px;flex:0 0 auto}
 #hojaTarjeta h3{margin-bottom:8px}
 #hojaTarjeta .campo{margin-bottom:12px}
+/* Pestañas Hoy / Resumen y Resumen de planta (usa los paneles, barras y tabla dinámica de estilos.css). */
+.pl-pestanas{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;margin:2px 0 14px;border-radius:14px;background:var(--panel-2);border:1px solid var(--borde)}
+.pl-pestanas a{display:block;text-align:center;padding:9px 6px;border-radius:10px;color:var(--texto-3);text-decoration:none;font-weight:500;font-size:14.5px}
+.pl-pestanas a.activa{background:var(--panel);color:var(--texto);box-shadow:inset 0 0 0 1px var(--borde)}

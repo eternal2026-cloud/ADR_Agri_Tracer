@@ -128,7 +128,7 @@ TC.fusionar = function (r, o) {
     var p = k.split('.');
     if (p.length === 2) {
       r.etapas[p[0]][p[1]] = b[k];
-      if (p[1] === 'fin') { r.etapas[p[0]].editado = !!o.etapas[p[0]].editado; delete r.etapas[p[0]].porPlanta; }
+      if (p[1] === 'fin') { r.etapas[p[0]].editado = !!o.etapas[p[0]].editado; delete r.etapas[p[0]].porPlanta; delete r.etapas[p[0]].porCamion; }
     } else if (k === 'estado') r.estado = b[k] === 'cerrado' ? 'cerrado' : 'borrador';
     else r[k] = b[k];
     if (tb[k]) r.t[k] = tb[k]; else delete r.t[k];

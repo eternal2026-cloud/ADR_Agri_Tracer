@@ -1,6 +1,6 @@
 /* ============================================================================
  * app.js — ARRANQUE DE RECEPCIÓN UVA (Ingeniería · Planta)
- * Vistas: #hoy (en vivo) y #reg/<id>. Accesos: planta.uva (planta.uva.recepcion registra).
+ * Vistas: #hoy (en vivo), #resumen (gráficos, resumen.js) y #reg/<id>. Accesos: planta.uva (planta.uva.recepcion registra).
  * ==========================================================================*/
 DR.ir = function () {
   var h = location.hash.replace('#', '') || 'hoy', p = h.split('/');
@@ -9,6 +9,7 @@ DR.ir = function () {
   PL.alCambiar = null;
   cont.scrollTop = 0;
   if (p[0] === 'reg' && p[1]) { DR.vista = 'reg'; VIS.registro(cont, decodeURIComponent(p[1])); return; }
+  if (p[0] === 'resumen') { DR.vista = 'resumen'; VIS.resumen(cont); return; }
   DR.vista = 'hoy';
   VIS.hoy(cont);
 };

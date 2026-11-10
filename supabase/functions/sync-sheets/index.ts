@@ -691,6 +691,11 @@ function estandarUva(lista: Fila[], zona: string, fundo: string, planta: string)
   return mejor;
 }
 
+/** Comentarios de Arándano (mismo orden que RES.OBS de ciclos/js/resumen.js). */
+const OBS_CICLOS: [string, string][] = [['obs_cosecha', 'Cosecha'], ['obs_jaba', 'Jabero'], ['obs_moto', 'Moto'],
+  ['obs_traslado_ca', 'Traslado C.A.'], ['obs_jabas_2', 'Descarga'], ['obs_camion', 'Camión'],
+  ['obs_traslado_planta', 'Traslado planta'], ['obs_cs', 'C. Sombra'], ['obs_ca', 'C. Acopio']];
+
 const UVA_BASE = ['ID', 'Registrado por', 'Equipo'];
 const UVA_BD = ['SEMANA', 'FECHA', 'CAMPAÑA', 'ZONA', 'FUNDO', 'LOTE', 'SUBLOTE', 'PASADA', 'COLOR', 'VARIEDAD', 'GRUPO',
   'INICIO COSECHA', 'FIN COSECHA', 'T. Cosecha', 'T. espera traslado de jaba', 'INICIO TRASLADO DE JABA', 'FIN TRASLADO DE JABA', 'T. traslado jaba a pallet',
@@ -706,6 +711,8 @@ const UVA_PLANTA = ['Origen', 'HORA LLEGADA CAMIÓN', 'HORA RECEPCIÓN', 'T. esp
   'T. EN PLANTA', 'T. fin carga → llegada planta', 'T. CICLO COMPLETO', 'Registrado en planta por', 'Observación planta', 'Causas planta'];
 /** Datos de la etapa Carga (desde 0057, al final para no mover las columnas del dashboard). */
 const UVA_CARGA = ['N° pallets cargados (carga)', 'N° pallets total (carga)', 'Último en editar'];
+/** Notas escritas en la app y origen de la llegada (desde 0063, al final para no mover columnas). */
+const UVA_NOTAS = ['Comentarios de etapas (campo)', 'Llegada marcada por', 'Llegada tomada del ciclo'];
 const UVA_ETAPAS = ['Semana', 'Fecha', 'Zona', 'Fundo', 'Lote', 'Variedad', 'Grupo', 'Planta', 'Estado', 'N°', 'Etapa', 'Inicio', 'Fin',
   'Minutos', 'Espera previa (min)', 'Meta (min)', 'En meta', 'Causa de demora', 'Comentario', 'Hora editada', 'Recibido'];
 /** Marcas de planta como «etapas» 9…13 de la hoja Etapas: [nombre, desde, hasta, tramo, clave de detalle]. */
@@ -719,7 +726,7 @@ const UVA_ETAPAS_PLANTA: [string, string, string, string, string][] = [
 
 function pestanasUva(d: UvaDatos | null): Pestana[] {
   if (!d) return [];
-  const cabReg = [...UVA_BASE, ...UVA_BD, ...UVA_EXTRA, ...UVA_PLANTA, ...UVA_CARGA];
+  const cabReg = [...UVA_BASE, ...UVA_BD, ...UVA_EXTRA, ...UVA_PLANTA, ...UVA_CARGA, ...UVA_NOTAS];
   const cabEta = [...UVA_BASE, ...UVA_ETAPAS];
   const regs: unknown[][] = [cabReg];
   const etas: unknown[][] = [cabEta];
@@ -754,13 +761,20 @@ function pestanasUva(d: UvaDatos | null): Pestana[] {
     const pl = [origenTxt(f.origen), H(f.hora_llegada), H(f.hora_recepcion), vNum(f.t_espera_recepcion), H(f.ini_descarga), vNum(f.t_espera_descarga),
       H(f.fin_descarga), vNum(f.t_descarga), H(f.ini_abastecimiento), vNum(f.t_espera_abastecimiento), f.linea || '', MU(f.planta_destino),
       vNum(f.t_en_planta), vNum(f.t_llegada_desde_carga), vNum(f.t_ciclo_completo), f.planta_usuario || '', f.planta_obs || '', causas];
-    regs.push([...base, ...bd, ...extra, ...pl, vNum(r.cargaCarg), vNum(r.cargaTot), r.editadoPor || '']);
+    // Causa y comentario de cada etapa de campo en una sola celda: «7. Carga: Falta de camión - esperó guía | …».
+    const notasCampo = et.map((x) => {
+      const t = [x.causa, x.comentario ?? x.com].map((v) => String(v ?? '').trim()).filter(Boolean).join(' - ');
+      return t ? (x.n ? x.n + '. ' : '') + (x.etapa || '') + ': ' + t : '';
+    }).filter(Boolean).join(' | ');
+    const porTxt = ({ campo: 'Campo', planta: 'Planta', camion: 'Mismo camión (placa ± 30 min)' } as Record<string, string>)[f.llegada_por] || '';
+    regs.push([...base, ...bd, ...extra, ...pl, vNum(r.cargaCarg), vNum(r.cargaTot), r.editadoPor || '',
+      notasCampo, porTxt, f.llegada_ref || '']);
 
     const comun = (n: unknown, etapa: string) => [...base, vNum(f.semana ?? r.semana), serialF(f.fecha || r.fecha), zona, fundo, r.lote || f.lote || '',
       r.variedad || f.variedad || '', r.grupo || f.grupo || '', planta, esPlanta ? (f.estado || '') : (r.estado || 'Cerrado'), n, etapa];
     for (const x of et) {
       etas.push([...comun(vNum(x.n), x.etapa || ''), H(x.inicio), H(x.fin), vNum(x.minutos), vNum(x.espera), vNum(x.meta), x.enMeta || '',
-        x.causa || '', x.comentario || '', x.editado || '', H(f.campo_recibido)]);
+        x.causa || '', x.comentario || x.com || '', x.editado || '', H(f.campo_recibido)]);
     }
     if (f.vinculado || esPlanta) {
       UVA_ETAPAS_PLANTA.forEach(([nombre, desde, hasta, tramo, k], i) => {
@@ -887,6 +901,12 @@ Deno.serve(async (req) => {
       ['Estado', (f) => f.cerrado ? 'Cerrado' : 'En curso'],
       ['Registrado por', (f) => quien(f.creado_por)], TS('creado_en', 'Creado'), TS('actualizado_en', 'Actualizado'),
       TX('cultivo', 'Cultivo'),
+      // Comentarios que faltaban (0033) y todos juntos en una celda; al final para no mover columnas.
+      TX('obs_cosecha', 'Obs. cosecha'), TX('obs_moto', 'Obs. motocarga'), TX('obs_camion', 'Obs. carga camión'),
+      ['Comentarios (todas las etapas)', (f) => OBS_CICLOS.map(([k, t]) => {
+        const v = String(f[k] ?? '').trim();
+        return v ? t + ': ' + v : '';
+      }).filter(Boolean).join(' | ')],
     ];
     const colsResumen: Col[] = [
       ['Semana', (f) => f._semana], TX('fundo', 'Fundo'), NU('n_muestras', 'N° muestras', 0),

@@ -147,7 +147,8 @@ SHEETS.subir = function (silencioso) {
 
 /* ------------------------------ llegada del camión (compartida con Planta) ------------------------------
  * El fin de la etapa 8 (Traslado a planta) es la llegada del camión: la marca campo o planta, la que
- * llegue primero. Si la marcó planta, aquí se completa la etapa 8 (y se vuelve a subir igual). */
+ * llegue primero. Si la marcó planta, aquí se completa la etapa 8 (y se vuelve a subir igual).
+ * Desde 0063 también llega la de otro pallet del mismo camión (misma placa, salida a ± 30 min). */
 SHEETS.ponerLlegada = function (r, d) {
   if (!r || !d || !d.llegada || r.estado === 'cerrado') return;
   var x = r.etapas.tra;
@@ -155,9 +156,12 @@ SHEETS.ponerLlegada = function (r, d) {
   if (!x.ini) x.ini = r.etapas.car.fin || '';
   x.fin = new Date(d.llegada).toISOString();
   x.porPlanta = true; x.editado = false;
+  // 0063: la llegada puede venir de otro pallet del mismo camión (misma placa, salida a ± 30 min).
+  if (d.llegada_por === 'camion') x.porCamion = true; else delete x.porCamion;
   if (!r.planta && d.planta) r.planta = d.planta;
   TC.guardarRegistro(r); ALERTAS.sync(r);
-  DR.toast('Planta marcó la llegada del camión' + (r.placa ? ' ' + r.placa : '') + ' · ' + DR.hhmm(x.fin) + '.', 'info');
+  DR.toast((x.porCamion ? 'Llegada tomada de otro pallet del mismo camión' : 'Planta marcó la llegada del camión') +
+    (r.placa ? ' ' + r.placa : '') + ' · ' + DR.hhmm(x.fin) + '.', 'info');
   if (DR.vista === 'registrar' && window.REG && REG.id === r.id && REG.vista === 'wiz') REG.pintarWiz(DR.$('#contenido'), r, 0);
   SHEETS.pronto();
 };

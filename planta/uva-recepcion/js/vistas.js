@@ -17,6 +17,13 @@ VIS.progreso = function (r) {
   }).join('') + '</div>';
 };
 
+/** Pestañas Hoy / Resumen (arriba de ambas vistas). */
+VIS.pestanas = function (activa) {
+  return '<nav class="pl-pestanas" aria-label="Secciones">' + [['hoy', 'Hoy'], ['resumen', 'Resumen']].map(function (x) {
+    return '<a href="#' + x[0] + '" class="' + (x[0] === activa ? 'activa' : '') + '"' + (x[0] === activa ? ' aria-current="page"' : '') + '>' + x[1] + '</a>';
+  }).join('') + '</nav>';
+};
+
 /* ================================================================ HOY */
 VIS.hoy = function (c) {
   var puede = AT.puedeCapturar() && AT.tieneAcceso('planta.uva.recepcion');
@@ -26,7 +33,7 @@ VIS.hoy = function (c) {
       return '<article class="pl-tarjeta entra"><div class="pl-tarjeta-cab"><b class="pl-placa">' + DR.esc(r.placa) + '</b>' + VIS.chipOrigen(r) + '</div>' +
         '<div class="pl-dato">' + DR.esc([r.fundo, r.lote, r.variedad].filter(Boolean).join(' · ') || 'Sin lote') + (r.pallet ? ' · Pallet <b>' + DR.esc(r.pallet) + '</b>' : '') + '</div>' +
         '<div class="pl-sub">' + DR.esc(r.registrador || '') + ' · ' + (r.fin_carga ? 'Carga terminó ' + PL.horaCorta(r.fin_carga) : DR.esc(r.etapa_actual || r.estado || '')) +
-          (r.planta ? ' · ' + DR.esc(r.planta) : '') + (r.hora_llegada ? ' · <b>Llegó ' + PL.horaCorta(r.hora_llegada) + '</b> (marcado en campo)' : '') + '</div>' +
+          (r.planta ? ' · ' + DR.esc(r.planta) : '') + (r.hora_llegada ? ' · <b>Llegó ' + PL.horaCorta(r.hora_llegada) + '</b> (' + (r.llegada_por === 'camion' ? 'tomada de otro pallet del mismo camión' : r.llegada_por === 'planta' ? 'marcada en planta' : 'marcada en campo') + ')' : '') + '</div>' +
         (puede ? '<button class="btn verde chico" data-continuar="' + DR.esc(r.id) + '" type="button">Continuar en planta</button>' : '') + '</article>';
     };
     var tarjetaPlanta = function (r) {
@@ -46,7 +53,7 @@ VIS.hoy = function (c) {
     DR.entrarPaneles('#plListas');
   };
 
-  c.innerHTML = '<div class="vista angosta">' +
+  c.innerHTML = '<div class="vista angosta">' + VIS.pestanas('hoy') +
     UI.encabezado('Ingeniería · Planta', 'Recepción Uva', 'Continúa por la placa un ciclo de campo de hoy, o inicia uno desde planta.') +
     '<div class="pl-buscar entra"><input id="plPlaca" placeholder="Buscar placa (ej. ABC123)" autocomplete="off" autocapitalize="characters" value="' + DR.esc(VIS.filtro) + '">' +
       '<button class="btn sec" id="plRecargar" type="button" title="Actualizar">↻</button></div>' +

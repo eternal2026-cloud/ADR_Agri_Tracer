@@ -316,7 +316,7 @@ RESULTADO.valorLinea = function (v) {
 
 RESULTADO.mapaLado = function (lado) {
   var n = DATOS.normalizar(lado);
-  var izq = /IZQ/.test(n), der = /DER/.test(n);
+  var izq = DATOS.ladoAB(lado) === 'A', der = DATOS.ladoAB(lado) === 'B';
   if (!izq && !der) return '';
   return '<svg class="lado-mapa" viewBox="0 0 120 44" aria-hidden="true">' +
     '<rect class="zona' + (izq ? ' on' : '') + '" x="1" y="3" width="42" height="38" rx="7"/>' +
@@ -348,6 +348,8 @@ RESULTADO.htmlEncontrado = function (res) {
       RESULTADO.item('lado', 'Lado', f.lado, RESULTADO.mapaLado(f.lado)) +
       RESULTADO.item('labor', 'Labor', f.labor) +
     '</div>' +
+    (f.supervisor || f.clasificacion ? '<div class="res-obs"><b>Supervisor</b>' + DR.esc(f.supervisor || '—') +
+      (f.clasificacion ? '<b style="margin-top:8px">Clasificación</b>' + DR.esc(f.clasificacion + (DATOS.NOMBRES_CLASIF[f.clasificacion] ? ' · ' + DATOS.NOMBRES_CLASIF[f.clasificacion] : '')) : '') + '</div>' : '') +
     (f.obs ? '<div class="res-obs"><b>Observación</b>' + DR.esc(f.obs) + '</div>' : '');
 };
 

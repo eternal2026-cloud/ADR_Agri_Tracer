@@ -68,10 +68,10 @@ DATOS.aplicar = function (filas, origen) {
 
 /* ------------------------------ fuente: Supabase ------------------------------ */
 DATOS.cargarDesdeServidor = function () {
-  return sb.from('reub_personal').select('dni,nombre,linea,lado,labor,obs').eq('activo', true).then(function (r) {
+  return sb.from('reub_personal').select('dni,nombre,linea,lado,labor,supervisor,clasificacion,obs').eq('activo', true).then(function (r) {
     if (r.error) throw new Error(r.error.message || 'No se pudo consultar la lista de reubicación.');
     var filas = r.data.map(function (f) {
-      return { dni: DATOS.claveDoc(f.dni), nombre: f.nombre || '', linea: f.linea || '', lado: f.lado || '', labor: f.labor || '', obs: f.obs || '' };
+      return { dni: DATOS.claveDoc(f.dni), nombre: f.nombre || '', linea: f.linea || '', lado: f.lado || '', labor: f.labor || '', supervisor: f.supervisor || '', clasificacion: f.clasificacion || '', obs: f.obs || '' };
     });
     DATOS._guardar(DATOS.CLAVE_CACHE, filas);
     return DATOS.aplicar(filas, 'servidor');
@@ -102,6 +102,8 @@ DATOS.COLUMNAS = [
   { id: 'linea',  prueba: /LINEA/ },
   { id: 'lado',   prueba: /\bLADO\b/ },
   { id: 'labor',  prueba: /LABOR|PUESTO|ACTIVIDAD|FUNCION|TAREA/ },
+  { id: 'supervisor',    prueba: /SUPERVISOR|ENCARGAD/ },
+  { id: 'clasificacion', prueba: /CLASIFIC|RENDIMIENTO/ },
   { id: 'obs',    prueba: /OBSERV|COMENTARIO|\bNOTA/ },
   { id: 'nombre', prueba: /NOMBRE|APELLIDO|TRABAJADOR|COLABORADOR/ }
 ];
@@ -140,13 +142,21 @@ DATOS.leerLibro = function (buffer, nombreArchivo) {
     return String(v === undefined || v === null ? '' : v).replace(/\s+/g, ' ').trim();
   };
 
-  var lista = [], vistos = {}, sinDoc = 0, duplicados = [], incompletos = 0;
+  var lista = [], vistos = {}, sinDoc = 0, duplicados = [], incompletos = 0, ladoMal = [], clasMal = [], lineaMal = [];
   for (var i = elegido.fila + 1; i < elegido.filas.length; i++) {
     var f = elegido.filas[i];
-    var reg = { dni: DATOS.claveDoc(valor(f, 'dni')), nombre: valor(f, 'nombre'), linea: valor(f, 'linea'), lado: valor(f, 'lado'), labor: valor(f, 'labor'), obs: valor(f, 'obs') };
+    var reg = { dni: DATOS.claveDoc(valor(f, 'dni')), nombre: valor(f, 'nombre'), linea: valor(f, 'linea'), lado: valor(f, 'lado'), labor: valor(f, 'labor'),
+                supervisor: valor(f, 'supervisor'), clasificacion: valor(f, 'clasificacion'), obs: valor(f, 'obs') };
     if (!reg.dni && !reg.nombre && !reg.linea && !reg.lado && !reg.labor) continue;
     if (!reg.dni) { sinDoc++; continue; }
     if (vistos[reg.dni]) { duplicados.push(reg.dni); continue; }
+    // lado solo A o B; clasificación solo AR, MR o BR (la base rechaza otros valores)
+    if (reg.lado) { var ld = DATOS.ladoAB(reg.lado); if (!ld) ladoMal.push(reg.dni); reg.lado = ld; }
+    if (reg.clasificacion) { var cl = DATOS.clasif(reg.clasificacion); if (!cl) clasMal.push(reg.dni); reg.clasificacion = cl; }
+    // línea 1–6; si la labor es LIMPIEZA, línea 1–16
+    var nLinea = parseInt((reg.linea.match(/\d+/) || [''])[0], 10);
+    var maxLinea = /LIMPIEZA/.test(DATOS.normalizar(reg.labor)) ? 16 : 6;
+    if (reg.linea && (!(nLinea >= 1) || nLinea > maxLinea)) lineaMal.push(reg.dni);
     if (!reg.nombre || !reg.linea || !reg.lado || !reg.labor) incompletos++;
     vistos[reg.dni] = true;
     lista.push(reg);
@@ -159,9 +169,31 @@ DATOS.leerLibro = function (buffer, nombreArchivo) {
   if (sinDoc) avisos.push(sinDoc + ' fila(s) sin DNI fueron omitidas.');
   if (duplicados.length) avisos.push(duplicados.length + ' DNI repetido(s); se usó la primera fila: ' + duplicados.slice(0, 5).join(', ') + (duplicados.length > 5 ? '…' : ''));
   if (incompletos) avisos.push(incompletos + ' trabajador(es) con datos incompletos.');
+  var muestra = function (l) { return l.slice(0, 5).join(', ') + (l.length > 5 ? '…' : ''); };
+  if (ladoMal.length) avisos.push(ladoMal.length + ' lado(s) no son A ni B y quedaron vacíos: ' + muestra(ladoMal));
+  if (clasMal.length) avisos.push(clasMal.length + ' clasificación(es) no son AR, MR ni BR y quedaron vacías: ' + muestra(clasMal));
+  if (lineaMal.length) avisos.push(lineaMal.length + ' línea(s) fuera de rango (1–6, o 1–16 en LIMPIEZA): ' + muestra(lineaMal));
 
   return { filas: lista, meta: { archivo: nombreArchivo, hoja: elegido.hoja, fecha: new Date().toISOString(), avisos: avisos } };
 };
+
+/** "A", "LADO A" → "A"; "B", "LADO B" → "B"; cualquier otro valor → ''. */
+DATOS.ladoAB = function (v) {
+  var n = DATOS.normalizar(v).replace(/^LADO\s*/, '').trim();
+  return n === 'A' || n === 'B' ? n : '';
+};
+
+/** AR / MR / BR; acepta también "Alto rendimiento", "Mediano…", "Bajo…". */
+DATOS.clasif = function (v) {
+  var n = DATOS.normalizar(v).trim();
+  if (/^(AR|MR|BR)\b/.test(n)) return n.substring(0, 2);
+  if (/^ALTO/.test(n)) return 'AR';
+  if (/^(MEDIANO|MEDIO)/.test(n)) return 'MR';
+  if (/^BAJO/.test(n)) return 'BR';
+  return '';
+};
+
+DATOS.NOMBRES_CLASIF = { AR: 'Alto rendimiento', MR: 'Mediano rendimiento', BR: 'Bajo rendimiento' };
 
 /** Sube el resultado de leerLibro() a Supabase (reemplaza el roster completo). Requiere sesión admin. */
 DATOS.subirLote = function (filas) {

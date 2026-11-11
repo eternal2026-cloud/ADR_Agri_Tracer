@@ -111,6 +111,7 @@ VISTAS.filtrarPersonal = function () {
         '<span class="persona-dni">DNI ' + DR.esc(f.dni) + '</span>' +
         '<span class="etiquetas">' + (f.linea ? '<span class="tag linea">' + DR.esc(f.linea) + '</span>' : '') +
         (f.lado ? '<span class="tag lado">' + DR.esc(f.lado) + '</span>' : '') + (f.labor ? '<span class="tag labor">' + DR.esc(f.labor) + '</span>' : '') +
+        (f.clasificacion ? '<span class="tag">' + DR.esc(f.clasificacion) + '</span>' : '') + (f.supervisor ? '<span class="tag">Sup. ' + DR.esc(f.supervisor) + '</span>' : '') +
         '</span></span>' + DR.ICONOS.chevron + '</button>';
     }).join('') +
     (res.length > MAX ? '<div class="vacio">Mostrando ' + MAX + ' de ' + DR.num(res.length) + '. Escribe para afinar la búsqueda.</div>' : '');

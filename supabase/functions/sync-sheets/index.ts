@@ -913,7 +913,8 @@ Deno.serve(async (req) => {
       ...TRAMOS.map(([k, t]) => DU(k, t + ' (min:seg)')), DU('t_ciclo_total', 'Total ciclo (min:seg)'), NU('tiempo_horas', 'Horas'),
     ];
     const colsPersonal: Col[] = [
-      TX('dni', 'DNI'), TX('nombre', 'Nombre'), TX('linea', 'Línea'), TX('lado', 'Lado'), TX('labor', 'Labor'), TX('obs', 'Observación'),
+      TX('dni', 'DNI'), TX('nombre', 'Nombre'), TX('linea', 'Línea'), TX('lado', 'Lado'), TX('labor', 'Labor'),
+      TX('supervisor', 'Supervisor'), TX('clasificacion', 'Clasificación'), TX('obs', 'Observación'),
       ['Activo', (f) => f.activo ? 'Sí' : 'No'], ['Actualizado por', (f) => quien(f.actualizado_por)], TS('actualizado_en', 'Actualizado'),
     ];
     const colsEscaneos: Col[] = [

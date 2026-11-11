@@ -8,7 +8,7 @@
 var VISTAS = {};
 
 var DR = {
-  VERSION: '1.3.3-integra',
+  VERSION: '1.3.4-integra',
   vista: null,
   anima: (typeof anime === 'function') &&
     !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)

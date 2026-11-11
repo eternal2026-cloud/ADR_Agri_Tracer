@@ -354,7 +354,7 @@ CONFIG.editarVerCiclos = function (u) {
     '<div class="res-dni">Ciclos que puede ver en Tiempos de ciclo</div>' +
     '<div class="sep-titulo" style="margin-top:14px">Arándano</div>' + CONFIG.selectorVerCiclos('hojaVerCiclos', solo) +
     '<div class="sep-titulo" style="margin-top:14px">Uva</div>' + CONFIG.selectorVerCiclos('hojaVerCiclosUva', soloUva) +
-    '<div class="aviso" style="margin-top:14px"><b>Todos los ciclos:</b> ve los ciclos de cualquier persona en sus fundos asignados. En Uva además puede continuarlos y completarlos (ej. el auxiliar de carga) y su ciclo se une con el del mismo N° de pallet del día.<br>' +
+    '<div class="aviso" style="margin-top:14px"><b>Todos los ciclos:</b> ve los ciclos de cualquier persona en sus fundos asignados. En Uva además puede continuarlos y completarlos (ej. el auxiliar de carga). Dos ciclos iniciados por separado nunca se unen, aunque tengan el mismo N° de pallet.<br>' +
       '<b>Solo los suyos:</b> solo ve (y sigue) los ciclos que él mismo creó; en Uva no puede editar ni unirse a ciclos de otras personas. Los fundos asignados se siguen aplicando.</div>' +
     '<div class="acciones"><button type="button" class="btn sec" id="btnVerCiclosCancelar" style="flex:1">Cancelar</button>' +
     '<button type="button" class="btn verde" id="btnVerCiclosGuardar" style="flex:1">Guardar</button></div>');

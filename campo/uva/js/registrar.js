@@ -413,9 +413,9 @@ REG.enfocarDato = function (r, e) {
   if (c) { c.scrollIntoView({ behavior: 'smooth', block: 'center' }); if (c.focus) c.focus(); }
 };
 
-/** Otro ciclo con el mismo N° de pallet, la MISMA fecha y el mismo fundo: Integra los junta al subir (0058).
- *  Los N° cortos (0014, 0020…) se repiten de un día a otro: por eso ya no se mira el día anterior.
- *  Con «Solo sus ciclos» solo se une con los suyos. */
+/** Otro ciclo con el mismo N° de pallet, la MISMA fecha y el mismo fundo. Desde 0066 Integra solo los junta si
+ *  uno de los dos se creó con «Unirse a un pallet por su N°» (continuar sin señal). Dos inicios distintos nunca
+ *  se unen: los N° de pallet se repiten entre grupos, así que solo se avisa. */
 REG.mismoPallet = function (r) {
   var k = String(r.pallet || '').replace(/\s+/g, '').toUpperCase();
   if (!k) return null;
@@ -427,15 +427,19 @@ REG.mismoPallet = function (r) {
 };
 REG.avisoPallet = function (r) {
   var o = REG.mismoPallet(r);
-  return o ? '<div class="aviso">El pallet ' + DR.esc(r.pallet) + ' también lo registra ' + DR.esc(o.registrador || 'otro equipo') + ' (' + DR.esc(TC.titulo(o)) +
-    '). Al subir, Integra junta los dos en un solo ciclo: vale cada hora según cuándo se tomó.</div>' : '';
+  if (!o) return '';
+  return r.union
+    ? '<div class="aviso">Sigues el pallet ' + DR.esc(r.pallet) + ' de ' + DR.esc(o.registrador || 'otro equipo') + ' (' + DR.esc(TC.titulo(o)) +
+      '). Al subir, Integra junta tus etapas con las suyas en un solo ciclo.</div>'
+    : '<div class="aviso">Ya existe otro pallet N° ' + DR.esc(r.pallet) + ' de hoy: ' + DR.esc(o.registrador || 'otro equipo') + ' (' + DR.esc(TC.titulo(o)) +
+      '). Son ciclos distintos y no se unen. Si es el mismo pallet físico, no lo inicies de nuevo: búscalo en «Unirse a un pallet por su N°»; si no, revisa el número.</div>';
 };
 
 /**
  * «Unirse a un pallet por su N°»: el auxiliar que sigue el ciclo (de la carga en adelante) busca el
  * N° de pallet entre los ciclos en curso de todos los equipos (como la placa en Arándano) y lo
  * continúa. Sin señal o si aún no aparece, lo crea solo con el N°; al subir, Integra lo une al ciclo
- * del mismo N° de pallet y fecha sin perder los datos de nadie.
+ * del mismo N° de pallet y fecha sin perder los datos de nadie. Es la ÚNICA forma de unir dos ciclos (0066).
  */
 REG.unirse = function () {
   var hoy = DR.hoyISO(), q = '';

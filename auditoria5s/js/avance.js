@@ -9,6 +9,9 @@
  *     completa, sin notas de seguimiento), estado, fecha de cierre y fotos
  *     nuevas en las celdas Antes / Después (rpc_s5_obs_actualizar). Una fila sin
  *     N° conocido y con foto «Antes» se registra como observación nueva.
+ *   · Filas borradas → las observaciones de ESTA auditoría que faltan en el Excel
+ *     (y cuya zona sí viene en él) se eliminan (rpc_s5_obs_eliminar, 0070; queda
+ *     copia en s5_obs_eliminadas). En la revisión se pueden desmarcar.
  * Fotos: lee las que flotan sobre la celda (ExcelJS) y las «imagen en celda» de
  * Excel 365 (richData, leídas del .xlsx). Se comparan por huella (dHash) con las
  * de la app y solo se suben las que no estén ya.
@@ -370,7 +373,8 @@ AV.abrir = function (opc) {
         '<div class="res-estado" style="color:#7FD3F2">' + DR.ICONOS.subir + '<span>Excel de avance</span></div>' +
         '<div class="res-nombre">' + S5.iconoCultivo(cul, 26) + ' ' + DR.esc(cul ? cul.nombre : '') + '</div>' +
         '<div class="res-dni" style="letter-spacing:0">Sube el Excel con la misma estructura que «Descargar Excel» de Observaciones (hojas del área + hoja BD). ' +
-          'Antes de aplicar verás qué cambia: puntajes, nombres de zona, datos de la auditoría y observaciones (textos, estado y fotos nuevas).</div>' +
+          'Antes de aplicar verás qué cambia: puntajes, nombres de zona, datos de la auditoría y observaciones (textos, estado y fotos nuevas). ' +
+          'Si borraste la fila de una observación de esta auditoría, esa observación se elimina (podrás desmarcarla en la revisión).</div>' +
         '<div class="form" style="margin-top:14px">' +
           '<div class="campo ancho"><label for="avAud">Auditoría a actualizar<em>obligatorio</em></label><select id="avAud">' +
             '<option value="">Elige la auditoría</option>' + AV.auds.map(function (a) {
@@ -417,13 +421,13 @@ AV.abrir = function (opc) {
 /* ------------------------------------------------------------ lectura y comparación */
 AV.analizar = function (aud, archivo, progreso) {
   var area = S5.area(aud.area_id) || {}, buf, wb, enCelda;
-  var plan = { aud: aud, cabecera: {}, cabTxt: [], zonas: [], obs: [], avisos: [], otras: 0 };
+  var plan = { aud: aud, cabecera: {}, cabTxt: [], zonas: [], obs: [], eliminar: [], avisos: [], otras: 0 };
   return archivo.arrayBuffer().then(function (b) {
     buf = b;
     return INF.excelJS();
   }).then(function (ExcelJS) {
     wb = new ExcelJS.Workbook();
-    return wb.xlsx.load(buf).catch(function () { throw new Error('No se pudo leer el archivo. ¿Es un Excel .xlsx?'); });
+    return wb.xlsx.load(buf).catch(function () { throw new Error('No se pudo abrir el archivo. Revisa que sea un Excel .xlsx (no .xls ni .csv) y que no esté abierto con errores o dañado.'); });
   }).then(function () {
     progreso('Leyendo fotos y figuras…');
     return AV.fotosDelLibro(buf, wb);
@@ -441,7 +445,7 @@ AV.analizar = function (aud, archivo, progreso) {
     AV.leerBD(wb, aud, area, bd, plan);
     return AV.leerObservaciones(wb, enCelda, aud, area, obs, plan, progreso);
   }).then(function () {
-    if (!plan.hojaBD && !plan.hojasObs) throw new Error('El Excel no tiene la hoja BD ni hojas de Observaciones con la estructura de la descarga.');
+    if (!plan.hojaBD && !plan.hojasObs) throw new Error('Este Excel no tiene el formato de «Descargar Excel»: no tiene la hoja «BD» ni hojas con las columnas ZONA, OBSERVACIONES y ESTADO.');
     return plan;
   });
 };
@@ -463,7 +467,7 @@ AV.leerBD = function (wb, aud, area, bd, plan) {
     var x = AV.titulos(h, ['n zona', 's', 'n auditoria']);
     if (x) { ws = h; t = x; }
   });
-  if (!ws) { plan.avisos.push('No se encontró la hoja BD: no se revisan puntajes ni datos de la auditoría.'); return; }
+  if (!ws) { plan.avisos.push('El Excel no tiene la hoja «BD» (la de puntajes): los puntajes y los datos de la auditoría se dejan como están. Solo se revisan las observaciones.'); return; }
   plan.hojaBD = ws.name;
   var c = t.col, celda = function (fila, k) { return c[k] ? AV.valor(fila.getCell(c[k])) : null; };
   var filas = [];
@@ -482,11 +486,11 @@ AV.leerBD = function (wb, aud, area, bd, plan) {
   var elegidas = delArea.filter(function (x) { return x.num === aud.numero_auditoria; });
   if (!elegidas.length && nums.length === 1) {
     elegidas = delArea;
-    plan.avisos.push('La hoja BD trae la auditoría N° ' + nums[0] + ': se aplica a la N° ' + aud.numero_auditoria + ' que elegiste.');
+    plan.avisos.push('La hoja «BD» es de la auditoría N° ' + nums[0] + ', pero elegiste la N° ' + aud.numero_auditoria + '. Sus puntajes se cargarán en la N° ' + aud.numero_auditoria + '; si no es la correcta, toca «Volver» y elige otra.');
   }
   if (!elegidas.length) {
-    plan.avisos.push(delArea.length ? 'La hoja BD no tiene filas de la auditoría N° ' + aud.numero_auditoria + ' (trae las N° ' + nums.join(', ') + ').'
-      : 'La hoja BD no tiene filas del área ' + area.nombre + '.');
+    plan.avisos.push(delArea.length ? 'La hoja «BD» no tiene puntajes de la auditoría N° ' + aud.numero_auditoria + ' (solo de la(s) N° ' + nums.join(', ') + '): los puntajes se dejan como están.'
+      : 'La hoja «BD» no tiene puntajes del área ' + area.nombre + ': los puntajes se dejan como están.');
     return;
   }
 
@@ -499,7 +503,7 @@ AV.leerBD = function (wb, aud, area, bd, plan) {
   cambio('tipo', 'Tipo', tipo, aud.tipo);
   cambio('campana', 'Campaña', p.campana, aud.campana);
   cambio('planta', 'Planta', p.planta, aud.planta);
-  if (plan.cabecera.fecha && plan.cabecera.fecha > S5.hoy()) { delete plan.cabecera.fecha; plan.avisos.push('La fecha de la hoja BD está en el futuro: no se cambia.'); }
+  if (plan.cabecera.fecha && plan.cabecera.fecha > S5.hoy()) { delete plan.cabecera.fecha; plan.avisos.push('La fecha de la hoja «BD» (' + S5.fecha(p.fecha) + ') es posterior a hoy: se mantiene la fecha de la auditoría (' + S5.fecha(aud.fecha) + ').'); }
 
   // puntajes actuales por zona y S
   var actual = {};
@@ -517,14 +521,14 @@ AV.leerBD = function (wb, aud, area, bd, plan) {
         var it = S5.items.filter(function (q) { return q.s === x.s && q.numero === i + 1; })[0];
         if (!it) return;
         if (isNaN(v) || [0, 0.5, 1, 1.5, 2].indexOf(v) < 0) {
-          plan.avisos.push('BD fila ' + x.fila + ' · zona ' + num + ' · ' + x.s + 'S-' + (i + 1) + ': puntaje «' + AV.texto(x.items[i]) + '» no válido (0, 0.5, 1, 1.5 o 2).');
+          plan.avisos.push('Hoja «BD», fila ' + x.fila + ' (zona ' + num + ', ítem ' + x.s + 'S-' + (i + 1) + '): el puntaje «' + AV.texto(x.items[i]) + '» no es válido. Solo se acepta 0, 0.5, 1, 1.5 o 2; ese ítem se deja como está.');
           return;
         }
         var antes = b && b['i' + (i + 1)] !== null && b['i' + (i + 1)] !== undefined ? Number(b['i' + (i + 1)]) : null;
         if (antes !== v) item.puntajes.push({ s: x.s, numero: i + 1, puntaje: v, antes: antes });
       });
     });
-    if (item.nueva && !nombre) { plan.avisos.push('La zona N° ' + num + ' no existe y no tiene nombre en la hoja BD: no se crea.'); return; }
+    if (item.nueva && !nombre) { plan.avisos.push('Hoja «BD»: la zona N° ' + num + ' no existe en la app y no tiene nombre (columna SUB ÁREA), así que no se crea. Escribe su nombre y vuelve a subir el Excel.'); return; }
     if (item.renombrar || item.nueva || item.puntajes.length) plan.zonas.push(item);
   });
 };
@@ -539,7 +543,7 @@ AV.leerObservaciones = function (wb, fotosLibro, aud, area, obs, plan, progreso)
     if (!c.area) {
       areaHoja = S5.areas.filter(function (a) { return AV.norm(a.nombre) === deHoja; })[0] || null;
       if (!areaHoja && (deHoja === 'observaciones' || deHoja.indexOf('observaciones') === 0)) areaHoja = area;
-      if (!areaHoja) { plan.avisos.push('La hoja «' + ws.name + '» no corresponde a un área conocida: se omite.'); return; }
+      if (!areaHoja) { plan.avisos.push('La hoja «' + ws.name + '» no tiene el nombre de ningún área, así que no se lee. Si es del área ' + area.nombre + ', cámbiale el nombre a «' + area.nombre + '».'); return; }
       if (areaHoja.id !== area.id) { plan.otras++; return; }
     }
     plan.hojasObs++;
@@ -552,9 +556,9 @@ AV.leerObservaciones = function (wb, fotosLibro, aud, area, obs, plan, progreso)
       var fAntes = fotosDe(n, c.antes), fDespues = fotosDe(n, c.despues);
       if (!desc && !zonaTxt && !fAntes.length) continue;
       if (c.area && AV.norm(val(f, 'area')) && AV.norm(val(f, 'area')) !== AV.norm(area.nombre)) { plan.otras++; continue; }
-      var hallada = AV.buscarZona(zonaTxt, zonasArea, area), z = hallada && hallada.z, ref = '«' + ws.name + '» fila ' + n;
-      if (!z) { plan.avisos.push(ref + ': la zona «' + zonaTxt + '» no existe en ' + area.nombre + '. Se omite.'); continue; }
-      if (hallada.aprox) plan.avisos.push(ref + ': zona «' + zonaTxt + '» tomada como ' + S5.nombreZona(z) + ' (coincidencia aproximada).');
+      var hallada = AV.buscarZona(zonaTxt, zonasArea, area), z = hallada && hallada.z, ref = 'Fila ' + n + ' de «' + ws.name + '»';
+      if (!z) { plan.avisos.push(ref + ': la zona «' + zonaTxt + '» no existe en el área ' + area.nombre + ', así que esta fila no se carga. Escribe el nombre de la zona tal como figura en la app.'); continue; }
+      if (hallada.aprox) plan.avisos.push(ref + ': la zona «' + zonaTxt + '» no coincide exactamente con ninguna; se tomó como «' + S5.nombreZona(z) + '». Si no es esa, corrige el nombre en el Excel.');
       var o = num ? obs.filter(function (x) { return x.zona_id === z.id && x.numero === num; })[0] : null;
       tareas.push({ ref: ref, hoja: ws.name, fila: n, z: z, o: o || null, num: num, desc: desc, accion: AV.texto(val(f, 'accion correctiva')),
         estadoTxt: AV.texto(val(f, 'estado')), cierre: c['fecha de cierre'] ? AV.iso(val(f, 'fecha de cierre')) : undefined,
@@ -571,9 +575,31 @@ AV.leerObservaciones = function (wb, fotosLibro, aud, area, obs, plan, progreso)
     return nums.length > 0 && o.numero > Math.min.apply(null, nums) - margen && o.numero < Math.max.apply(null, nums) + margen;
   };
   var faltan = obs.filter(function (o) { return cerca(o, 3); });
-  faltan.filter(function (o) { return cerca(o, 0); }).forEach(function (o) {
-    plan.avisos.push('N° ' + o.numero + ' · ' + S5.nombreZona(S5.zonas.filter(function (z) { return z.id === o.zona_id; })[0] || {}) +
-      ': no figura en el Excel. Si borraste su fila, en la app sigue igual (el Excel de avance no elimina observaciones) y sus fotos no pasan a otra fila; si ya no corresponde, cámbiale el estado desde la app.');
+  var nomZona = function (o) { return S5.nombreZona(S5.zonas.filter(function (z) { return z.id === o.zona_id; })[0] || {}); };
+
+  // Filas borradas a mano: las observaciones de ESTA auditoría que no están en el Excel se eliminan,
+  // siempre que el Excel traiga filas de su zona (si la zona no viene, el Excel se descargó filtrado).
+  var zonasExcel = tareas.map(function (t) { return t.z.id; });
+  var sinZona = [];
+  plan.eliminar = [];
+  if (plan.hojasObs) obs.forEach(function (o) {
+    if (o.auditoria_id !== aud.id || enExcel.indexOf(o) > -1) return;
+    if (zonasExcel.indexOf(o.zona_id) < 0) { sinZona.push(o); return; }
+    if (AT.esAdmin() || S5.enPlazoObs(o)) { plan.eliminar.push({ o: o, z: S5.zona(o.zona_id) || {} }); return; }
+    plan.avisos.push('N° ' + o.numero + ' · ' + nomZona(o) + ': borraste su fila, pero no se eliminará porque el plazo para modificarla venció el ' +
+      S5.fecha(S5.limiteObs(o)) + '. Si de verdad debe eliminarse, pide a un administrador que suba el Excel.');
+  });
+  if (sinZona.length) {
+    var nombres = [];
+    sinZona.forEach(function (o) { var n = nomZona(o); if (nombres.indexOf(n) < 0) nombres.push(n); });
+    plan.avisos.push('El Excel no trae ninguna fila de ' + (nombres.length === 1 ? 'la zona ' : 'las zonas ') + nombres.join(', ') + ', así que sus ' +
+      sinZona.length + ' observación(es) de esta auditoría se dejan como están (no se eliminan). Si quieres eliminarlas, deja al menos una fila de esa zona en el Excel.');
+  }
+  // De otras auditorías no se elimina nada: solo se avisa.
+  faltan.filter(function (o) { return cerca(o, 0) && o.auditoria_id !== aud.id; }).forEach(function (o) {
+    var codigo = (AV.auds.filter(function (a) { return a.id === o.auditoria_id; })[0] || {}).codigo;
+    plan.avisos.push('N° ' + o.numero + ' · ' + nomZona(o) + ': no está en el Excel, pero es de otra auditoría' + (codigo ? ' (' + codigo + ')' : '') +
+      ', así que no se elimina. Si ya no corresponde, cámbiale el estado desde la app.');
   });
   var fotosDeObs = function (o) {
     return S5.fotosDe(o, 'antes').concat(S5.fotosDe(o, 'despues')).map(function (ruta) { return { ruta: ruta, o: o }; });
@@ -617,17 +643,17 @@ AV.leerObservaciones = function (wb, fotosLibro, aud, area, obs, plan, progreso)
 /** Arma el cambio de una fila de observaciones (o el alta, si es nueva). */
 AV.compararObs = function (t, aud, plan) {
   var o = t.o, estado = AV.estado(t.estadoTxt);
-  if (estado === undefined) plan.avisos.push(t.ref + ': estado «' + t.estadoTxt + '» no reconocido (' + S5.ESTADOS.join(', ') + '). No se cambia.');
+  if (estado === undefined) plan.avisos.push(t.ref + ': el estado «' + t.estadoTxt + '» no se reconoce, así que el estado se deja como está. Usa uno de estos: ' + S5.ESTADOS.join(', ') + '.');
 
   // La celda completa es la acción correctiva (ya no hay notas de seguimiento).
   var accion = t.accion;
 
   if (!o) {
-    if (!t.desc) { plan.avisos.push(t.ref + ': fila sin texto de observación. Se omite.'); return Promise.resolve(); }
+    if (!t.desc) { plan.avisos.push(t.ref + ': la fila no tiene texto en la columna «Observaciones», así que no se carga.'); return Promise.resolve(); }
     return AV.fotosNuevas(t.fAntes, [], t.ajenas).then(function (fa) {
       AV.avisoAjenas(plan, t.ref + (t.num ? ' (N° ' + t.num + ')' : ''), fa);
       if (!fa.nuevas.length) {
-        plan.avisos.push(t.ref + (t.num ? ' (N° ' + t.num + ')' : '') + ': no existe en la app y no tiene foto «Antes» propia en la celda: no se puede registrar.');
+        plan.avisos.push(t.ref + (t.num ? ' (N° ' + t.num + ')' : '') + ': es una observación nueva, pero no tiene su propia foto en «Antes». No se registra: toda observación nueva necesita al menos una foto «Antes».');
         return;
       }
       return AV.fotosNuevas(t.fDespues, [], t.ajenas).then(function (fd) {
@@ -641,12 +667,12 @@ AV.compararObs = function (t, aud, plan) {
   var cambios = [], p = { id: o.id, origen: 'excel' };
   var plazo = AT.esAdmin() || S5.enPlazoObs(o), bloqueados = [];
   if (t.desc && AV.blando(t.desc) !== AV.blando(o.descripcion)) {
-    if (plazo) { p.descripcion = t.desc; cambios.push('Observación: «' + DR.recortar(t.desc, 90) + '»'); } else bloqueados.push('observación');
+    if (plazo) { p.descripcion = t.desc; cambios.push('Observación: «' + DR.recortar(t.desc, 90) + '»'); } else bloqueados.push('la observación');
   }
   if (AV.blando(accion) !== AV.blando(o.accion_correctiva)) {
-    if (plazo) { p.accion_correctiva = accion; cambios.push('Acción correctiva: ' + (accion ? '«' + DR.recortar(accion, 90) + '»' : '(vacía)')); } else bloqueados.push('acción correctiva');
+    if (plazo) { p.accion_correctiva = accion; cambios.push('Acción correctiva: ' + (accion ? '«' + DR.recortar(accion, 90) + '»' : '(vacía)')); } else bloqueados.push('la acción correctiva');
   }
-  if (bloqueados.length) plan.avisos.push(t.ref + ' (N° ' + o.numero + '): cambió ' + bloqueados.join(' y ') + ', pero el plazo para editar textos venció el ' + S5.fecha(S5.limiteObs(o)) + '. Solo un administrador puede hacerlo.');
+  if (bloqueados.length) plan.avisos.push(t.ref + ' (N° ' + o.numero + '): cambiaste el texto de ' + bloqueados.join(' y ') + ', pero el plazo para editarlo venció el ' + S5.fecha(S5.limiteObs(o)) + '. Ese texto se deja como está; pide a un administrador que suba el Excel.');
   if (estado && estado !== o.estado) { p.estado = estado; cambios.push('Estado: ' + o.estado + ' → ' + estado); }
   var estadoFinal = p.estado || o.estado;
   if (t.cierre !== undefined && (t.cierre || null) !== (o.fecha_cierre || null) && !(!t.cierre && estadoFinal === 'Cerrado')) {
@@ -672,9 +698,9 @@ AV.compararObs = function (t, aud, plan) {
       if (dist) cambios.push(dist + ' foto(s) «' + x[1] + '» distinta(s) a la de la app: se cambia por la del Excel');
     });
     if (r[0].quitadas || r[1].quitadas) plan.avisos.push(t.ref + ' (N° ' + o.numero + '): ' + ((r[0].quitadas || 0) + (r[1].quitadas || 0)) +
-      ' foto(s) de la celda ya se borraron en la app: no se vuelven a subir. Si sí van, agrégalas desde la app.');
-    if (r[0].sobran || r[1].sobran) plan.avisos.push(t.ref + ' (N° ' + o.numero + '): hay más fotos de las que caben (máximo ' + FOTOS.MAX + ' por tipo); se agregan las primeras.');
-    if (r[0].ilegibles || r[1].ilegibles) plan.avisos.push(t.ref + ' (N° ' + o.numero + '): ' + ((r[0].ilegibles || 0) + (r[1].ilegibles || 0)) + ' imagen(es) en un formato que el navegador no lee (p. ej. EMF). Pégalas como JPG o PNG.');
+      ' foto(s) de esta fila ya se habían borrado en la app, así que no se vuelven a subir. Si sí deben ir, agrégalas desde la app.');
+    if (r[0].sobran || r[1].sobran) plan.avisos.push(t.ref + ' (N° ' + o.numero + '): tiene más de ' + FOTOS.MAX + ' fotos «Antes» o «Después»; solo se agregan las primeras ' + FOTOS.MAX + '.');
+    if (r[0].ilegibles || r[1].ilegibles) plan.avisos.push(t.ref + ' (N° ' + o.numero + '): ' + ((r[0].ilegibles || 0) + (r[1].ilegibles || 0)) + ' imagen(es) en un formato que no se puede leer (por ejemplo, EMF). Cópialas y pégalas en el Excel como JPG o PNG.');
     if (!cambios.length) return;
     plan.obs.push({ tipo: 'cambio', ref: t.ref, o: o, z: t.z, p: p, cambios: cambios, fotosAntes: r[0].nuevas, fotosDespues: r[1].nuevas,
       reemplazosAntes: r[0].reemplazos, reemplazosDespues: r[1].reemplazos });
@@ -683,8 +709,8 @@ AV.compararObs = function (t, aud, plan) {
 
 AV.avisoAjenas = function (plan, ref, r) {
   (r.deOtras || []).forEach(function (o) {
-    plan.avisos.push(ref + ': una foto de la celda es de la N° ' + o.numero + ' (' + S5.nombreZona(S5.zonas.filter(function (z) { return z.id === o.zona_id; })[0] || {}) +
-      '); quedó en esta fila por error (por ejemplo, al borrar una fila). No se agrega aquí.');
+    plan.avisos.push(ref + ': una de sus fotos es de la observación N° ' + o.numero + ' (' + S5.nombreZona(S5.zonas.filter(function (z) { return z.id === o.zona_id; })[0] || {}) +
+      '). Seguramente quedó aquí al borrar o mover filas, así que no se agrega a esta fila.');
   });
 };
 /** Todas las fotos que el plan sube: nuevas y las que reemplazan (con figuras). */
@@ -694,7 +720,12 @@ AV.blobsDe = function (x) {
 
 /* ------------------------------------------------------------ vista previa y aplicación */
 AV.hayCambios = function (plan) {
-  return Object.keys(plan.cabecera).length > 0 || plan.zonas.length > 0 || plan.obs.length > 0;
+  return Object.keys(plan.cabecera).length > 0 || plan.zonas.length > 0 || plan.obs.length > 0 || AV.aEliminar(plan).length > 0;
+};
+
+/** Observaciones a eliminar (filas borradas), sin las que el usuario desmarcó en la revisión. */
+AV.aEliminar = function (plan) {
+  return (plan.eliminar || []).filter(function (x) { return !x.conservar; });
 };
 
 AV.miniaturas = function (blobs) {
@@ -719,6 +750,7 @@ AV.pintarPlan = function () {
     '<div class="av-kpis">' +
       '<div><b>' + nPts + '</b><span>puntaje(s)</span></div>' +
       '<div><b>' + (cambiosObs.length + nuevas.length) + '</b><span>observación(es)</span></div>' +
+      (plan.eliminar.length ? '<div><b>' + plan.eliminar.length + '</b><span>a eliminar</span></div>' : '') +
       '<div><b>' + nFotos + '</b><span>foto(s) a subir</span></div></div>' +
     bloque('Datos de la auditoría', plan.cabTxt.length ? plan.cabTxt.length + ' cambio(s)' : 'sin cambios',
       plan.cabTxt.length ? '<ul>' + plan.cabTxt.map(function (x) { return '<li>' + DR.esc(x) + '</li>'; }).join('') + '</ul>' : '') +
@@ -737,14 +769,28 @@ AV.pintarPlan = function () {
           : '<li><b>N° ' + x.o.numero + ' · ' + DR.esc(S5.nombreZona(x.z)) + '</b>' + x.cambios.map(function (t) { return '<small>' + DR.esc(t) + '</small>'; }).join('') +
             AV.miniaturas(AV.blobsDe(x)) + '</li>';
       }).join('') + '</ul>' : '') +
+    (plan.eliminar.length ? '<details class="av-bloque" open><summary><b>Observaciones a eliminar</b><span>' + plan.eliminar.length + ' fila(s) borrada(s) del Excel</span></summary>' +
+      '<ul><li><small>Estas observaciones de la auditoría ' + DR.esc(a.codigo) + ' ya no están en el Excel (se borró su fila), así que al aplicar se eliminan de la app. ' +
+        'Si alguna se borró por error, desmárcala y se conservará.</small></li>' + plan.eliminar.map(function (x, i) {
+        return '<li><label class="av-elim"><input type="checkbox" data-elim="' + i + '"' + (x.conservar ? '' : ' checked') + '> <b>N° ' + x.o.numero + ' · ' + DR.esc(S5.nombreZona(x.z)) + '</b></label>' +
+          S5.pillEstado(x.o.estado) + '<small>' + DR.esc(DR.recortar(x.o.descripcion, 140)) + '</small></li>';
+      }).join('') + '</ul></details>' : '') +
     (plan.otras ? '<div class="ayuda-campo" style="margin-top:8px">' + plan.otras + ' fila(s) u hoja(s) de otras áreas no se tocan.</div>' : '') +
-    (plan.avisos.length ? '<div class="aviso alerta av-avisos"><b>Revisa</b><ul>' + plan.avisos.map(function (x) { return '<li>' + DR.esc(x) + '</li>'; }).join('') + '</ul></div>' : '') +
+    (plan.avisos.length ? '<div class="aviso alerta av-avisos"><b>Antes de aplicar, revisa ' + (plan.avisos.length === 1 ? 'este punto' : 'estos ' + plan.avisos.length + ' puntos') + '</b>' +
+      '<small>Cada uno indica la fila del Excel, qué pasa con ella y qué hacer si no es lo que esperabas.</small>' +
+      '<ul>' + plan.avisos.map(function (x) { return '<li>' + DR.esc(x) + '</li>'; }).join('') + '</ul></div>' : '') +
     (hay ? '' : '<div class="aviso ok" style="margin-top:12px">El Excel coincide con la app: no hay nada que actualizar.</div>') +
     '<div class="acciones"><button type="button" class="btn sec" id="avVolver">Volver</button>' +
     '<button type="button" class="btn verde" id="avAplicar" style="flex:1"' + (hay ? '' : ' disabled') + '>Aplicar cambios</button></div>', { fija: true });
 
   DR.$('#avVolver').onclick = function () { AV.abrir({ auditoria: a }); };
   DR.$('#avAplicar').onclick = AV.aplicar;
+  DR.$$('[data-elim]').forEach(function (c) {
+    c.onchange = function () {
+      plan.eliminar[Number(this.getAttribute('data-elim'))].conservar = !this.checked;
+      DR.$('#avAplicar').disabled = !AV.hayCambios(plan);
+    };
+  });
 };
 
 AV.subirFotos = function (blobs, base) {
@@ -755,7 +801,7 @@ AV.subirFotos = function (blobs, base) {
 };
 
 AV.aplicar = function () {
-  var plan = AV.plan, a = plan.aud, btn = DR.$('#avAplicar'), errores = [], res = null, hechas = 0;
+  var plan = AV.plan, a = plan.aud, btn = DR.$('#avAplicar'), errores = [], res = null, hechas = 0, eliminadas = 0, nObs = plan.obs.length;
   btn.disabled = true;
   btn.classList.add('cargando');
   DR.$('#avVolver').disabled = true;
@@ -783,10 +829,24 @@ AV.aplicar = function () {
       });
     }, Promise.resolve());
   }).then(function () {
+    // Al final, las filas borradas: así los N° de las nuevas no reutilizan el de una eliminada.
+    var elim = AV.aEliminar(plan), n = 0;
+    return elim.reduce(function (cadena, x) {
+      return cadena.then(function () {
+        paso('Eliminando ' + (++n) + ' de ' + elim.length + '…');
+        return AT.rpc('rpc_s5_obs_eliminar', { p_observacion: x.o.id, p_origen: 'excel' }).then(function () {
+          eliminadas++;
+          OBS.lista = OBS.lista.filter(function (y) { return y.id !== x.o.id; });
+        }).catch(function (e) {
+          errores.push('N° ' + x.o.numero + ' · ' + S5.nombreZona(x.z) + ' (no se eliminó): ' + e.message);
+        });
+      });
+    }, Promise.resolve());
+  }).then(function () {
     DR.vibrar(40);
     DR.sonar(!errores.length);
     var avisos = ((res && res.avisos) || []).concat(errores);
-    DR.toast(errores.length ? 'Excel aplicado con ' + errores.length + ' error(es). Revisa el detalle.' : 'Auditoría ' + a.codigo + ' actualizada con el Excel.', errores.length ? 'error' : undefined);
+    DR.toast(errores.length ? 'Se aplicó el Excel, pero ' + errores.length + ' cambio(s) no se pudieron guardar. Revisa el detalle.' : 'Auditoría ' + a.codigo + ' actualizada con el Excel.', errores.length ? 'error' : undefined);
     return S5.cargar(true).then(function () {
       UI.abrirHoja('<div class="asa"></div>' +
         '<div class="res-estado" style="color:#B7E27C">' + DR.ICONOS.checkChico + '<span>Excel aplicado</span></div>' +
@@ -794,8 +854,9 @@ AV.aplicar = function () {
         '<ul class="av-final">' +
           (res ? '<li>' + res.puntajes + ' puntaje(s) · ' + res.renombradas + ' zona(s) renombrada(s) · ' + res.zonas_nuevas + ' zona(s) nueva(s) · ' +
             res.cabecera + ' dato(s) de la auditoría' + (res.completas ? ' · ' + res.completas + ' zona(s) completada(s)' : '') + '</li>' : '') +
-          '<li>' + (plan.obs.length - errores.length) + ' de ' + plan.obs.length + ' observación(es) actualizada(s) o registrada(s)</li></ul>' +
-        (avisos.length ? '<div class="aviso alerta av-avisos"><b>Revisa</b><ul>' + avisos.map(function (t) { return '<li>' + DR.esc(t) + '</li>'; }).join('') + '</ul></div>' : '') +
+          (nObs ? '<li>' + (nObs - errores.length + (AV.aEliminar(plan).length - eliminadas)) + ' de ' + nObs + ' observación(es) actualizada(s) o registrada(s)</li>' : '') +
+          (AV.aEliminar(plan).length ? '<li>' + eliminadas + ' de ' + AV.aEliminar(plan).length + ' observación(es) eliminada(s) (filas borradas del Excel)</li>' : '') + '</ul>' +
+        (avisos.length ? '<div class="aviso alerta av-avisos"><b>' + (errores.length ? 'Revisa: hubo cambios que no se guardaron' : 'Ten en cuenta') + '</b><ul>' + avisos.map(function (t) { return '<li>' + DR.esc(t) + '</li>'; }).join('') + '</ul></div>' : '') +
         '<div class="acciones"><button type="button" class="btn verde" id="avVer" style="flex:1">Ver la auditoría</button></div>', { fija: true });
       DR.$('#avVer').onclick = function () {
         UI.cerrarHoja();

@@ -126,9 +126,10 @@ TIEMPOS.pintar = function (cont) {
               DR.esc(a2.nombre) + (on ? '<small>en curso</small>' : (a2.sustento ? '<small>nueva</small>' : '')) + (n ? '<b>' + n + '</b>' : '') + '</button>';
           }).join('') + '</div>';
       }).join('') + '<div class="acciones"><button type="button" class="btn sec chico" id="btnEtapaNueva">' + DR.ICONOS.mas + 'Etapa nueva</button>' +
-        '<button type="button" class="btn sec chico" id="btnManual">' + DR.ICONOS.mas + 'Registrar a mano</button></div>');
-  } else if (edita) {
-    h += '<div class="acciones" style="margin:0 0 14px"><button type="button" class="btn sec chico" id="btnManual">' + DR.ICONOS.mas + 'Registrar toma a mano</button></div>';
+        '<button type="button" class="btn sec chico" id="btnManual">' + DR.ICONOS.mas + 'Registrar a mano</button>' + TIEMPOS.btnEditarEtapas() + '</div>');
+  } else if (edita || AT.esAdmin()) {
+    h += '<div class="acciones" style="margin:0 0 14px">' + (edita ? '<button type="button" class="btn sec chico" id="btnManual">' + DR.ICONOS.mas + 'Registrar toma a mano</button>' : '') +
+      TIEMPOS.btnEditarEtapas() + '</div>';
   }
 
   var lista = EVAL.d.tiempos.slice().sort(function (a2, b) { return a2.inicio < b.inicio ? 1 : -1; });
@@ -187,6 +188,7 @@ TIEMPOS.pintar = function (cont) {
   if (DR.$('#btnHorasJornada')) DR.$('#btnHorasJornada').onclick = TIEMPOS.editarJornada;
   if (DR.$('#btnEtapaNueva')) DR.$('#btnEtapaNueva').onclick = TIEMPOS.nuevaEtapa;
   if (DR.$('#btnManual')) DR.$('#btnManual').onclick = function () { TIEMPOS.editar(null); };
+  if (DR.$('#btnEditarEtapas')) DR.$('#btnEditarEtapas').onclick = TIEMPOS.editarEtapas;
   if (DR.$('#btnReintentar')) DR.$('#btnReintentar').onclick = function () { TIEMPOS.subirPendientes(true); };
 };
 
@@ -382,6 +384,68 @@ TIEMPOS.nuevaEtapa = function () {
       DR.toast('Etapa «' + a.nombre + '» creada.');
       if (TIEMPOS.jornadaAbierta() && !TIEMPOS.etapa()) TIEMPOS.iniciar(a.id);
       else TIEMPOS.pintar(DR.$('#seccion'));
+    }).catch(function (e) { btn.classList.remove('cargando'); DR.toast(e.message, 'error'); });
+  };
+};
+
+/* ------------------------------------------------ editar etapas (solo admin) */
+/** Etapas que el admin puede editar: Tiempo muerto e Inicio/Fin de jornada son fijas. */
+TIEMPOS.ETAPAS_FIJAS = [TOP.ID_MUERTO].concat(TOP.ID_JORNADA);
+TIEMPOS.btnEditarEtapas = function () {
+  return AT.esAdmin() ? '<button type="button" class="btn sec chico" id="btnEditarEtapas">Editar etapas</button>' : '';
+};
+
+/** Lista de etapas por categoría; tocar una abre su edición (nombre y categoría). */
+TIEMPOS.editarEtapas = function () {
+  UI.abrirHoja('<h2>Editar etapas</h2><div class="sub">Cambia el nombre o la categoría. Se aplica también a todas las tomas ya registradas ' +
+    '(Resumen, Excel y Sheets salen con el nombre y la categoría nuevos).</div>' +
+    TOP.ORDEN_CLASES.map(function (c) {
+      var acts = TOP.actividades.filter(function (a) { return a.clase === c && TIEMPOS.ETAPAS_FIJAS.indexOf(a.id) < 0; });
+      if (!acts.length) return '';
+      return '<div class="top-clase-tit" style="--c:' + TOP.CLASES[c].c + '">' + DR.esc(TOP.CLASES[c].t) + '</div><div class="top-acts">' + acts.map(function (a) {
+        return '<button type="button" class="top-act" style="--c:' + TOP.CLASES[c].c + '" data-editar-act="' + a.id + '">' + DR.esc(a.nombre) + '</button>';
+      }).join('') + '</div>';
+    }).join('') +
+    '<div class="acciones"><button type="button" class="btn sec" onclick="UI.cerrarHoja()">Cerrar</button></div>');
+  DR.$$('[data-editar-act]').forEach(function (b) {
+    b.onclick = function () { TIEMPOS.editarEtapa(TOP.actividad(b.getAttribute('data-editar-act'))); };
+  });
+};
+
+TIEMPOS.editarEtapa = function (a) {
+  var clase = a.clase;
+  var fijaClase = a.id === TIEMPOS.ID_COSECHA;
+  UI.abrirHoja('<h2>Editar etapa</h2><div class="sub">Antes: «' + DR.esc(a.nombre) + '» · ' + DR.esc(TOP.CLASES[a.clase].t) + '</div>' +
+    '<div class="form" id="frmEditEtapa" style="margin-top:12px">' +
+    '<div class="campo ancho"><label>Nombre de la etapa</label><input data-campo="nombre" maxlength="80" value="' + DR.esc(a.nombre) + '"></div>' +
+    '<div class="campo ancho"><label>Categoría' + (fijaClase ? ' <em>Cosecha siempre es productiva</em>' : '') + '</label><div class="top-clases-sel">' +
+      TOP.ORDEN_CLASES.map(function (c) {
+        return '<button type="button" class="top-clase-op' + (c === clase ? ' activo' : '') + '" data-clase-ed="' + c + '" style="--c:' + TOP.CLASES[c].c + '"' +
+          (fijaClase && c !== clase ? ' disabled' : '') + '><b>' + DR.esc(TOP.CLASES[c].t) + '</b><small>' + DR.esc(TOP.CLASES[c].d) + '</small></button>';
+      }).join('') + '</div></div></div>' +
+    '<div class="aviso alerta" style="margin-top:12px">El cambio se aplica a <b>todas</b> las evaluaciones, también a las tomas pasadas.</div>' +
+    '<div class="acciones"><button type="button" class="btn verde" id="btnGuardarEtapa">Guardar cambios</button>' +
+    '<button type="button" class="btn sec" id="btnVolverEtapas">Volver</button></div>');
+  DR.$$('[data-clase-ed]').forEach(function (b) {
+    b.onclick = function () {
+      clase = b.getAttribute('data-clase-ed');
+      DR.$$('[data-clase-ed]').forEach(function (o) { o.classList.toggle('activo', o === b); });
+    };
+  });
+  DR.$('#btnVolverEtapas').onclick = TIEMPOS.editarEtapas;
+  DR.$('#btnGuardarEtapa').onclick = function () {
+    var btn = this, nombre = (UI.leerForm('frmEditEtapa').nombre || '').trim().replace(/\s+/g, ' ');
+    if (nombre.length < 3) { DR.toast('Escribe el nombre de la etapa.', 'error'); return; }
+    if (nombre === a.nombre && clase === a.clase) { TIEMPOS.editarEtapas(); return; }
+    var ya = TOP.todas.filter(function (x) { return x.id !== a.id && TOP.norm(x.nombre) === TOP.norm(nombre); })[0];
+    if (ya) { DR.toast('Ya existe otra etapa llamada «' + ya.nombre + '».', 'error'); return; }
+    btn.classList.add('cargando');
+    AT.rpc('rpc_top_editar_actividad', { p_id: a.id, p_nombre: nombre, p_clase: clase }).then(function (r) {
+      // Mismo objeto en TOP.todas y TOP.actividades: se actualiza en ambos.
+      [TOP.todas, TOP.actividades].forEach(function (l) { l.forEach(function (x) { if (x.id === r.id) { x.nombre = r.nombre; x.clase = r.clase; } }); });
+      DR.toast('Etapa actualizada: «' + r.nombre + '» · ' + TOP.CLASES[r.clase].t + '.');
+      TIEMPOS.editarEtapas();
+      if (DR.$('#seccion') && EVAL.tab === 'tiempos') TIEMPOS.pintar(DR.$('#seccion'));
     }).catch(function (e) { btn.classList.remove('cargando'); DR.toast(e.message, 'error'); });
   };
 };

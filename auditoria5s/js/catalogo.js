@@ -224,7 +224,25 @@ S5.itemHtml = function (it, valor, opc) {
     '<span class="item5s-num">' + it.numero + '</span>' +
     '<div class="item5s-texto">' + DR.esc(it.texto) + (opc.nota ? '<span class="item5s-nota">' + opc.nota + '</span>' : '') +
     '<span class="cambio" data-cambio="' + it.id + '"></span></div>' +
-    '<div class="puntaje" role="radiogroup" aria-label="Puntaje del ítem ' + it.numero + '">' + botones + '</div></div>';
+    '<div class="puntaje" role="radiogroup" aria-label="Puntaje del ítem ' + it.numero + '">' + botones + '</div>' +
+    S5.criterioHtml(it, tiene ? Number(valor) : null) + '</div>';
+};
+
+/** Criterio de la Cartilla del Auditor v02 (columnas D·E·F·G) para el puntaje elegido.
+ *  Sin puntaje no se muestra nada: el ítem queda como siempre. */
+S5.criterio = function (it, v) {
+  if (!it || v === null || v === undefined || isNaN(v)) return null;
+  var campo = { 0: 'criterio_0', 1: 'criterio_1', 1.5: 'criterio_15', 2: 'criterio_2' }[v];
+  if (!campo) return null;
+  var t = it[campo];
+  if (t) return { texto: t, aviso: false };
+  if (v === 1.5 && (it.criterio_0 || it.criterio_2)) return { texto: 'Este ítem no admite 1.5 (seguridad / conducta: cumple o no cumple). Usa 1 o 2.', aviso: true };
+  return null;
+};
+S5.criterioHtml = function (it, v) {
+  var c = S5.criterio(it, v);
+  return '<div class="item5s-criterio' + (c ? '' : ' oculto') + (c && c.aviso ? ' aviso-crit' : '') + '" data-v="' + (c ? v : '') + '" aria-live="polite">' +
+    (c ? '<b>' + v + '</b><span>' + DR.esc(c.texto) + '</span>' : '') + '</div>';
 };
 
 /** Delegación de toques en los controles 0 · 1 · 1.5 · 2. alCambiar(item_id, valor). */
@@ -240,6 +258,8 @@ S5.enlazarPuntajes = function (raiz, alCambiar) {
       });
       fila.classList.add('lleno');
       fila.classList.remove('falta');
+      var crit = fila.querySelector('.item5s-criterio');
+      if (crit) crit.outerHTML = S5.criterioHtml(S5.item(fila.getAttribute('data-item')), v);
       DR.vibrar(15);
       if (DR.anima) anime({ targets: b, scale: [0.88, 1], duration: 320, easing: 'easeOutBack' });
       alCambiar(Number(fila.getAttribute('data-item')), v);

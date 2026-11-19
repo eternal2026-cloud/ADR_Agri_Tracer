@@ -62,7 +62,7 @@ CAT.pintar = function (animar) {
 
   var h = UI.encabezado('Auditoría 5S', 'Catálogo', 'Cultivos, áreas, zonas por cultivo y textos del CHECK LIST. Nada se borra: desactiva lo que ya no aplica para conservar el historial.');
 
-  h += UI.panel('Plazo de corrección', 'Días desde la fecha de la auditoría en que un auditor puede corregir puntajes desde un seguimiento. Pasado el plazo, solo un administrador.',
+  h += UI.panel('Plazo de corrección', 'Días desde la fecha de la auditoría en que un auditor puede usar «Corregir una S» (directo, sin sustento) o corregir desde un seguimiento. Pasado el plazo, solo un administrador.',
     '<div class="form"><div class="campo"><label for="catDias">Días</label><input id="catDias" type="number" inputmode="numeric" min="0" max="60" value="' + S5.diasCorreccion() + '"></div></div>' +
     '<div class="acciones"><button type="button" class="btn" id="catGuardarParam">Guardar plazo</button></div>');
 

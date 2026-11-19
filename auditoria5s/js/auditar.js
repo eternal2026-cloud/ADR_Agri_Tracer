@@ -380,7 +380,9 @@ AUD.pintarZonas = function () {
       UI.kpi('Avance', completas + '<small>de ' + zonas.length + ' zonas</small>', faltan ? 'Faltan ' + faltan : 'Todas completas', '#EF7C3B') +
       UI.kpi('Puntaje del área', S5.pct(promedio), promedio !== null ? S5.madurez(promedio) + ' · promedio de las S evaluadas' : 'Aún sin puntajes', '#0097CE') +
     '</div>' +
-    (enCurso ? '' : '<div class="aviso ok" style="margin-bottom:14px">Auditoría cerrada. Para cambiar un puntaje registra un seguimiento en la observación que lo sustenta.</div>') +
+    (enCurso ? '' : '<div class="aviso ok" style="margin-bottom:14px">Auditoría cerrada. ' + (AUD.puedeCorregirAud(a)
+      ? 'Toca una zona y luego <b>Corregir una S</b> para cambiar puntajes' + (AT.esAdmin() ? '' : ' (hasta el ' + S5.fecha(S5.limiteCorreccion(a)) + ')') + '.'
+      : 'El plazo de corrección venció el ' + S5.fecha(S5.limiteCorreccion(a)) + ': pide a un administrador que corrija el puntaje.') + '</div>') +
     '<div class="conteo">Elige el N° de zona</div><div class="zonas-grid">' + tarjetas + '</div>' +
     '<div class="acciones-fin" style="margin-top:18px">' +
       (enCurso ? '<button type="button" class="btn verde grande" id="btnCerrarAud"' + (faltan && !AT.esAdmin() ? ' disabled' : '') + '>' + DR.ICONOS.checkChico +
@@ -449,10 +451,16 @@ AUD.cargarZona = function () {
   });
 };
 
-/** Se puede puntuar: auditoría en curso y zona sin completar, o completada pero el mismo día de la auditoría. */
+/** «Corregir una S» libre (sin sustento): auditor hasta fecha + plazo de corrección (aunque esté cerrada);
+ *  administrador siempre; nunca en anuladas (0072). */
+AUD.puedeCorregirAud = function (a) {
+  a = a || AUD.aud;
+  return a.estado !== 'anulada' && S5.puedeCorregir(a);
+};
+/** Se puede puntuar: zona pendiente de una auditoría en curso, o corrección dentro del plazo. */
 AUD.editable = function () {
   var e = AUD.evaluacion;
-  return AUD.aud.estado === 'en_curso' && (!e || e.estado !== 'completa' || S5.hoy() <= AUD.aud.fecha);
+  return (AUD.aud.estado === 'en_curso' && (!e || e.estado !== 'completa')) || AUD.puedeCorregirAud();
 };
 
 AUD.primeraSPendiente = function (calc) {
@@ -736,7 +744,7 @@ AUD.pintarResumenZona = function (celebrar) {
   AT.rpc('fn_s5_resumen', { p_auditoria: a.id }).then(function (r) { AUD.resumen = r || []; }).catch(function () { /* se usa lo que había */ }).then(function () {
     if (AUD.vista !== 'resumenZona' || AUD.zona !== z) return;
     var porS = OBS.porS(AUD.puntajes), ev = AUD.evaluacion, completa = ev && ev.estado === 'completa';
-    var aqui = AUD.obsAqui(z.id), editableHoy = a.estado === 'en_curso' && (!completa || S5.hoy() <= a.fecha);
+    var aqui = AUD.obsAqui(z.id), editableHoy = (a.estado === 'en_curso' && !completa) || AUD.puedeCorregirAud(a);
     var siguiente = AUD.zonasVisibles().filter(function (x) {
       var f = AUD.filaResumen(x.id);
       return x.activo && x.id !== z.id && !(f && f.estado_zona === 'completa');
@@ -769,8 +777,9 @@ AUD.pintarResumenZona = function (celebrar) {
         (siguiente && a.estado === 'en_curso' ? '<button type="button" class="btn verde grande" id="btnSigZona"><span>Siguiente zona: <b>' + DR.esc(S5.nombreZona(siguiente)) + '</b></span>' + DR.ICONOS.chevron + '</button>' : '') +
         (a.estado !== 'anulada' ? '<button type="button" class="btn sec" id="btnObsZona2">' + FOTOS.ICONO + '<span>' + AUD.textoObs() + '</span></button>' : '') +
         '<button type="button" class="btn sec" id="btnVerZonas">Volver a zonas</button>' +
-        (editableHoy ? '<button type="button" class="btn sec" id="btnCorregirS">Corregir una S</button>'
-          : '<div class="ayuda">Para cambiar un puntaje registra un seguimiento en la observación que lo sustenta (pestaña Observaciones).</div>') +
+        (editableHoy ? '<button type="button" class="btn sec" id="btnCorregirS">Corregir una S</button>' +
+            (completa && !AT.esAdmin() ? '<div class="ayuda">Puedes corregir hasta el ' + S5.fecha(S5.limiteCorreccion(a)) + ' (' + S5.diasCorreccion() + ' días desde la auditoría).</div>' : '')
+          : (a.estado === 'anulada' ? '' : '<div class="ayuda">El plazo de corrección venció el ' + S5.fecha(S5.limiteCorreccion(a)) + '. Pide a un administrador que corrija el puntaje.</div>')) +
       '</div>';
 
     S5.animarBarras(cont);

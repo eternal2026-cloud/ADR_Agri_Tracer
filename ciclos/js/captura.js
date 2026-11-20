@@ -476,9 +476,9 @@ CAPTURA.campoHtml = function (c) {
         : '<span class="nota-vacia">Sin opciones. Un administrador puede agregarlas en Config → Listas.</span>') + '</div></div>';
   }
   if (c.tipo === 'fecha') return '<div class="' + clase + '">' + etiqueta + '<input id="' + id + '" type="date" data-campo="' + c.clave + '" value="' + v + '"></div>';
-  if (c.desglose) return '<div class="campo desglose"><label for="' + id + '">' + c.label + '</label><input id="' + id + '" type="number" inputmode="numeric" min="0" step="1" data-campo="' + c.clave + '" value="' + DR.esc(v) + '"></div>';
+  if (c.desglose) return '<div class="campo desglose"><label for="' + id + '">' + c.label + '</label><input id="' + id + '" type="number" inputmode="decimal" min="0" step="any" data-campo="' + c.clave + '" value="' + DR.esc(v) + '"></div>';
   if (c.auto) return '<div class="' + clase + '">' + etiqueta + '<input id="' + id + '" class="auto" data-campo="' + c.clave + '" value="' + DR.esc(v) + '" readonly tabindex="-1" placeholder="Se llena con las cantidades de abajo"></div>';
-  if (c.tipo === 'numero') return '<div class="' + clase + '">' + etiqueta + '<input id="' + id + '" type="number" inputmode="numeric" min="0" step="1" data-campo="' + c.clave + '" value="' + DR.esc(v) + '"></div>';
+  if (c.tipo === 'numero') return '<div class="' + clase + '">' + etiqueta + '<input id="' + id + '" type="number" inputmode="decimal" min="0" step="any" data-campo="' + c.clave + '" value="' + DR.esc(v) + '"></div>';
   return '<div class="' + clase + '">' + etiqueta + '<input id="' + id + '" data-campo="' + c.clave + '" value="' + DR.esc(v) + '"' +
     (c.mayusculas ? ' autocapitalize="characters" style="text-transform:uppercase"' : '') + ' autocomplete="off"></div>';
 };
@@ -825,7 +825,7 @@ CAPTURA.guardar = function (opc) {
       var x = v[c.clave];
       if (c.tipo === 'hora') datos[c.clave] = CAPTURA.aIso(x);
       else if (x === '' || x === undefined) datos[c.clave] = null;
-      else if (c.tipo === 'numero') datos[c.clave] = Math.round(Number(x));
+      else if (c.tipo === 'numero') datos[c.clave] = Math.round(Number(String(x).replace(',', '.')) * 100) / 100; // decimales (0073)
       else datos[c.clave] = c.mayusculas ? String(x).toUpperCase() : x;
     });
     if (e.id === 'cosecha') CAPTURA.guardarPrefs(v);

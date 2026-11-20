@@ -7,7 +7,7 @@
  *   · Minutos por tramo (traslado desde la carga + tramos de planta; esperas punteadas).
  *   · Tiempo promedio por planta, línea, placa, fundo, origen, hora de llegada o día; «Ver tabla».
  *   · Causas de demora marcadas en planta (cuántas veces).
- *   · Tabla dinámica planta › día › camión (expandir, contraer, copiar a Outlook / Excel).
+ *   · Tabla dinámica planta › día › lote › camión (expandir, contraer, copiar a Outlook / Excel).
  *   · Evolución: líneas por planta del tiempo en planta o de un tramo, por día o semana.
  *   Tiempos en planta > 480 min (atípicos) o negativos no promedian.
  * ==========================================================================*/
@@ -139,7 +139,7 @@ PR.pintar = function (c, quieto) {
       '<div id="prGrupo"></div></section>' +
     '<section class="panel' + e + '"><h2>Causas de demora</h2><div class="sub">Veces que se marcó cada causa en «Causa / nota» de una marca de planta.</div>' + PR.causasHtml(l) + '</section>' +
     '<section class="panel' + e + '"><h2>Promedio por planta · ' + DR.esc(ambito) + '</h2>' +
-      '<div class="sub">Tabla dinámica (min:seg): toca una planta para ver sus días y un día para ver sus camiones. Columnas en cursiva = esperas.</div>' +
+      '<div class="sub">Tabla dinámica (min:seg): toca una planta para ver sus días, un día para ver sus lotes y un lote para ver sus camiones. Columnas en cursiva = esperas.</div>' +
       '<div class="piv-barra"><button class="btn sec chico" id="prAbrir" type="button">Expandir todo</button><button class="btn sec chico" id="prCerrar" type="button">Contraer todo</button>' +
       '<button class="btn verde chico" id="prCopiar" type="button">Copiar tabla</button></div>' +
       '<div class="tabla-cont piv" id="prPiv">' + PR.pivotHtml(l) + '</div></section>' +
@@ -162,7 +162,7 @@ PR.pintar = function (c, quieto) {
   DR.$('#prVerTabla').onclick = function () { PR.verTabla = !PR.verTabla; PR.pintar(c, true); };
   DR.$$('[data-piv]', c).forEach(function (tr) { tr.onclick = function () { var k = tr.getAttribute('data-piv'); PR.abiertos[k] = !PR.abiertos[k]; PR.pintar(c, true); }; });
   DR.$$('[data-reg]', c).forEach(function (tr) { tr.onclick = function () { location.hash = '#reg/' + encodeURIComponent(tr.getAttribute('data-reg')); }; });
-  DR.$('#prAbrir').onclick = function () { l.forEach(function (r) { var p = r.planta || 'Sin planta'; PR.abiertos[p] = true; PR.abiertos[p + '|' + (r.fecha || '')] = true; }); PR.pintar(c, true); };
+  DR.$('#prAbrir').onclick = function () { l.forEach(function (r) { var p = r.planta || 'Sin planta', k = p + '|' + (r.fecha || ''); PR.abiertos[p] = true; PR.abiertos[k] = true; PR.abiertos[k + '|' + PR.loteEtq(r)] = true; }); PR.pintar(c, true); };
   DR.$('#prCerrar').onclick = function () { PR.abiertos = {}; PR.pintar(c, true); };
   DR.$('#prCopiar').onclick = PR.copiar;
   DR.$('#prMet').onchange = function () { cambiar('met', this.value); };
@@ -215,7 +215,7 @@ PR.causasHtml = function (l) {
   }).join('');
 };
 
-/* ------------------------------------------------ tabla dinámica planta › día › camión */
+/* ------------------------------------------------ tabla dinámica planta › día › lote › camión */
 PR.pivotHtml = function (l) {
   if (!l.length) return '<div class="vacio">Sin registros con estos filtros.</div>';
   var celdas = function (o) {
@@ -234,14 +234,38 @@ PR.pivotHtml = function (l) {
     if (!ab) return;
     Object.keys(por[p]).sort().reverse().forEach(function (d) {
       var k = p + '|' + d, ad = PR.abiertos[k], regs = por[p][d];
-      h += '<tr class="piv-n2" data-piv="' + DR.esc(k) + '" style="cursor:pointer"><td class="piv-etq" style="padding-left:22px">' + (ad ? '▾ ' : '▸ ') + PR.fecha(d) + '</td><td class="num">' + regs.length + '</td>' + celdas(PR.resumir(regs)) + '</tr>';
-      if (ad) regs.forEach(function (r) {
-        h += '<tr class="piv-ciclo" data-reg="' + DR.esc(r.id) + '" style="cursor:pointer"><td class="piv-etq">' + PL.horaCorta(r.hora_llegada) + ' · ' + DR.esc(r.placa || '—') +
-          (r.linea ? ' · L' + DR.esc(r.linea) : '') + (r.pallet ? ' · P' + DR.esc(r.pallet) : '') + '</td><td class="num">' + DR.esc(PL.origenTxt(r)) + '</td>' + celdas(PR.resumir([r])) + '</tr>';
+      var lotes = PR.porLote(regs), nl = Object.keys(lotes).length;
+      h += '<tr class="piv-n2" data-piv="' + DR.esc(k) + '" style="cursor:pointer"><td class="piv-etq" style="padding-left:22px">' + (ad ? '▾ ' : '▸ ') + PR.fecha(d) +
+        ' <small>' + nl + ' lote(s)</small></td><td class="num">' + regs.length + '</td>' + celdas(PR.resumir(regs)) + '</tr>';
+      if (!ad) return;
+      PR.ordenLotes(lotes).forEach(function (lt) {
+        var kl = k + '|' + lt, al = PR.abiertos[kl], rl = lotes[lt];
+        h += '<tr class="piv-n3" data-piv="' + DR.esc(kl) + '" style="cursor:pointer"><td class="piv-etq" style="padding-left:40px">' + (al ? '▾ ' : '▸ ') + DR.esc(lt) +
+          '</td><td class="num">' + rl.length + '</td>' + celdas(PR.resumir(rl)) + '</tr>';
+        if (al) rl.forEach(function (r) {
+          h += '<tr class="piv-ciclo" data-reg="' + DR.esc(r.id) + '" style="cursor:pointer"><td class="piv-etq" style="padding-left:58px">' + PL.horaCorta(r.hora_llegada) + ' · ' + DR.esc(r.placa || '—') +
+            (r.linea ? ' · L' + DR.esc(r.linea) : '') + (r.pallet ? ' · P' + DR.esc(r.pallet) : '') + '</td><td class="num">' + DR.esc(PL.origenTxt(r)) + '</td>' + celdas(PR.resumir([r])) + '</tr>';
+        });
       });
     });
   });
   return h + '<tr class="fila-total"><td class="piv-etq"><b>Total general</b></td><td class="num">' + l.length + '</td>' + celdas(PR.resumir(l)) + '</tr></tbody></table>';
+};
+/** Registros de un día agrupados por lote (como la TD de Arándano): «Lote 12 · FUNDO». */
+PR.loteEtq = function (r) {
+  var l = String(r.lote || '').trim(), f = String(r.fundo || '').trim();
+  return (l ? 'Lote ' + l : 'Sin lote') + (f ? ' · ' + f : '');
+};
+PR.porLote = function (regs) {
+  var o = {};
+  regs.forEach(function (r) { var k = PR.loteEtq(r); (o[k] = o[k] || []).push(r); });
+  return o;
+};
+PR.ordenLotes = function (o) {
+  return Object.keys(o).sort(function (a, b) {
+    var sa = /^Sin lote/.test(a), sb2 = /^Sin lote/.test(b);
+    return sa !== sb2 ? (sa ? 1 : -1) : a.localeCompare(b, 'es', { numeric: true });
+  });
 };
 PR.copiar = function () {
   var t = DR.$('#prPiv table');

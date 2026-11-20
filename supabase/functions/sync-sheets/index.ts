@@ -589,7 +589,7 @@ function pestanasTop(d: TopDatos | null): Pestana[] {
   const colsTiempos: Col[] = [...B,
     ['Actividad', (f) => txt(act.get(Number(f.actividad_id))?.nombre)],
     ['Clase', (f) => TOP_CLASES[act.get(Number(f.actividad_id))?.clase] || ''],
-    TS('inicio', 'Inicio'), TS('fin', 'Fin'), ['Duración (min:seg)', (f) => segDur(f.duracion_seg), 'dur'], NU('duracion_seg', 'Duración (s)', 0), NU('envases', 'Envases', 0), TX('nota', 'Nota')];
+    TS('inicio', 'Inicio'), TS('fin', 'Fin'), ['Duración (min:seg)', (f) => segDur(f.duracion_seg), 'dur'], NU('duracion_seg', 'Duración (s)', 0), NU('envases', 'Envases'), TX('nota', 'Nota')];
 
   const colsCump: Col[] = [...B, NU('ronda', 'Ronda', 0),
     ['Tipo', (f) => txt(item.get(Number(f.item_id))?.tipo)], ['Presentación', (f) => txt(item.get(Number(f.item_id))?.presentacion)],
@@ -724,6 +724,14 @@ const UVA_ETAPAS_PLANTA: [string, string, string, string, string][] = [
   ['Espera de abastecimiento a línea', 'fin_descarga', 'ini_abastecimiento', 't_espera_abastecimiento', 'abast'],
 ];
 
+/** Causa y comentario de cada etapa de campo en una sola celda: «7. Carga: Falta de camión - esperó guía | …». */
+function notasDe(et: Fila[]): string {
+  return et.map((x) => {
+    const t = [x.causa, x.comentario ?? x.com].map((v) => String(v ?? '').trim()).filter(Boolean).join(' - ');
+    return t ? (x.n ? x.n + '. ' : '') + (x.etapa || '') + ': ' + t : '';
+  }).filter(Boolean).join(' | ');
+}
+
 function pestanasUva(d: UvaDatos | null): Pestana[] {
   if (!d) return [];
   const cabReg = [...UVA_BASE, ...UVA_BD, ...UVA_EXTRA, ...UVA_PLANTA, ...UVA_CARGA, ...UVA_NOTAS];
@@ -751,7 +759,7 @@ function pestanasUva(d: UvaDatos | null): Pestana[] {
     const traza = f.origen === 'integra' ? 'INTEGRA' : esPlanta ? '' :
       !r.permisosVersion ? 'SIN PERMISOS' : (r.permisosHash !== r.permisosFirma ? 'EDITADO EN EL EQUIPO' : 'OK');
     const extra = [vNum(r.minTotal), vNum(r.metaTotal), r.enMeta || '', r.atipico || '', vNum(r.minEsperas), r.lenta || '', r.mayorEspera || '', r.pallet || f.pallet || '',
-      r.observacion || '', H(r.creado || f.planta_inicio), H(r.modificado || f.planta_actualizado), H(f.campo_recibido || f.planta_actualizado),
+      r.observacion || notasDe(et), H(r.creado || f.planta_inicio), H(r.modificado || f.planta_actualizado), H(f.campo_recibido || f.planta_actualizado),
       esPlanta ? (f.estado || 'En proceso') : (r.estado || 'Cerrado'), r.etapaActual || '', r.situacion || '', H(r.desde),
       f.ambito, f.origen === 'integra' ? 'Integra' : (r.permisosVersion ? (r.permisosPerfil || 'Sin nombre') + ' · v' + r.permisosVersion : ''), traza,
       std ?? '', std && tTra !== '' && tTra !== null && tTra !== undefined ? (Number(tTra) > std ? 'Sí' : 'No') : ''];
@@ -760,12 +768,8 @@ function pestanasUva(d: UvaDatos | null): Pestana[] {
       .filter(Boolean).join(' | ');
     const pl = [origenTxt(f.origen), H(f.hora_llegada), H(f.hora_recepcion), vNum(f.t_espera_recepcion), H(f.ini_descarga), vNum(f.t_espera_descarga),
       H(f.fin_descarga), vNum(f.t_descarga), H(f.ini_abastecimiento), vNum(f.t_espera_abastecimiento), f.linea || '', MU(f.planta_destino),
-      vNum(f.t_en_planta), vNum(f.t_llegada_desde_carga), vNum(f.t_ciclo_completo), f.planta_usuario || '', f.planta_obs || '', causas];
-    // Causa y comentario de cada etapa de campo en una sola celda: «7. Carga: Falta de camión - esperó guía | …».
-    const notasCampo = et.map((x) => {
-      const t = [x.causa, x.comentario ?? x.com].map((v) => String(v ?? '').trim()).filter(Boolean).join(' - ');
-      return t ? (x.n ? x.n + '. ' : '') + (x.etapa || '') + ': ' + t : '';
-    }).filter(Boolean).join(' | ');
+      vNum(f.t_en_planta), vNum(f.t_llegada_desde_carga), vNum(f.t_ciclo_completo), f.planta_usuario || '', f.planta_obs || causas, causas];
+    const notasCampo = notasDe(et);
     const porTxt = ({ campo: 'Campo', planta: 'Planta', camion: 'Mismo camión (placa ± 30 min)' } as Record<string, string>)[f.llegada_por] || '';
     regs.push([...base, ...bd, ...extra, ...pl, vNum(r.cargaCarg), vNum(r.cargaTot), r.editadoPor || '',
       notasCampo, porTxt, f.llegada_ref || '']);
@@ -885,13 +889,13 @@ Deno.serve(async (req) => {
       TX('fecha', 'Fecha'), NU('semana', 'Semana', 0), TX('codigo', 'Código'), TX('fundo', 'Fundo'), TX('lote', 'Lote'),
       TX('lider', 'Líder de grupo'), TX('presentacion', 'Presentación'), TX('variedad', 'Variedad'), TX('calibre', 'Calibre'),
       TS('inicio_cosecha', 'Inicio cosecha'), TS('fin_cosecha', 'Fin cosecha'),
-      TS('inicio_jabero', 'Inicio jabero'), TS('fin_jabero', 'Fin jabero'), NU('num_jabas', 'N° jabas', 0), TX('obs_jaba', 'Obs. jaba'),
+      TS('inicio_jabero', 'Inicio jabero'), TS('fin_jabero', 'Fin jabero'), NU('num_jabas', 'N° jabas'), TX('obs_jaba', 'Obs. jaba'),
       TX('placa', 'Placa motocarga'), TS('hora_llegada_moto', 'Llegada motocarga'), TS('inicio_carga_moto', 'Inicio carga moto'), TS('fin_carga_moto', 'Fin carga moto'),
-      NU('jabas_bandeja', 'Jabas bandeja', 0), NU('jabas_jarra', 'Jabas jarra 0.5 kg', 0), NU('jabas_bulk', 'Jabas bulk 3.5', 0),
+      NU('jabas_bandeja', 'Jabas bandeja'), NU('jabas_jarra', 'Jabas jarra 0.5 kg'), NU('jabas_bulk', 'Jabas bulk 3.5'),
       TS('inicio_traslado_ca', 'Inicio traslado C.A.'), TX('obs_traslado_ca', 'Obs. traslado C.A.'), TS('fin_traslado_ca', 'Fin traslado C.A.'),
-      NU('num_jabas_2', 'N° jabas (2)', 0), TX('obs_jabas_2', 'Obs. jabas (2)'),
+      NU('num_jabas_2', 'N° jabas (2)'), TX('obs_jabas_2', 'Obs. jabas (2)'),
       TS('inicio_descarga_ca', 'Inicio descarga C.A.'), TS('fin_descarga_ca', 'Fin descarga C.A.'),
-      NU('num_pallets', 'N° pallets', 0), TX('presentaciones', 'Presentaciones'), TX('placa_camion', 'Placa camión'),
+      NU('num_pallets', 'N° pallets'), TX('presentaciones', 'Presentaciones'), TX('placa_camion', 'Placa camión'),
       TS('inicio_carga_camion', 'Inicio carga camión'), TS('fin_carga_camion', 'Fin carga camión'),
       TS('inicio_traslado_planta', 'Inicio traslado planta'), TX('obs_traslado_planta', 'Obs. traslado planta'), TS('fin_traslado_planta', 'Fin traslado planta'),
       TX('obs_cs', 'Obs. Casa Sombra'), TX('tareadora', 'Tareadora'), TX('obs_ca', 'Obs. C. Acopio'),

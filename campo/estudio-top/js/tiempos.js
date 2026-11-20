@@ -21,7 +21,7 @@ TIEMPOS.pedirEnvases = function (r, listo) {
   var tipo = EVAL.ev && EVAL.ev.presentacion === 'JARRA' ? 'jarras' : 'bandejas';
   UI.abrirHoja('<h2>Cantidad de envases</h2><div class="sub">¿Cuántas ' + tipo + ' llenó el cosechador en esta cosecha?</div>' +
     '<div class="form" id="frmEnvases" style="margin-top:12px"><div class="campo ancho"><label>Envases (' + tipo + ') <em>obligatorio</em></label>' +
-    '<input type="number" inputmode="numeric" min="0" max="5000" step="1" data-campo="envases" value="' + (r.envases !== undefined && r.envases !== null ? r.envases : '') + '"></div></div>' +
+    '<input type="number" inputmode="decimal" min="0" max="5000" step="any" data-campo="envases" value="' + (r.envases !== undefined && r.envases !== null ? r.envases : '') + '"></div></div>' +
     '<div class="acciones"><button type="button" class="btn verde" id="btnEnvasesOk">Guardar</button>' +
     '<button type="button" class="btn sec" onclick="UI.cerrarHoja()">Cancelar</button></div>');
   var inp = DR.$('#frmEnvases input');
@@ -35,8 +35,9 @@ TIEMPOS.pedirEnvases = function (r, listo) {
 };
 TIEMPOS.leerEnvases = function (v) {
   if (v === '' || v === null || v === undefined) return null;
-  var n = Number(v);
-  return isNaN(n) || n < 0 || n > 5000 || Math.floor(n) !== n ? null : n;
+  // Acepta decimales con punto o coma (ej. 8.5 u 8,5 bandejas); se guardan con 2 decimales (0073).
+  var n = Number(String(v).replace(',', '.'));
+  return isNaN(n) || n < 0 || n > 5000 ? null : Math.round(n * 100) / 100;
 };
 
 TIEMPOS.clave = function () { return 'reloj.' + EVAL.ev.id; };
@@ -461,7 +462,7 @@ TIEMPOS.editar = function (t) {
     '<div class="campo"><label>Inicio</label><input type="datetime-local" step="1" data-campo="inicio" value="' + (t ? TOP.aLocal(t.inicio) : ahora) + '"></div>' +
     '<div class="campo"><label>Fin</label><input type="datetime-local" step="1" data-campo="fin" value="' + (t ? TOP.aLocal(t.fin) : ahora) + '"></div>' +
     '<div class="campo ancho" id="campoEnvases"><label>Cantidad de envases (bandejas o jarras) <em>obligatorio en Cosecha</em></label>' +
-      '<input type="number" inputmode="numeric" min="0" max="5000" step="1" data-campo="envases" value="' + (t && t.envases !== null && t.envases !== undefined ? t.envases : '') + '"></div>' +
+      '<input type="number" inputmode="decimal" min="0" max="5000" step="any" data-campo="envases" value="' + (t && t.envases !== null && t.envases !== undefined ? t.envases : '') + '"></div>' +
     '<div class="campo ancho"><label>Nota <em>opcional</em></label><input data-campo="nota" maxlength="200" value="' + DR.esc(t ? t.nota : '') + '" placeholder="Ej. lote con mucha fruta, interrupción…"></div></div>' +
     '<div class="acciones"><button type="button" class="btn verde" id="btnGuardarToma">Guardar</button>' +
     (nueva ? '' : '<button type="button" class="btn sec btn-peligro" id="btnBorrarToma">Borrar toma</button>') +

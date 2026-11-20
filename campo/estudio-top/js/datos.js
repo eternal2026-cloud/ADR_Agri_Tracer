@@ -310,10 +310,26 @@ TOP.porEvaluaciones = function (tabla, ids) {
   if (!ids.length) return Promise.resolve([]);
   var tandas = [];
   for (var i = 0; i < ids.length; i += 120) tandas.push(ids.slice(i, i + 120));
-  return Promise.all(tandas.map(function (t) { return sb.from(tabla).select('*').in('evaluacion_id', t); })).then(function (rs) {
+  // El servidor entrega como máximo 1000 filas por consulta: se pide por páginas hasta traerlo todo
+  // (antes se cortaba en 1000 y faltaban tomas de tiempo y verificaciones en el Resumen y el Excel).
+  var PAG = 1000;
+  // Orden estable por la clave de cada tabla para que las páginas no se repitan ni salten filas.
+  var orden = { top_cumplimiento: ['evaluacion_id', 'item_id', 'ronda'], top_ergonomia: ['evaluacion_id'], top_encuestas: ['evaluacion_id'] }[tabla] || ['id'];
+  var tanda = function (t) {
     var filas = [];
-    rs.forEach(function (r) { if (r.error) throw new Error(r.error.message); filas = filas.concat(r.data); });
-    return filas;
+    var pagina = function (desde) {
+      var q = sb.from(tabla).select('*').in('evaluacion_id', t);
+      orden.forEach(function (k) { q = q.order(k, { ascending: true }); });
+      return q.range(desde, desde + PAG - 1).then(function (r) {
+        if (r.error) throw new Error(r.error.message);
+        filas = filas.concat(r.data || []);
+        return (r.data || []).length < PAG ? filas : pagina(desde + PAG);
+      });
+    };
+    return pagina(0);
+  };
+  return Promise.all(tandas.map(tanda)).then(function (rs) {
+    return rs.reduce(function (a, b) { return a.concat(b); }, []);
   });
 };
 

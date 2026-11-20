@@ -691,28 +691,31 @@ function estandarUva(lista: Fila[], zona: string, fundo: string, planta: string)
   return mejor;
 }
 
-/** Comentarios de Arándano (mismo orden que RES.OBS de ciclos/js/resumen.js). */
-const OBS_CICLOS: [string, string][] = [['obs_cosecha', 'Cosecha'], ['obs_jaba', 'Jabero'], ['obs_moto', 'Moto'],
-  ['obs_traslado_ca', 'Traslado C.A.'], ['obs_jabas_2', 'Descarga'], ['obs_camion', 'Camión'],
-  ['obs_traslado_planta', 'Traslado planta'], ['obs_cs', 'C. Sombra'], ['obs_ca', 'C. Acopio']];
+/** Comentario de Arándano que va a la derecha de cada tramo en Ciclos_BD (v18). */
+const OBS_TRAMO: Record<string, string> = {
+  t_cosecha: 'obs_cosecha', t_jabero: 'obs_jaba', t_estadia_cs: 'obs_cs', t_carga_moto: 'obs_moto',
+  t_traslado_ca: 'obs_traslado_ca', t_descarga_ca: 'obs_jabas_2', t_estadia_ca: 'obs_ca',
+  t_carga_camion: 'obs_camion', t_traslado_planta: 'obs_traslado_planta',
+};
 
 const UVA_BASE = ['ID', 'Registrado por', 'Equipo'];
 const UVA_BD = ['SEMANA', 'FECHA', 'CAMPAÑA', 'ZONA', 'FUNDO', 'LOTE', 'SUBLOTE', 'PASADA', 'COLOR', 'VARIEDAD', 'GRUPO',
-  'INICIO COSECHA', 'FIN COSECHA', 'T. Cosecha', 'T. espera traslado de jaba', 'INICIO TRASLADO DE JABA', 'FIN TRASLADO DE JABA', 'T. traslado jaba a pallet',
-  'INICIO ARMADO PALLET', 'FIN ARMADO PALLET', 'N° JABAS', 'T. armado pallet', 'T. espera lecturado', 'INICIO LECTURADO', 'FIN LECTURADO', 'T. Lecturado',
-  'T. espera enzunchado', 'INICIO ENZUNCHADO', 'FIN ENZUNCHADO', 'T. enzunchado', 'N° de zunchos', 'T. espera portabin', 'INICIO PORTABIN', 'FIN PORTABIN', 'T. portabin',
-  'T. espera carga', 'Placa de camión', 'INICIO CARGA', 'FIN CARGA', 'T. carga', 'N° pallet totales', 'N° de pallet cargados', 'T. espera traslado',
-  'T. CONFORMACIÓN DE CARGA', 'INICIO TRASLADO', 'FIN TRASLADO', 'T. traslado', 'PLANTA'];
+  'INICIO COSECHA', 'FIN COSECHA', 'T. Cosecha', 'Comentario cosecha', 'T. espera traslado de jaba', 'INICIO TRASLADO DE JABA', 'FIN TRASLADO DE JABA', 'T. traslado jaba a pallet', 'Comentario traslado jaba a pallet',
+  'INICIO ARMADO PALLET', 'FIN ARMADO PALLET', 'N° JABAS', 'T. armado pallet', 'Comentario armado pallet', 'T. espera lecturado', 'INICIO LECTURADO', 'FIN LECTURADO', 'T. Lecturado', 'Comentario lecturado',
+  'T. espera enzunchado', 'INICIO ENZUNCHADO', 'FIN ENZUNCHADO', 'T. enzunchado', 'Comentario enzunchado', 'N° de zunchos', 'T. espera portabin', 'INICIO PORTABIN', 'FIN PORTABIN', 'T. portabin', 'Comentario portabin',
+  'T. espera carga', 'Placa de camión', 'INICIO CARGA', 'FIN CARGA', 'T. carga', 'Comentario carga', 'N° pallet totales', 'N° de pallet cargados', 'T. espera traslado',
+  'T. CONFORMACIÓN DE CARGA', 'INICIO TRASLADO', 'FIN TRASLADO', 'T. traslado', 'Comentario traslado', 'PLANTA'];
 const UVA_EXTRA = ['T. CICLO TOTAL', 'Meta ciclo (min)', 'En meta', 'Atípico', 'Min. esperas', 'Etapa más lenta', 'Mayor espera antes de', 'Pallet',
   'Observación', 'Creado', 'Modificado', 'Recibido', 'Estado', 'Etapa actual', 'Situación', 'Desde',
   'Ámbito', 'Permisos (perfil · versión)', 'Trazabilidad permisos', 'Estándar traslado (min)', 'Traslado sobre estándar'];
-const UVA_PLANTA = ['Origen', 'HORA LLEGADA CAMIÓN', 'HORA RECEPCIÓN', 'T. espera recepción', 'INICIO DESCARGA', 'T. espera descarga',
-  'FIN DESCARGA', 'T. descarga', 'INICIO ABASTECIMIENTO', 'T. espera abastecimiento', 'LÍNEA ABASTECIMIENTO', 'PLANTA RECEPCIÓN',
-  'T. EN PLANTA', 'T. fin carga → llegada planta', 'T. CICLO COMPLETO', 'Registrado en planta por', 'Observación planta', 'Causas planta'];
+const UVA_PLANTA = ['Origen', 'HORA LLEGADA CAMIÓN', 'HORA RECEPCIÓN', 'T. espera recepción', 'Comentario espera recepción', 'INICIO DESCARGA',
+  'T. espera descarga', 'Comentario espera descarga', 'FIN DESCARGA', 'T. descarga', 'Comentario descarga', 'INICIO ABASTECIMIENTO',
+  'T. espera abastecimiento', 'Comentario espera abastecimiento', 'LÍNEA ABASTECIMIENTO', 'PLANTA RECEPCIÓN',
+  'T. EN PLANTA', 'T. fin carga → llegada planta', 'Comentario llegada a planta', 'T. CICLO COMPLETO', 'Registrado en planta por', 'Observación planta'];
 /** Datos de la etapa Carga (desde 0057, al final para no mover las columnas del dashboard). */
 const UVA_CARGA = ['N° pallets cargados (carga)', 'N° pallets total (carga)', 'Último en editar'];
-/** Notas escritas en la app y origen de la llegada (desde 0063, al final para no mover columnas). */
-const UVA_NOTAS = ['Comentarios de etapas (campo)', 'Llegada marcada por', 'Llegada tomada del ciclo'];
+/** Origen de la llegada (desde 0063). Los comentarios van a la derecha de cada «T.» (v18). */
+const UVA_NOTAS = ['Llegada marcada por', 'Llegada tomada del ciclo'];
 const UVA_ETAPAS = ['Semana', 'Fecha', 'Zona', 'Fundo', 'Lote', 'Variedad', 'Grupo', 'Planta', 'Estado', 'N°', 'Etapa', 'Inicio', 'Fin',
   'Minutos', 'Espera previa (min)', 'Meta (min)', 'En meta', 'Causa de demora', 'Comentario', 'Hora editada', 'Recibido'];
 /** Marcas de planta como «etapas» 9…13 de la hoja Etapas: [nombre, desde, hasta, tramo, clave de detalle]. */
@@ -724,13 +727,9 @@ const UVA_ETAPAS_PLANTA: [string, string, string, string, string][] = [
   ['Espera de abastecimiento a línea', 'fin_descarga', 'ini_abastecimiento', 't_espera_abastecimiento', 'abast'],
 ];
 
-/** Causa y comentario de cada etapa de campo en una sola celda: «7. Carga: Falta de camión - esperó guía | …». */
-function notasDe(et: Fila[]): string {
-  return et.map((x) => {
-    const t = [x.causa, x.comentario ?? x.com].map((v) => String(v ?? '').trim()).filter(Boolean).join(' - ');
-    return t ? (x.n ? x.n + '. ' : '') + (x.etapa || '') + ': ' + t : '';
-  }).filter(Boolean).join(' | ');
-}
+/** Comentario de una etapa o marca: «causa - comentario» (cada uno en su columna, junto a su «T.»). */
+const notaDe = (x: Fila | undefined): string => !x ? '' :
+  [x.causa, x.comentario ?? x.com].map((v) => String(v ?? '').trim()).filter(Boolean).join(' - ');
 
 function pestanasUva(d: UvaDatos | null): Pestana[] {
   if (!d) return [];
@@ -749,30 +748,28 @@ function pestanasUva(d: UvaDatos | null): Pestana[] {
     const base = [f.id, esPlanta ? (f.planta_usuario || f.registrador || '') : (f.registrador || ''), esPlanta ? 'INTEGRA-PLANTA' : (f.dispositivo || '')];
     const bd = [vNum(f.semana ?? r.semana), serialF(f.fecha || r.fecha), r.campana || f.campana || '', zona, fundo, r.lote || f.lote || '', r.sublote || '',
       vNum(r.pasada), r.color || '', r.variedad || f.variedad || '', r.grupo || f.grupo || '',
-      H(E(0).inicio), H(E(0).fin), vNum(E(0).minutos), vNum(E(1).espera), H(E(1).inicio), H(E(1).fin), vNum(E(1).minutos),
-      H(E(2).inicio), H(E(2).fin), vNum(r.jabas), vNum(E(2).minutos), vNum(E(3).espera), H(E(3).inicio), H(E(3).fin), vNum(E(3).minutos),
-      vNum(E(4).espera), H(E(4).inicio), H(E(4).fin), vNum(E(4).minutos), vNum(r.zunchos), vNum(E(5).espera), H(E(5).inicio), H(E(5).fin), vNum(E(5).minutos),
-      vNum(E(6).espera), f.placa || r.placa || '', H(E(6).inicio), H(E(6).fin), vNum(E(6).minutos), vNum(r.palletsTot), vNum(r.palletsCarg), vNum(E(7).espera),
-      vNum(r.minConformacion), H(E(7).inicio), H(E(7).fin), vNum(E(7).minutos), planta];
+      H(E(0).inicio), H(E(0).fin), vNum(E(0).minutos), notaDe(E(0)), vNum(E(1).espera), H(E(1).inicio), H(E(1).fin), vNum(E(1).minutos), notaDe(E(1)),
+      H(E(2).inicio), H(E(2).fin), vNum(r.jabas), vNum(E(2).minutos), notaDe(E(2)), vNum(E(3).espera), H(E(3).inicio), H(E(3).fin), vNum(E(3).minutos), notaDe(E(3)),
+      vNum(E(4).espera), H(E(4).inicio), H(E(4).fin), vNum(E(4).minutos), notaDe(E(4)), vNum(r.zunchos), vNum(E(5).espera), H(E(5).inicio), H(E(5).fin), vNum(E(5).minutos), notaDe(E(5)),
+      vNum(E(6).espera), f.placa || r.placa || '', H(E(6).inicio), H(E(6).fin), vNum(E(6).minutos), notaDe(E(6)), vNum(r.palletsTot), vNum(r.palletsCarg), vNum(E(7).espera),
+      vNum(r.minConformacion), H(E(7).inicio), H(E(7).fin), vNum(E(7).minutos), notaDe(E(7)), planta];
     const std = esPlanta ? null : estandarUva(d.traslados, zona, fundo, planta);
     const tTra = E(7).minutos;
     const traza = f.origen === 'integra' ? 'INTEGRA' : esPlanta ? '' :
       !r.permisosVersion ? 'SIN PERMISOS' : (r.permisosHash !== r.permisosFirma ? 'EDITADO EN EL EQUIPO' : 'OK');
     const extra = [vNum(r.minTotal), vNum(r.metaTotal), r.enMeta || '', r.atipico || '', vNum(r.minEsperas), r.lenta || '', r.mayorEspera || '', r.pallet || f.pallet || '',
-      r.observacion || notasDe(et), H(r.creado || f.planta_inicio), H(r.modificado || f.planta_actualizado), H(f.campo_recibido || f.planta_actualizado),
+      r.observacion || '', H(r.creado || f.planta_inicio), H(r.modificado || f.planta_actualizado), H(f.campo_recibido || f.planta_actualizado),
       esPlanta ? (f.estado || 'En proceso') : (r.estado || 'Cerrado'), r.etapaActual || '', r.situacion || '', H(r.desde),
       f.ambito, f.origen === 'integra' ? 'Integra' : (r.permisosVersion ? (r.permisosPerfil || 'Sin nombre') + ' · v' + r.permisosVersion : ''), traza,
       std ?? '', std && tTra !== '' && tTra !== null && tTra !== undefined ? (Number(tTra) > std ? 'Sí' : 'No') : ''];
     const det: Fila = f.planta_detalle || {};
-    const causas = UVA_ETAPAS_PLANTA.map(([n, , , , k]) => det[k] && (det[k].causa || det[k].com) ? n + ': ' + [det[k].causa, det[k].com].filter(Boolean).join(' - ') : '')
-      .filter(Boolean).join(' | ');
-    const pl = [origenTxt(f.origen), H(f.hora_llegada), H(f.hora_recepcion), vNum(f.t_espera_recepcion), H(f.ini_descarga), vNum(f.t_espera_descarga),
-      H(f.fin_descarga), vNum(f.t_descarga), H(f.ini_abastecimiento), vNum(f.t_espera_abastecimiento), f.linea || '', MU(f.planta_destino),
-      vNum(f.t_en_planta), vNum(f.t_llegada_desde_carga), vNum(f.t_ciclo_completo), f.planta_usuario || '', f.planta_obs || causas, causas];
-    const notasCampo = notasDe(et);
+    const pl = [origenTxt(f.origen), H(f.hora_llegada), H(f.hora_recepcion), vNum(f.t_espera_recepcion), notaDe(det.rec), H(f.ini_descarga),
+      vNum(f.t_espera_descarga), notaDe(det.idesc), H(f.fin_descarga), vNum(f.t_descarga), notaDe(det.fdesc), H(f.ini_abastecimiento),
+      vNum(f.t_espera_abastecimiento), notaDe(det.abast), f.linea || '', MU(f.planta_destino),
+      vNum(f.t_en_planta), vNum(f.t_llegada_desde_carga), notaDe(det.lleg), vNum(f.t_ciclo_completo), f.planta_usuario || '', f.planta_obs || ''];
     const porTxt = ({ campo: 'Campo', planta: 'Planta', camion: 'Mismo camión (placa ± 30 min)' } as Record<string, string>)[f.llegada_por] || '';
     regs.push([...base, ...bd, ...extra, ...pl, vNum(r.cargaCarg), vNum(r.cargaTot), r.editadoPor || '',
-      notasCampo, porTxt, f.llegada_ref || '']);
+      porTxt, f.llegada_ref || '']);
 
     const comun = (n: unknown, etapa: string) => [...base, vNum(f.semana ?? r.semana), serialF(f.fecha || r.fecha), zona, fundo, r.lote || f.lote || '',
       r.variedad || f.variedad || '', r.grupo || f.grupo || '', planta, esPlanta ? (f.estado || '') : (r.estado || 'Cerrado'), n, etapa];
@@ -889,28 +886,23 @@ Deno.serve(async (req) => {
       TX('fecha', 'Fecha'), NU('semana', 'Semana', 0), TX('codigo', 'Código'), TX('fundo', 'Fundo'), TX('lote', 'Lote'),
       TX('lider', 'Líder de grupo'), TX('presentacion', 'Presentación'), TX('variedad', 'Variedad'), TX('calibre', 'Calibre'),
       TS('inicio_cosecha', 'Inicio cosecha'), TS('fin_cosecha', 'Fin cosecha'),
-      TS('inicio_jabero', 'Inicio jabero'), TS('fin_jabero', 'Fin jabero'), NU('num_jabas', 'N° jabas'), TX('obs_jaba', 'Obs. jaba'),
+      TS('inicio_jabero', 'Inicio jabero'), TS('fin_jabero', 'Fin jabero'), NU('num_jabas', 'N° jabas'),
       TX('placa', 'Placa motocarga'), TS('hora_llegada_moto', 'Llegada motocarga'), TS('inicio_carga_moto', 'Inicio carga moto'), TS('fin_carga_moto', 'Fin carga moto'),
       NU('jabas_bandeja', 'Jabas bandeja'), NU('jabas_jarra', 'Jabas jarra 0.5 kg'), NU('jabas_bulk', 'Jabas bulk 3.5'),
-      TS('inicio_traslado_ca', 'Inicio traslado C.A.'), TX('obs_traslado_ca', 'Obs. traslado C.A.'), TS('fin_traslado_ca', 'Fin traslado C.A.'),
-      NU('num_jabas_2', 'N° jabas (2)'), TX('obs_jabas_2', 'Obs. jabas (2)'),
+      TS('inicio_traslado_ca', 'Inicio traslado C.A.'), TS('fin_traslado_ca', 'Fin traslado C.A.'),
+      NU('num_jabas_2', 'N° jabas (2)'),
       TS('inicio_descarga_ca', 'Inicio descarga C.A.'), TS('fin_descarga_ca', 'Fin descarga C.A.'),
       NU('num_pallets', 'N° pallets'), TX('presentaciones', 'Presentaciones'), TX('placa_camion', 'Placa camión'),
       TS('inicio_carga_camion', 'Inicio carga camión'), TS('fin_carga_camion', 'Fin carga camión'),
-      TS('inicio_traslado_planta', 'Inicio traslado planta'), TX('obs_traslado_planta', 'Obs. traslado planta'), TS('fin_traslado_planta', 'Fin traslado planta'),
-      TX('obs_cs', 'Obs. Casa Sombra'), TX('tareadora', 'Tareadora'), TX('obs_ca', 'Obs. C. Acopio'),
-      ...TRAMOS.map(([k, t]) => DU(k, 'T. ' + t + ' (min:seg)')),
+      TS('inicio_traslado_planta', 'Inicio traslado planta'), TS('fin_traslado_planta', 'Fin traslado planta'),
+      TX('tareadora', 'Tareadora'),
+      // Cada tramo con su comentario a la derecha (sin juntar comentarios en una celda).
+      ...TRAMOS.flatMap(([k, t]): Col[] => OBS_TRAMO[k] ? [DU(k, 'T. ' + t + ' (min:seg)'), TX(OBS_TRAMO[k], 'Comentario ' + t)] : [DU(k, 'T. ' + t + ' (min:seg)')]),
       DU('t_ciclo_total', 'T. ciclo total (min:seg)'),
       ['Horas', (f) => (f.t_ciclo_total === null || f.t_ciclo_total === undefined) ? '' : num(Number(f.t_ciclo_total) / 60)],
       ['Estado', (f) => f.cerrado ? 'Cerrado' : 'En curso'],
       ['Registrado por', (f) => quien(f.creado_por)], TS('creado_en', 'Creado'), TS('actualizado_en', 'Actualizado'),
       TX('cultivo', 'Cultivo'),
-      // Comentarios que faltaban (0033) y todos juntos en una celda; al final para no mover columnas.
-      TX('obs_cosecha', 'Obs. cosecha'), TX('obs_moto', 'Obs. motocarga'), TX('obs_camion', 'Obs. carga camión'),
-      ['Comentarios (todas las etapas)', (f) => OBS_CICLOS.map(([k, t]) => {
-        const v = String(f[k] ?? '').trim();
-        return v ? t + ': ' + v : '';
-      }).filter(Boolean).join(' | ')],
     ];
     const colsResumen: Col[] = [
       ['Semana', (f) => f._semana], TX('fundo', 'Fundo'), NU('n_muestras', 'N° muestras', 0),
